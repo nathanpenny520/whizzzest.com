@@ -1,0 +1,11 @@
+# 构建产物
+dist/
+
+# 本地参考：旧站源码克隆（勿提交）
+reference/
+
+# 依赖与本地状态
+node_modules/
+.wrangler/
+.dev.vars
+.DS_Store
