@@ -1,0 +1,34 @@
+<!-- {"title":"烟花产业 — 焰境·万载","description":"中国四大花炮主产区之一，1400 余年烟花爆竹生产史。从千年窑火到科技升级、文旅融合，读懂万载花炮产业。","ogImage":"/assets/img/wanzaihuapao.jpg"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <h1>{{data.hero.title}}</h1>
+      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    </section>
+
+    <section class="section" style="padding-top: 24px;">
+      <div class="container">
+        {{#each data.sections as s}}
+        <article class="split reveal">
+          <div class="split-media">
+            <img src="/assets/img/{{s.img}}" alt="{{s.title}}" loading="lazy" decoding="async">
+          </div>
+          <div class="split-body">
+            <span class="kicker">0{{@index}} · 产业</span>
+            <h3>{{s.title}}</h3>
+            {{#each s.paras as p}}<p>{{p}}</p>{{/each}}
+          </div>
+        </article>
+        {{/each}}
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

@@ -1,0 +1,19 @@
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-about">
+      <h3>{{site.footer.aboutTitle}}</h3>
+      <p>{{site.footer.aboutDesc}}</p>
+      <p>{{site.footer.contact}}：<a href="mailto:{{site.email}}">{{site.email}}</a></p>
+    </div>
+    <nav class="footer-links" aria-label="友情链接">
+      <h3>友情链接</h3>
+      <ul>
+        {{#each site.footer.friendLinks}}<li><a href="{{item.href}}" target="_blank" rel="noopener">{{item.label}}</a></li>{{/each}}
+      </ul>
+    </nav>
+  </div>
+  <div class="container footer-legal">
+    <p>Copyright © <span class="js-year">2026</span> {{site.name}}</p>
+    {{#each site.footer.icpLines}}<p><a href="{{site.footer.beianHref}}" target="_blank" rel="noopener">{{item}}</a></p>{{/each}}
+  </div>
+</footer>

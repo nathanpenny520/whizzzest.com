@@ -1,0 +1,53 @@
+<!-- {"title":"赏烟地点 — 焰境·万载","description":"万载古城、龙湖公园——最佳烟花观赏点位、观赏建议与交通指南。每周六晚八点，焰火之吻如约而至。","ogImage":"/assets/img/viewingspots_hero.jpeg"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <h1>{{data.hero.title}}</h1>
+      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    </section>
+
+    <section class="section" style="padding-top: 24px;">
+      <div class="container-wide">
+        <div class="grid" style="gap: 48px;">
+          {{#each data.spots as spot}}
+          <article class="route-card reveal">
+            <img class="route-media" src="/assets/img/{{spot.img}}" alt="{{spot.name}}" loading="lazy" decoding="async">
+            <div class="route-body">
+              <h3>{{spot.name}}</h3>
+              <p style="margin-top:12px; color: var(--c-text-2);">{{spot.desc}}</p>
+              <div class="chip-row">
+                <span class="chip-label">观赏点位</span>
+                <span class="chip">{{spot.viewing}}</span>
+              </div>
+              <div class="chip-row">
+                <span class="chip-label">交通</span>
+                <span class="chip">{{spot.transport}}</span>
+              </div>
+            </div>
+          </article>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>观赏贴士</h2>
+        </div>
+        <div class="prose reveal">
+          <p>{{data.bestViewing}}</p>
+          <p>{{data.transportation}}</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

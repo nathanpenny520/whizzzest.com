@@ -1,0 +1,58 @@
+<!-- {"title":"关于 — 焰境·万载","description":"焰境·万载——以「中国花炮之乡」千年烟花文化为核心的万载数字文旅站。联系我们：whizzzest@outlook.com","ogImage":"/assets/img/site_intro_1.jpg"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <h1>{{data.title}}</h1>
+      <p class="hero-sub">{{data.desc}}</p>
+    </section>
+
+    <section class="section" style="padding-top: 24px;">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.contact}}</h2>
+        </div>
+        <div style="text-align:center;">
+          <a class="btn" href="mailto:{{data.email}}">{{data.email}}</a>
+        </div>
+
+        <div class="section-head reveal" style="margin-top: 88px;">
+          <h2>关注我们</h2>
+        </div>
+        <div class="qr-grid reveal">
+          {{#each data.codes as code}}
+          <div class="qr-card">
+            <img src="/assets/img/{{code.img}}" alt="{{code.name}}二维码" loading="lazy" decoding="async">
+            <p>{{code.name}}</p>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container-wide">
+        <div class="section-head reveal">
+          <h2>链接</h2>
+        </div>
+        <div class="chip-row reveal" style="justify-content:center; gap: 28px;">
+          {{#each data.links as link}}
+          <a class="btn-text" href="{{link.href}}" target="_blank" rel="noopener">{{link.label}} ↗</a>
+          {{/each}}
+        </div>
+        <div class="gallery reveal" style="margin-top: 64px;">
+          {{#each data.gallery as g}}
+          <img src="/assets/img/{{g.img}}" alt="{{g.alt}}" loading="lazy" decoding="async">
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

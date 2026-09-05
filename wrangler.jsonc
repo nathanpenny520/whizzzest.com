@@ -1,0 +1,11 @@
+{
+  // 焰境·万载 — Workers Static Assets（方案 §4 / §9）
+  // 部署前注意：whizzzest.com zone 归属 nathanpenny@qq.com 账号，
+  // 本机 wrangler 当前登录的是 gmail 账号，P5 时需先 `wrangler login` 切换。
+  "name": "whizzzest",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}

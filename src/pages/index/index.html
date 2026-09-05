@@ -1,0 +1,68 @@
+<!-- {"title":"焰境·万载 — 一朝相逢，便是万载","description":"探索千年烟花文化，体验非遗魅力，品味特色美食，领略万载风光。中国花炮之乡·江西万载。","ogImage":"/assets/img/longhu_yanhuowanhui.jpeg"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/longhu_yanhuowanhui.jpeg" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+        <p class="hero-cta"><a class="btn btn-light" href="/tourism/">{{data.hero.cta}}</a></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.featuresTitle}}</h2>
+        </div>
+        <div class="grid grid-3">
+          {{#each data.features as f}}
+          <div class="feature-card reveal">
+            <span class="feature-no">0{{@index}}</span>
+            <h3>{{f.title}}</h3>
+            <p>{{f.desc}}</p>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container-wide">
+        <div class="section-head reveal">
+          <h2>风物万载</h2>
+          <p>从千年窑火到人间烟火，每一面都值得亲历。</p>
+        </div>
+        <div class="grid grid-3">
+          {{#each data.teasers as t}}
+          <a class="card reveal" href="{{t.href}}">
+            <img class="card-media" src="/assets/img/{{t.img}}" alt="{{t.title}}" loading="lazy" decoding="async">
+            <div class="card-body">
+              <h3>{{t.title}}</h3>
+              <p>{{t.desc}}</p>
+            </div>
+          </a>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-band section-alt">
+      <div class="reveal">
+        <h2>{{data.cta.title}}</h2>
+        <p>{{data.cta.desc}}</p>
+        <a class="btn" href="/tourism/">{{data.cta.viewRoutes}}</a>
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

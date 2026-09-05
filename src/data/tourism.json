@@ -1,0 +1,108 @@
+{
+  "hero": {
+    "title": "旅游线路",
+    "subtitle": "精选万载旅游路线"
+  },
+  "cta": {
+    "title": "开始您的万载之旅",
+    "desc": "选择适合您的旅游线路，体验万载的千年文化、自然风光和红色根基。",
+    "cta": "查看赏烟地点"
+  },
+  "routes": [
+    {
+      "key": "ancient",
+      "title": "古城文化之旅",
+      "img": "guc_wenhua_tra.jpg",
+      "schedule": [
+        {
+          "time": "上午",
+          "desc": "上午：抵达万载，游览万载古城，参观古祠堂群、历史文化馆、宗祠文化馆、国学文化馆"
+        },
+        {
+          "time": "中午",
+          "desc": "中午：在万载厨房（古城店）品尝万载特色美食"
+        },
+        {
+          "time": "下午",
+          "desc": "下午：体验夏布织造技艺，观看得胜鼓表演"
+        },
+        {
+          "time": "晚上",
+          "desc": "晚上：观看\"焰火之吻\"烟花秀，品尝万载夜市美食"
+        }
+      ]
+    },
+    {
+      "key": "mountain",
+      "title": "山水文化之旅",
+      "img": "sanshiba_pool.jpeg",
+      "schedule": [
+        {
+          "time": "上午",
+          "desc": "上午：游览竹山洞景区、万载恒晖艺术农业景区"
+        },
+        {
+          "time": "中午",
+          "desc": "中午：品尝农家菜，品尝万载味道"
+        },
+        {
+          "time": "下午",
+          "desc": "下午：游览九龙原始森林，在漂流中感受自然风光"
+        },
+        {
+          "time": "晚上",
+          "desc": "晚上：在龙湖公园看花炮文化节，感受夜幕下坠落的\"流星\""
+        }
+      ]
+    },
+    {
+      "key": "red",
+      "title": "红色文化之旅",
+      "img": "hongs_wenhua_tra.jpg",
+      "schedule": [
+        {
+          "time": "上午",
+          "desc": "上午：参观湘鄂赣革命纪念馆，万载革命烈士纪念馆"
+        },
+        {
+          "time": "中午",
+          "desc": "中午：体验红军餐，感受先辈精神"
+        },
+        {
+          "time": "下午",
+          "desc": "下午：参观仙源湘鄂赣革命根据地旧址群，重走红军小道"
+        },
+        {
+          "time": "晚上",
+          "desc": "晚上：欣赏非遗展演，观看烟花秀，品尝万载特色美食"
+        }
+      ]
+    }
+  ],
+  "gallery": [
+    {
+      "img": "guchen_niaokan.jpeg",
+      "alt": "万载古城鸟瞰"
+    },
+    {
+      "img": "guchen_xuejing.png",
+      "alt": "古城雪景"
+    },
+    {
+      "img": "sanshiba_pool.jpeg",
+      "alt": "三十把水库"
+    },
+    {
+      "img": "xianyuanyanxue.jpg",
+      "alt": "仙源红色研学"
+    },
+    {
+      "img": "mountains.jpeg",
+      "alt": "九龙原始森林"
+    },
+    {
+      "img": "longhu_yanhuowanhui.jpeg",
+      "alt": "龙湖烟花晚会"
+    }
+  ]
+}

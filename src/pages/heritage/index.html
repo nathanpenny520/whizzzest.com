@@ -1,0 +1,34 @@
+<!-- {"title":"非遗文化 — 焰境·万载","description":"万载花炮制作技艺、得胜鼓、开口傩、夏布织造、纸棚山歌——探秘江西万载国家级非物质文化遗产。","ogImage":"/assets/img/kaikounuo.jpeg"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <h1>{{data.hero.title}}</h1>
+      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    </section>
+
+    <section class="section" style="padding-top: 24px;">
+      <div class="container">
+        {{#each data.sections as s}}
+        <article class="split reveal">
+          <div class="split-media">
+            <img src="/assets/img/{{s.img}}" alt="{{s.title}}" loading="lazy" decoding="async">
+          </div>
+          <div class="split-body">
+            <span class="kicker">0{{@index}} · 非遗</span>
+            <h3>{{s.title}}</h3>
+            {{#each s.paras as p}}<p>{{p}}</p>{{/each}}
+          </div>
+        </article>
+        {{/each}}
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

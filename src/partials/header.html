@@ -1,0 +1,18 @@
+<a class="skip-link" href="#main">跳到主要内容</a>
+<header class="nav">
+  <nav class="nav-inner" aria-label="主导航">
+    <a class="nav-logo" href="/" aria-label="焰境·万载 首页">焰境·万载</a>
+    <button class="nav-burger" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="nav-drawer">
+      <span class="nav-burger-line" aria-hidden="true"></span>
+      <span class="nav-burger-line" aria-hidden="true"></span>
+    </button>
+    <ul class="nav-menu" aria-label="站内页面">
+      {{#each site.nav}}<li class="nav-item"><a class="nav-link" href="{{item.href}}">{{item.label}}</a></li>{{/each}}
+    </ul>
+  </nav>
+</header>
+<div class="nav-drawer" id="nav-drawer">
+  <ul class="nav-drawer-list" aria-label="站内页面">
+    {{#each site.nav}}<li class="nav-drawer-item"><a class="nav-link" href="{{item.href}}">{{item.label}}</a></li>{{/each}}
+  </ul>
+</div>

@@ -1,0 +1,50 @@
+<!-- {"title":"旅游线路 — 焰境·万载","description":"古城文化之旅、山水文化之旅、红色文化之旅——万载古城、竹山洞、九龙原始森林，一站式游玩攻略。","ogImage":"/assets/img/guchen_niaokan.jpeg"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <h1>{{data.hero.title}}</h1>
+      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    </section>
+
+    <section class="section" style="padding-top: 24px;">
+      <div class="container-wide">
+        <div class="grid" style="gap: 48px;">
+          {{#each data.routes as route}}
+          <article class="route-card reveal">
+            <img class="route-media" src="/assets/img/{{route.img}}" alt="{{route.title}}" loading="lazy" decoding="async">
+            <div class="route-body">
+              <h3>{{route.title}}</h3>
+              <ul class="timeline">
+                {{#each route.schedule as step}}
+                <li><span class="time">{{step.time}}</span><span>{{step.desc}}</span></li>
+                {{/each}}
+              </ul>
+            </div>
+          </article>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container-wide">
+        <div class="section-head reveal">
+          <h2>万载风光</h2>
+        </div>
+        <div class="gallery reveal">
+          {{#each data.gallery as g}}
+          <img src="/assets/img/{{g.img}}" alt="{{g.alt}}" loading="lazy" decoding="async">
+          {{/each}}
+        </div>
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>
