@@ -378,17 +378,45 @@ async function sendEmailCode(request, env, user) {
 
 async function sendCodeEmail(env, email, code, purpose) {
   const action = purpose === 'bind' ? '绑定商户中心邮箱' : '登录焰境好店商户中心';
+  // 邮件端兼容：全内联样式 + table 布局 + 绝对地址图片/链接（站点 logo 为 public/logo.png）
+  const FONT = "-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif";
   await sendMail({
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
     to: email,
     fromName: '焰境·万载商户中心',
     subject: '验证码（10 分钟内有效）',
-    html: `<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:480px;margin:0 auto;padding:28px 24px;color:#1d1d1f">
-  <p style="font-size:15px">你正在进行<b>${action}</b>操作，验证码：</p>
-  <p style="font-size:34px;font-weight:700;letter-spacing:8px;color:#d64524;margin:18px 0">${code}</p>
-  <p style="font-size:13px;color:#6e6e73">验证码 10 分钟内有效，请勿泄露给他人。若非本人操作，请忽略本邮件。</p>
-  <p style="font-size:12px;color:#86868b;margin-top:22px">焰境·万载 · 焰境好店 merchant.whizzzest.com</p>
+    html: `<div style="margin:0;padding:32px 16px;background:#f5f5f7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:20px;">
+  <tr><td style="padding:30px 36px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="padding-right:10px;vertical-align:middle;"><img src="https://whizzzest.com/logo.png" width="30" height="30" alt="焰境·万载" style="display:block;border:0;"></td>
+      <td style="vertical-align:middle;font-family:${FONT};font-size:17px;font-weight:600;color:#1d1d1f;">焰境·万载 · 焰境好店</td>
+    </tr></table>
+    <div style="margin-top:24px;font-family:${FONT};font-size:15px;color:#1d1d1f;line-height:1.7;">你正在进行<b>${action}</b>操作，验证码：</div>
+  </td></tr>
+  <tr><td align="center" style="padding:16px 36px 4px;">
+    <div style="font-family:${FONT};font-size:42px;font-weight:700;letter-spacing:12px;color:#d64524;">${code}</div>
+  </td></tr>
+  <tr><td style="padding:8px 36px 0;">
+    <div style="font-family:${FONT};font-size:13px;color:#6e6e73;line-height:1.8;">验证码 10 分钟内有效，请勿泄露给他人。<br>若非本人操作，请忽略本邮件。</div>
+  </td></tr>
+  <tr><td align="center" style="padding:26px 36px 6px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="background:#d64524;border-radius:980px;">
+        <a href="https://merchant.whizzzest.com/dashboard" style="display:inline-block;padding:11px 34px;font-family:${FONT};font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">前往商户中心</a>
+      </td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:16px 36px 30px;">
+    <div style="font-family:${FONT};font-size:12px;color:#86868b;line-height:1.8;">按钮无法点击？复制链接打开：<a href="https://merchant.whizzzest.com/dashboard" style="color:#d64524;text-decoration:none;">merchant.whizzzest.com/dashboard</a></div>
+  </td></tr>
+  <tr><td style="padding:16px 36px;background:#fafafc;border-top:1px solid rgba(0,0,0,.06);border-radius:0 0 20px 20px;">
+    <div style="font-family:${FONT};font-size:12px;color:#86868b;line-height:1.9;">焰境·万载 · 焰境好店（<a href="https://whizzzest.com/" style="color:#86868b;text-decoration:none;">whizzzest.com</a>）｜ 联系：<a href="mailto:contact@whizzzest.com" style="color:#86868b;">contact@whizzzest.com</a><br>本邮件由系统自动发送，请勿直接回复。</div>
+  </td></tr>
+</table>
+</td></tr></table>
 </div>`,
   });
 }
