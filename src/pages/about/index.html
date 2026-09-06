@@ -110,19 +110,26 @@
         <div class="section-head reveal">
           <h2>{{data.contact.title}}</h2>
         </div>
-        <div class="grid grid-3">
-          {{#each data.contact.channels as ch}}
-          <div class="feature-card contact-card reveal">
-            <p class="contact-label">{{ch.label}}</p>
-            {{#if ch.qr}}
-            <img class="contact-qr" src="/assets/img/{{ch.qr}}" alt="{{ch.label}}二维码" loading="lazy" decoding="async">
-            {{/if}}
-            <p class="contact-value">
-              {{#if ch.href}}<a href="{{ch.href}}" target="_blank" rel="noopener">{{ch.value}} ↗</a>{{/if}}
-              {{#unless ch.href}}{{ch.value}}{{/unless}}
-            </p>
+        <div class="contact-grid reveal">
+          <div class="qr-panel">
+            {{#each data.contact.qrs as qr}}
+            <figure class="qr-tile">
+              <img src="/assets/img/{{qr.qr}}" alt="{{qr.label}}二维码" loading="lazy" decoding="async">
+              <figcaption>
+                <strong>{{qr.label}}</strong>
+                <span>{{qr.value}}</span>
+              </figcaption>
+            </figure>
+            {{/each}}
           </div>
-          {{/each}}
+          <ul class="contact-links">
+            {{#each data.contact.links as link}}
+            <li>
+              <span class="link-label">{{link.label}}</span>
+              <a class="link-value" href="{{link.href}}" target="_blank" rel="noopener">{{link.value}} ↗</a>
+            </li>
+            {{/each}}
+          </ul>
         </div>
       </div>
     </section>

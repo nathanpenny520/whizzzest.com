@@ -101,50 +101,38 @@
   },
   "contact": {
     "title": "联系我们",
-    "emailLabel": "电子邮箱",
-    "email": "whizzzest@outlook.com",
-    "channels": [
-      {
-        "label": "电子邮箱",
-        "value": "whizzzest@outlook.com",
-        "href": "mailto:whizzzest@outlook.com",
-        "qr": ""
-      },
-      {
-        "label": "官方抖音",
-        "value": "焰境·万载",
-        "href": "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8",
-        "qr": ""
-      },
+    "qrs": [
       {
         "label": "微信公众号",
         "value": "云上万载-焰遇乡旅",
-        "href": "",
         "qr": "wxofficial.jpg"
-      },
-      {
-        "label": "在线咨询",
-        "value": "企业客服",
-        "href": "https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8",
-        "qr": ""
       },
       {
         "label": "微信视频号",
         "value": "焰境·万载",
-        "href": "",
         "qr": "videoaccount.jpeg"
+      }
+    ],
+    "links": [
+      {
+        "label": "电子邮箱",
+        "value": "whizzzest@outlook.com",
+        "href": "mailto:whizzzest@outlook.com"
+      },
+      {
+        "label": "官方抖音",
+        "value": "焰境·万载",
+        "href": "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8"
+      },
+      {
+        "label": "在线咨询",
+        "value": "企业客服",
+        "href": "https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8"
       },
       {
         "label": "小红书",
         "value": "焰境·万载",
-        "href": "https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4",
-        "qr": ""
-      },
-      {
-        "label": "万载文旅",
-        "value": "万载县文旅局",
-        "href": "",
-        "qr": "wanzai_wenlv_QR.jpeg"
+        "href": "https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4"
       }
     ]
   }

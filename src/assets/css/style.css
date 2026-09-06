@@ -1274,3 +1274,101 @@ button {
 @media (max-width: 700px) {
   .masonry { columns: 1; }
 }
+
+/* ---------------- 联系我们：二维码大图 + 链接列表 ---------------- */
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.qr-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.qr-tile {
+  background: var(--c-bg);
+  border-radius: var(--radius);
+  padding: 30px 24px;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.qr-tile img {
+  width: 100%;
+  max-width: 250px;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+.qr-tile figcaption {
+  margin-top: 18px;
+}
+
+.qr-tile strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.qr-tile span {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+
+.contact-links {
+  background: var(--c-bg);
+  border-radius: var(--radius);
+  padding: 10px 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.contact-links li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 21px 0;
+  border-bottom: 1px solid var(--c-hairline);
+}
+
+.contact-links li:last-child {
+  border-bottom: 0;
+}
+
+.link-label {
+  font-size: 15px;
+  color: var(--c-text-2);
+}
+
+.link-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--c-accent);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.link-value:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 833px) {
+  .contact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-links {
+    padding: 6px 24px;
+  }
+}

@@ -138,8 +138,7 @@ def main():
             "contact": f.get("contact", "联系我们"),
             "friendLinks": [
                 {"label": f.get("wanzaiGov", "万载县人民政府"), "href": "http://www.wanzai.gov.cn/"},
-                {"label": f.get("chinaFireworks", "中国烟花爆竹协会"), "href": "https://www.chinafireworks.org.cn/"},
-                {"label": "万载发布 · 抖音", "href": DOUYIN_OFFICIAL},
+                {"label": "作者个人主页", "href": "https://nathanpenny.fun"},
             ],
             "copyright": f.get("copyright", ""),
             "icpLines": [f["icp"]] if f.get("icp") else [],
@@ -284,15 +283,17 @@ def main():
         },
         "contact": {
             "title": contact["title"],
-            "emailLabel": contact["emailLabel"], "email": site["email"],
-            "channels": [
-                {"label": contact["emailLabel"], "value": site["email"], "href": f"mailto:{site['email']}", "qr": ""},
-                {"label": contact["douyinLabel"], "value": contact["douyin"], "href": DOUYIN_OFFICIAL, "qr": ""},
-                {"label": contact["wechatLabel"], "value": contact["wechat"], "href": "", "qr": "wxofficial.jpg"},
-                {"label": contact["serviceLabel"], "value": contact["service"], "href": WEIXIN_SERVICE, "qr": ""},
-                {"label": contact["videoLabel"], "value": contact["video"], "href": "", "qr": "videoaccount.jpeg"},
-                {"label": contact["xiaohongshuLabel"], "value": contact["xiaohongshu"], "href": XIAOHONGSHU, "qr": ""},
-                {"label": "万载文旅", "value": "万载县文旅局", "href": "", "qr": "wanzai_wenlv_QR.jpeg"},
+            # 二维码类（大图展示）
+            "qrs": [
+                {"label": contact["wechatLabel"], "value": contact["wechat"], "qr": "wxofficial.jpg"},
+                {"label": contact["videoLabel"], "value": contact["video"], "qr": "videoaccount.jpeg"},
+            ],
+            # 链接类（列表行）
+            "links": [
+                {"label": contact["emailLabel"], "value": site["email"], "href": f"mailto:{site['email']}"},
+                {"label": contact["douyinLabel"], "value": contact["douyin"], "href": DOUYIN_OFFICIAL},
+                {"label": contact["serviceLabel"], "value": contact["service"], "href": WEIXIN_SERVICE},
+                {"label": contact["xiaohongshuLabel"], "value": contact["xiaohongshu"], "href": XIAOHONGSHU},
             ],
         },
     }
