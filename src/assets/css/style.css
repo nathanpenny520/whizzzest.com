@@ -1855,7 +1855,21 @@ a.feature-card:hover {
 
 /* 详情页 */
 
-.md-page { padding: 30px 0 50px; }
+.md-hero {
+  padding: 22px 0 76px;
+  background: linear-gradient(180deg, #fbf1ec 0%, var(--c-bg) 100%);
+}
+
+.md-main { padding: 0 0 56px; }
+
+.md-card {
+  max-width: 880px;
+  margin: -58px auto 0;
+  background: var(--c-bg);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.10);
+  padding: 30px 34px 34px;
+}
 
 .md-crumb {
   display: flex;
@@ -1875,6 +1889,7 @@ a.feature-card:hover {
   overflow: hidden;
   aspect-ratio: 21 / 9;
   background: var(--c-bg-alt);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }
 
 .md-cover img {
@@ -1889,7 +1904,6 @@ a.feature-card:hover {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 26px;
 }
 
 .md-head .mc-badge,
@@ -1972,13 +1986,15 @@ a.feature-card:hover {
   .mc-hero { padding: 52px 22px 44px; }
   .mc-grid { grid-template-columns: repeat(auto-fill, minmax(46vw, 1fr)); gap: 12px; }
   .md-cover { aspect-ratio: 16 / 10; }
+  .md-hero { padding-bottom: 48px; }
+  .md-card { margin-top: -28px; padding: 22px 18px 24px; }
 }
 
 .md-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 22px;
 }
 
 .md-gallery img {

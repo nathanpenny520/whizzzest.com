@@ -188,8 +188,10 @@ async function merchantDetail(env, url, slug) {
   const coverHtml = item.cover
     ? `<div class="md-cover"><img src="${esc(mimg(item.cover))}" alt="${esc(item.name)}" loading="eager" decoding="async"></div>`
     : '';
-  const galleryHtml = gallery.length
-    ? `<div class="md-gallery">${gallery.map((k, i) => `<img src="${esc(mimg(k))}" alt="${esc(item.name)} 图${i + 1}" loading="lazy" decoding="async">`).join('')}</div>`
+  // 图集去重：第一张已在封面展示
+  const galleryExtra = gallery.filter((k) => k !== item.cover);
+  const galleryHtml = galleryExtra.length
+    ? `<div class="md-gallery">${galleryExtra.map((k, i) => `<img src="${esc(mimg(k))}" alt="${esc(item.name)} 图${i + 2}" loading="lazy" decoding="async">`).join('')}</div>`
     : '';
 
   const jsonLd = {
@@ -208,19 +210,25 @@ async function merchantDetail(env, url, slug) {
     url: `${SITE_URL}/merchants/${item.slug}/`,
     jsonLd,
     body: `
-    <section class="md-page">
+    <section class="md-hero">
       <div class="container">
         <nav class="md-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/merchants/">商户</a><span>/</span><b>${esc(item.name)}</b></nav>
         ${coverHtml}
-        ${galleryHtml}
-        <div class="md-head">
-          <h1>${esc(item.name)}</h1>
-          ${item.tier === 'featured' ? '<span class="mc-badge feat">推荐</span>' : item.tier === 'verified' ? '<span class="mc-badge">认证商户</span>' : ''}
-          <span class="mc-cat">${esc(CATEGORIES[item.category] || '其他')}</span>
+      </div>
+    </section>
+    <section class="md-main">
+      <div class="container">
+        <div class="md-card">
+          <div class="md-head">
+            <h1>${esc(item.name)}</h1>
+            ${item.tier === 'featured' ? '<span class="mc-badge feat">推荐</span>' : item.tier === 'verified' ? '<span class="mc-badge">认证商户</span>' : ''}
+            <span class="mc-cat">${esc(CATEGORIES[item.category] || '其他')}</span>
+          </div>
+          <p class="md-intro">${esc(item.intro)}</p>
+          ${detailHtml ? `<div class="md-detail">${detailHtml}</div>` : ''}
+          ${infoList}
+          ${galleryHtml}
         </div>
-        <p class="md-intro">${esc(item.intro)}</p>
-        ${detailHtml ? `<div class="md-detail">${detailHtml}</div>` : ''}
-        ${infoList}
       </div>
     </section>
     ${relatedHtml}`,
