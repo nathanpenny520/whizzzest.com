@@ -67,7 +67,7 @@
     </section>
     {{/each}}
 
-    <section class="section section-alt">
+    <section class="section section-alt home-merchants">
       <div class="container">
         <div class="section-head reveal">
           <h2>{{data.merchants.title}}</h2>
@@ -76,7 +76,7 @@
         <div class="grid grid-3">
           {{#each data.merchants.cats as c}}
           <a class="feature-card reveal" href="/merchants/?cat={{c.key}}">
-            <span class="feature-no">{{c.icon}}</span>
+            <span class="feature-icon">{{c.icon}}</span>
             <h3>{{c.title}}</h3>
             <p>{{c.desc}}</p>
           </a>

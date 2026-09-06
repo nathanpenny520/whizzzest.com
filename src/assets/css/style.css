@@ -471,6 +471,48 @@ button {
   line-height: 1.55;
 }
 
+/* 首页·商户入口（焰境好店）：图标徽章 + 呼吸感 */
+
+.home-merchants .grid {
+  gap: 32px;
+}
+
+.home-merchants .feature-card {
+  padding: 40px 34px;
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: linear-gradient(135deg, #fbf1ec, #f7e3da);
+}
+
+.home-merchants .feature-card h3 {
+  margin-top: 16px;
+}
+
+a.feature-card {
+  display: block;
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+}
+
+a.feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1);
+}
+
+.merchants-more {
+  margin-top: 44px;
+  text-align: center;
+}
+
 /* ---------------- 图文分栏（内容页主叙述块） ---------------- */
 
 .split {
