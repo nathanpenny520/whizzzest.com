@@ -13,6 +13,8 @@ import { sendMail } from './smtp.js';
 import { handleMerchants } from './merchants.js';
 import { handleTv, handleMedia, handleTvLatest } from './tv.js';
 import { handleLibrary } from './library.js';
+import { handleMusic, handleMusicPlay } from './music.js';
+import { handleAttractions } from './attractions.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
 const VID_COOKIE = 'vid';
@@ -40,6 +42,11 @@ export default {
     // 万载TV 最新视频（首页「焰境影像」条数据源，公开 JSON，docs/万载TV方案.md）
     if (url.pathname === '/api/tv/latest' && request.method === 'GET') {
       return handleTvLatest(env);
+    }
+
+    // 万载音乐播放计数（前端开始播放一首时回报一次，2026-09-06）
+    if (url.pathname.startsWith('/api/music/play/') && request.method === 'POST') {
+      return handleMusicPlay(request, env, url);
     }
 
     // 商户图片代理（R2 对象，merchant Worker 上传，M2）——不可浏览文档，直接返回不进访客采集
@@ -70,6 +77,12 @@ export default {
     } else if (url.pathname === '/library' || url.pathname.startsWith('/library/')) {
       // 焰境文库（docs/文库方案.md）：书架/详情/阅读页/sitemap
       res = await handleLibrary(request, env, url, ctx);
+    } else if (url.pathname === '/music' || url.pathname.startsWith('/music/')) {
+      // 万载音乐（2026-09-06）：播放器页 + 播放计数
+      res = await handleMusic(request, env, url, ctx);
+    } else if (url.pathname === '/attractions' || url.pathname.startsWith('/attractions/')) {
+      // 旅游景点（2026-09-06）：瀑布流推荐栏/详情页/sitemap
+      res = await handleAttractions(request, env, url, ctx);
     } else if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
       res = await handleMerchants(request, env, url);
     } else {

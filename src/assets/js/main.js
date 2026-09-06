@@ -282,6 +282,180 @@ if (tvStrip) {
     .catch(() => {});
 }
 
+/* 万载音乐播放器（/music/，Worker SSR 出曲目 data-*；单 <audio> 复用 + MediaSession 锁屏控制） */
+const musicPage = document.querySelector('.music-page');
+if (musicPage) {
+  const audio = document.getElementById('music-audio');
+  const rows = [...musicPage.querySelectorAll('.music-item')];
+  const toggleBtn = document.getElementById('music-toggle');
+  const prevBtn = document.getElementById('music-prev');
+  const nextBtn = document.getElementById('music-next');
+  const seek = document.getElementById('music-seek');
+  const vol = document.getElementById('music-vol');
+  const tCur = document.getElementById('music-tcur');
+  const tEnd = document.getElementById('music-tend');
+  const loopBtn = document.getElementById('music-loop');
+  const nowTitle = document.getElementById('music-now-title');
+  const nowArtist = document.getElementById('music-now-artist');
+  const nowMeta = document.getElementById('music-now-meta');
+  const nowCover = document.getElementById('music-cover');
+  const barCover = document.getElementById('music-bar-cover');
+
+  if (audio && rows.length && toggleBtn) {
+    let current = -1;
+    let seeking = false;
+    let loopOn = true;
+    const counted = new Set(); // 每首每次进页面只计一次播放
+
+    const fmt = (s) => {
+      s = Math.max(0, Math.floor(Number(s) || 0));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+
+    // range 滑杆焰色进度底
+    const paintFill = (input) => {
+      const p = ((input.value - input.min) / (input.max - input.min)) * 100;
+      input.style.background = `linear-gradient(90deg, #f2a03d ${p}%, rgba(255, 255, 255, 0.18) ${p}%)`;
+    };
+    paintFill(seek);
+    paintFill(vol);
+
+    const setCover = (box, url) => {
+      box.textContent = '';
+      if (url) {
+        const img = new Image();
+        img.src = url;
+        img.alt = '';
+        box.appendChild(img);
+      } else {
+        const ph = document.createElement('span');
+        ph.className = 'tv-ph';
+        ph.textContent = '焰';
+        box.appendChild(ph);
+      }
+    };
+
+    const setNow = (tr) => {
+      nowTitle.textContent = tr.dataset.title;
+      nowArtist.textContent = tr.dataset.artist || '佚名';
+      setCover(nowCover, tr.dataset.cover);
+      setCover(barCover, tr.dataset.cover);
+    };
+
+    // 播放计数：开始播放一首时回报一次（不阻塞，失败静默）
+    const count = (id) => {
+      if (!id || counted.has(id)) return;
+      counted.add(id);
+      fetch(`/api/music/play/${encodeURIComponent(id)}`, { method: 'POST' }).catch(() => {});
+    };
+
+    const load = (i) => {
+      const tr = rows[i];
+      if (!tr) return;
+      current = i;
+      rows.forEach((r, k) => {
+        r.classList.toggle('on', k === i);
+        r.classList.remove('paused');
+      });
+      audio.src = tr.dataset.src;
+      setNow(tr);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: tr.dataset.title,
+          artist: tr.dataset.artist || '万载音乐',
+          album: '万载音乐 · 焰境万载',
+          artwork: tr.dataset.cover ? [{ src: tr.dataset.cover, sizes: '512x512', type: 'image/jpeg' }] : [],
+        });
+      }
+      count(tr.dataset.id);
+    };
+
+    const step = (d) => {
+      if (!rows.length) return;
+      let i = current + d;
+      if (i < 0) i = rows.length - 1;
+      if (i >= rows.length) i = 0;
+      load(i);
+      audio.play();
+    };
+
+    const toggle = () => {
+      if (current < 0) {
+        load(0);
+        audio.play();
+        return;
+      }
+      if (audio.paused) audio.play();
+      else audio.pause();
+    };
+
+    const selectRow = (i) => {
+      if (current === i) toggle();
+      else {
+        load(i);
+        audio.play();
+      }
+    };
+
+    rows.forEach((r, i) => r.addEventListener('click', () => selectRow(i)));
+    prevBtn?.addEventListener('click', () => step(-1));
+    nextBtn?.addEventListener('click', () => step(1));
+    toggleBtn.addEventListener('click', toggle);
+    loopBtn?.addEventListener('click', () => {
+      loopOn = !loopOn;
+      loopBtn.classList.toggle('on', loopOn);
+      loopBtn.setAttribute('aria-pressed', String(loopOn));
+      loopBtn.setAttribute('aria-label', loopOn ? '列表循环（开）' : '列表循环（关）');
+    });
+
+    seek.addEventListener('input', () => {
+      seeking = true;
+      paintFill(seek);
+      if (audio.duration) tCur.textContent = fmt((seek.value / 1000) * audio.duration);
+    });
+    seek.addEventListener('change', () => {
+      if (audio.duration) audio.currentTime = (seek.value / 1000) * audio.duration;
+      seeking = false;
+    });
+    vol.addEventListener('input', () => {
+      audio.volume = vol.value / 100;
+      paintFill(vol);
+    });
+
+    audio.addEventListener('play', () => {
+      toggleBtn.classList.add('playing');
+      toggleBtn.setAttribute('aria-label', '暂停');
+      rows[current]?.classList.remove('paused');
+      nowMeta.textContent = '正在播放';
+    });
+    audio.addEventListener('pause', () => {
+      toggleBtn.classList.remove('playing');
+      toggleBtn.setAttribute('aria-label', '播放');
+      rows[current]?.classList.add('paused');
+      nowMeta.textContent = '已暂停';
+    });
+    audio.addEventListener('ended', () => {
+      if (loopOn || current < rows.length - 1) step(1);
+    });
+    audio.addEventListener('loadedmetadata', () => {
+      tEnd.textContent = fmt(audio.duration);
+    });
+    audio.addEventListener('timeupdate', () => {
+      if (seeking) return;
+      if (audio.duration) {
+        seek.value = Math.round((audio.currentTime / audio.duration) * 1000);
+        paintFill(seek);
+      }
+      tCur.textContent = fmt(audio.currentTime);
+    });
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('previoustrack', () => step(-1));
+      navigator.mediaSession.setActionHandler('nexttrack', () => step(1));
+    }
+  }
+}
+
 /* 联系表单：fetch 提交 /api/contact，Honeypot 字段一并带上 */
 const form = document.getElementById('contact-form');
 form?.addEventListener('submit', async (e) => {

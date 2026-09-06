@@ -3,7 +3,7 @@
  *
  * 安全层次：Cloudflare Access（第一道门，dashboard 开通）→ 本应用账号登录（第二道门）
  *  - GET  /login                 登录页（用户名选填：留空 = 主账号「站长」ADMIN_PASSWORD）
- *  - GET  /                      管理页（留言 / 访客 / 商户 / 视频 / 账号；视图记忆在 location.hash，刷新不丢）
+ *  - GET  /                      管理页（留言 / 访客 / 商户 / 视频 / 文库 / 音乐 / 景点 / 账号；视图记忆在 location.hash，刷新不丢）
  *  - POST /api/login             账号密码登录 → 签名会话 Cookie（HttpOnly/Secure/SameSite=Strict）
  *  - POST /api/logout            退出登录
  *  - GET  /api/me                当前登录账号（导航右上角展示用）
@@ -25,6 +25,19 @@
  *  - GET  /api/stats?days=7|30|90   概览卡片 + 每日趋势 + 页面/来源/设备/浏览器/OS/语言/地区 + 最近浏览
  *  - GET  /api/visitors             访客列表（?offset=0），按匿名 Cookie ID / IP 分组
  *  - GET  /api/visitors/:gid        单个访客的会话与页面轨迹
+ *
+ * 万载音乐管理（2026-09-06）：
+ *  - GET/POST /api/music           曲目列表（?status=&offset=）/ 新建（JSON 元数据）
+ *  - POST /api/music/:id           部分更新（上下线、排序；换音频/封面时级联删旧 R2 对象）
+ *  - DELETE /api/music/:id         删除（级联清理 R2 音频/封面）
+ *  - PUT /api/music/upload         MP3 流式上传（File 直作 body，魔数校验 ID3/MPEG，≤50MB）
+ *  - PUT /api/music/cover          封面上传（≤5MB，魔数校验 JPG/PNG/WebP，music/c-* 前缀）
+ *
+ * 旅游景点管理（2026-09-06）：
+ *  - GET/POST /api/attractions     景点列表（?status=&offset=）/ 新建（slug 唯一）
+ *  - POST /api/attractions/:id     部分更新（上下线、排序；换封面时级联删旧 R2 对象）
+ *  - DELETE /api/attractions/:id   删除（级联清理 R2 封面）
+ *  - PUT /api/attractions/cover    封面上传（≤5MB，attra/c-* 前缀）
  *
  * 会话：无状态 HMAC 签名（uid + 过期时间戳 + 签名；uid=0 主账号，>0 为 admin_users.id），
  *       改 ADMIN_SESSION_SECRET 即全体下线。
@@ -203,6 +216,30 @@ async function handleApi(request, env, path) {
   if ((m = path.match(/^\/api\/books\/(\d+)\/chapters\/(\d+)$/)) && method === 'DELETE') {
     return removeChapter(env, Number(m[1]), Number(m[2]));
   }
+
+  // 万载音乐管理（2026-09-06）：曲目 CRUD + MP3/封面上传；DELETE 级联清理 R2 音频/封面
+  if (path === '/api/music' && method === 'GET') return listTracks(env, request);
+  if (path === '/api/music' && method === 'POST') return saveTrack(env, request);
+  if ((m = path.match(/^\/api\/music\/(\d+)$/)) && method === 'POST') {
+    return saveTrack(env, request, Number(m[1]));
+  }
+  if ((m = path.match(/^\/api\/music\/(\d+)$/)) && method === 'DELETE') {
+    return removeTrack(env, Number(m[1]));
+  }
+  // 流式上传：MP3 File 直作 PUT body（request.body 探魔数后续流转发 R2，≤50MB）；封面 ≤5MB
+  if (path === '/api/music/upload' && method === 'PUT') return uploadTrackFile(env, request);
+  if (path === '/api/music/cover' && method === 'PUT') return uploadImageR2(env, request, 'music/c-');
+
+  // 旅游景点管理（2026-09-06）：CRUD + 封面上传；DELETE 级联清理 R2 封面
+  if (path === '/api/attractions' && method === 'GET') return listAttractions(env, request);
+  if (path === '/api/attractions' && method === 'POST') return saveAttraction(env, request);
+  if ((m = path.match(/^\/api\/attractions\/(\d+)$/)) && method === 'POST') {
+    return saveAttraction(env, request, Number(m[1]));
+  }
+  if ((m = path.match(/^\/api\/attractions\/(\d+)$/)) && method === 'DELETE') {
+    return removeAttraction(env, Number(m[1]));
+  }
+  if (path === '/api/attractions/cover' && method === 'PUT') return uploadImageR2(env, request, 'attra/c-');
 
   return json({ ok: false, error: 'not_found' }, 404);
 }
@@ -1158,6 +1195,270 @@ async function removeChapter(env, bookId, cid) {
   return json({ ok: true });
 }
 
+/* ---------------- 万载音乐管理（D1 music_tracks，2026-09-06） ---------------- */
+
+const MU_STATUSES = ['published', 'hidden'];
+const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+
+async function listTracks(env, request) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status');
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const counts = await env.DB.prepare('SELECT status, COUNT(*) n FROM music_tracks GROUP BY status').all();
+  const byStatus = {};
+  let total = 0;
+  (counts.results || []).forEach((r) => { byStatus[r.status] = r.n; total += r.n; });
+
+  const sql = MU_STATUSES.includes(status)
+    ? `SELECT * FROM music_tracks WHERE status = ?1 ORDER BY sort, id LIMIT ?2 OFFSET ?3`
+    : `SELECT * FROM music_tracks ORDER BY sort, id LIMIT ?1 OFFSET ?2`;
+  const { results } = MU_STATUSES.includes(status)
+    ? await env.DB.prepare(sql).bind(status, PAGE_SIZE, offset).all()
+    : await env.DB.prepare(sql).bind(PAGE_SIZE, offset).all();
+
+  return json({ ok: true, total, byStatus, storage: await mediaUsage(env), tracks: results || [] });
+}
+
+/** 新建（id 为空）或部分更新；换音频/封面时级联删旧 R2 对象 */
+async function saveTrack(env, request, id) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+
+  const f = {};
+  for (const [k, max] of Object.entries({
+    title: 80, artist: 40, cover: 300, file_key: 300, status: 10,
+  })) {
+    if (!(k in body)) continue;
+    const v = String(body[k] ?? '').trim().slice(0, max);
+    f[k] = ['artist', 'cover', 'file_key'].includes(k) && v === '' ? null : v;
+  }
+  for (const k of ['duration', 'sort']) {
+    if (!(k in body)) continue;
+    f[k] = Math.max(0, Math.min(k === 'duration' ? 86400 : 999, Math.round(Number(body[k]) || 0)));
+  }
+  if ('title' in f && !f.title) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('status' in f && !MU_STATUSES.includes(f.status)) return json({ ok: false, error: 'invalid_fields' }, 400);
+
+  // 新建：曲名 + 音频文件齐备
+  if (!id) {
+    if (!f.title || !f.file_key) return json({ ok: false, error: 'file_required' }, 400);
+    const r = await env.DB.prepare(
+      `INSERT INTO music_tracks (title, artist, cover, file_key, duration, sort, status)
+       VALUES (?1,?2,?3,?4,?5,?6,?7)`
+    )
+      .bind(f.title, f.artist || null, f.cover || null, f.file_key, f.duration || 0, f.sort || 0, f.status || 'published')
+      .run();
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
+
+  // 编辑：部分更新
+  const old = await env.DB.prepare('SELECT * FROM music_tracks WHERE id = ?1').bind(id).first();
+  if (!old) return json({ ok: false, error: 'not_found' }, 404);
+  if ('file_key' in f && !f.file_key) return json({ ok: false, error: 'file_required' }, 400);
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(f)) {
+    sets.push(`${k} = ?${vals.length + 1}`);
+    vals.push(v);
+  }
+  if (!sets.length) return json({ ok: false, error: 'no_fields' }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await env.DB.prepare(`UPDATE music_tracks SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`).bind(...vals, id).run();
+
+  // R2 旧对象清理：仅在换 key 时删（/ 开头是站内路径，不归 R2 管）
+  const r2Key = (k) => k && !k.startsWith('/');
+  const newFile = 'file_key' in f ? f.file_key : old.file_key;
+  if (r2Key(old.file_key) && old.file_key !== newFile) {
+    try { await env.MEDIA.delete(old.file_key); } catch (err) { console.error('old audio cleanup failed:', err); }
+  }
+  const newCover = 'cover' in f ? f.cover : old.cover;
+  if (r2Key(old.cover) && old.cover !== newCover) {
+    try { await env.MEDIA.delete(old.cover); } catch (err) { console.error('old cover cleanup failed:', err); }
+  }
+  return json({ ok: true });
+}
+
+async function removeTrack(env, id) {
+  const old = await env.DB.prepare('SELECT file_key, cover FROM music_tracks WHERE id = ?1').bind(id).first();
+  const { meta } = await env.DB.prepare('DELETE FROM music_tracks WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  if (env.MEDIA && old) {
+    for (const k of [old.file_key, old.cover]) {
+      if (k && !k.startsWith('/')) {
+        try { await env.MEDIA.delete(k); } catch (err) { console.error(`R2 cleanup failed for ${k}:`, err); }
+      }
+    }
+  }
+  return json({ ok: true });
+}
+
+/** MP3 流式上传：File 直作 PUT body → request.body 转发 R2（≤50MB，魔数校验 ID3/MPEG 帧头） */
+async function uploadTrackFile(env, request) {
+  if (!env.MEDIA) return json({ ok: false, error: 'storage_missing' }, 500);
+  const len = Number(request.headers.get('content-length') || 0);
+  if (!len) return json({ ok: false, error: 'empty_file' }, 400);
+  if (len > MAX_AUDIO_BYTES) return json({ ok: false, error: 'too_large' }, 413);
+  if (!request.body) return json({ ok: false, error: 'empty_file' }, 400);
+
+  // 魔数校验只读首个 chunk，随后把已读部分接回流式转发（不整读内存）
+  const reader = request.body.getReader();
+  const first = await reader.read().catch(() => ({}));
+  const head = first.value;
+  const isId3 = head && head[0] === 0x49 && head[1] === 0x44 && head[2] === 0x33;
+  const isMpeg = head && head[0] === 0xff && (head[1] & 0xe0) === 0xe0;
+  if (!isId3 && !isMpeg) {
+    try { await reader.cancel(); } catch { /* 已结束则忽略 */ }
+    return json({ ok: false, error: 'bad_audio' }, 400);
+  }
+  const body = new FixedLengthStream(len);
+  const writer = body.writable.getWriter();
+  (async () => {
+    try {
+      await writer.write(head);
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writer.write(value);
+      }
+      await writer.close();
+    } catch (err) {
+      await writer.abort(err).catch(() => {});
+    }
+  })();
+
+  const key = `music/a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.mp3`;
+  try {
+    await env.MEDIA.put(key, body.readable, { httpMetadata: { contentType: 'audio/mpeg' } });
+  } catch (err) {
+    console.error('audio upload failed:', err);
+    return json({ ok: false, error: 'upload_failed' }, 500);
+  }
+  return json({ ok: true, key });
+}
+
+/** 图片上传（共用）：≤5MB，魔数校验 JPG/PNG/WebP，存入指定前缀（music/c-* / attra/c-*） */
+async function uploadImageR2(env, request, prefix) {
+  if (!env.MEDIA) return json({ ok: false, error: 'storage_missing' }, 500);
+  const buf = new Uint8Array(await request.arrayBuffer());
+  if (!buf.length || buf.length > MAX_COVER_BYTES) return json({ ok: false, error: 'bad_cover' }, 400);
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  const isWebp = buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50;
+  const ext = isJpeg ? 'jpg' : isPng ? 'png' : isWebp ? 'webp' : null;
+  if (!ext) return json({ ok: false, error: 'bad_cover' }, 400);
+  const key = `${prefix}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  try {
+    await env.MEDIA.put(key, buf, { httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` } });
+  } catch (err) {
+    console.error('image upload failed:', err);
+    return json({ ok: false, error: 'upload_failed' }, 500);
+  }
+  return json({ ok: true, key });
+}
+
+/* ---------------- 旅游景点管理（D1 attractions，2026-09-06） ---------------- */
+
+const A_STATUSES = ['published', 'hidden'];
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,59}$/;
+
+async function listAttractions(env, request) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status');
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const counts = await env.DB.prepare('SELECT status, COUNT(*) n FROM attractions GROUP BY status').all();
+  const byStatus = {};
+  let total = 0;
+  (counts.results || []).forEach((r) => { byStatus[r.status] = r.n; total += r.n; });
+
+  const sql = A_STATUSES.includes(status)
+    ? `SELECT * FROM attractions WHERE status = ?1 ORDER BY sort, id DESC LIMIT ?2 OFFSET ?3`
+    : `SELECT * FROM attractions ORDER BY sort, id DESC LIMIT ?1 OFFSET ?2`;
+  const { results } = A_STATUSES.includes(status)
+    ? await env.DB.prepare(sql).bind(status, PAGE_SIZE, offset).all()
+    : await env.DB.prepare(sql).bind(PAGE_SIZE, offset).all();
+
+  return json({ ok: true, total, byStatus, storage: await mediaUsage(env), attractions: results || [] });
+}
+
+/** 新建（id 为空）或部分更新；slug 唯一；换封面时级联删旧 R2 对象 */
+async function saveAttraction(env, request, id) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+
+  const f = {};
+  for (const [k, max] of Object.entries({
+    name: 60, slug: 60, summary: 200, tags: 60, cover: 300,
+    body: 8000, address: 100, hours: 60, tickets: 60, transport: 100, status: 10,
+  })) {
+    if (!(k in body)) continue;
+    const v = String(body[k] ?? '').trim().slice(0, max);
+    f[k] = ['tags', 'cover', 'body', 'address', 'hours', 'tickets', 'transport'].includes(k) && v === '' ? null : v;
+  }
+  if ('sort' in body) f.sort = Math.max(0, Math.min(999, Math.round(Number(body.sort) || 0)));
+  if ('name' in f && !f.name) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('summary' in f && !f.summary) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('status' in f && !A_STATUSES.includes(f.status)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('slug' in f && f.slug && !SLUG_RE.test(f.slug)) return json({ ok: false, error: 'bad_slug' }, 400);
+
+  if (!id) {
+    if (!f.name || !f.summary) return json({ ok: false, error: 'invalid_fields' }, 400);
+    if (!f.slug) return json({ ok: false, error: 'slug_required' }, 400);
+    const dup = await env.DB.prepare('SELECT id FROM attractions WHERE slug = ?1').bind(f.slug).first();
+    if (dup) return json({ ok: false, error: 'dup_slug' }, 409);
+    const r = await env.DB.prepare(
+      `INSERT INTO attractions (slug, name, summary, tags, cover, body, address, hours, tickets, transport, sort, status)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)`
+    )
+      .bind(
+        f.slug, f.name, f.summary, f.tags || null, f.cover || null, f.body || null,
+        f.address || null, f.hours || null, f.tickets || null, f.transport || null,
+        f.sort || 0, f.status || 'published'
+      )
+      .run();
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
+
+  const old = await env.DB.prepare('SELECT * FROM attractions WHERE id = ?1').bind(id).first();
+  if (!old) return json({ ok: false, error: 'not_found' }, 404);
+  if ('slug' in f) {
+    const slug = f.slug ?? old.slug;
+    if (!slug || !SLUG_RE.test(slug)) return json({ ok: false, error: 'bad_slug' }, 400);
+    const dup = await env.DB.prepare('SELECT id FROM attractions WHERE slug = ?1 AND id != ?2')
+      .bind(slug, id).first();
+    if (dup) return json({ ok: false, error: 'dup_slug' }, 409);
+  }
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(f)) {
+    sets.push(`${k} = ?${vals.length + 1}`);
+    vals.push(v);
+  }
+  if (!sets.length) return json({ ok: false, error: 'no_fields' }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await env.DB.prepare(`UPDATE attractions SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`).bind(...vals, id).run();
+
+  const newCover = 'cover' in f ? f.cover : old.cover;
+  if (old.cover && !old.cover.startsWith('/') && old.cover !== newCover) {
+    try { await env.MEDIA.delete(old.cover); } catch (err) { console.error('old cover cleanup failed:', err); }
+  }
+  return json({ ok: true });
+}
+
+async function removeAttraction(env, id) {
+  const old = await env.DB.prepare('SELECT cover FROM attractions WHERE id = ?1').bind(id).first();
+  const { meta } = await env.DB.prepare('DELETE FROM attractions WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  if (env.MEDIA && old?.cover && !old.cover.startsWith('/')) {
+    try { await env.MEDIA.delete(old.cover); } catch (err) { console.error(`R2 cleanup failed for ${old.cover}:`, err); }
+  }
+  return json({ ok: true });
+}
+
 /* ---------------- 工具 ---------------- */
 
 async function hmacHex(secret, msg) {
@@ -1499,6 +1800,8 @@ ${BASE_CSS}
       <a class="anav-link" id="vtab-merch" href="#/merch">商户</a>
       <a class="anav-link" id="vtab-tv" href="#/tv">视频</a>
       <a class="anav-link" id="vtab-books" href="#/books">文库</a>
+      <a class="anav-link" id="vtab-music" href="#/music">音乐</a>
+      <a class="anav-link" id="vtab-attra" href="#/attra">景点</a>
       <a class="anav-link" id="vtab-acct" href="#/acct">账号</a>
     </nav>
     <div class="anav-right">
@@ -1522,6 +1825,8 @@ ${BASE_CSS}
     <li class="anav-drawer-item"><a class="anav-link" href="#/merch">商户</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/tv">视频</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/books">文库</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/music">音乐</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/attra">景点</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/acct">账号</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="https://whizzzest.com/" target="_blank" rel="noopener">前往官网 ↗</a></li>
     <li class="anav-drawer-item"><a class="anav-link" id="logout-m" href="#">退出登录</a></li>
@@ -1753,6 +2058,74 @@ ${BASE_CSS}
   <button class="more" id="bmore" type="button" style="display:none">加载更多</button>
 </div>
 
+<div id="view-music" class="wrap" style="display:none">
+  <div class="range">
+    <button class="tab active" data-must="" type="button">全部</button>
+    <button class="tab" data-must="published" type="button">已上线</button>
+    <button class="tab" data-must="hidden" type="button">已隐藏</button>
+    <span class="updated" id="mustats"></span>
+    <button id="muadd" type="button" class="primary">新增曲目</button>
+  </div>
+  <div class="panel" id="muform" style="display:none">
+    <h3 id="muform-title">新增曲目</h3>
+    <div class="mgrid">
+      <label>曲名 *<input id="mu-title" maxlength="80"></label>
+      <label>演唱 / 演奏<input id="mu-artist" maxlength="40" placeholder="佚名"></label>
+      <label>状态
+        <select id="mu-status">
+          <option value="published">上线</option>
+          <option value="hidden">隐藏</option>
+        </select>
+      </label>
+      <label>曲序（小者靠前）<input id="mu-sort" type="number" value="0"></label>
+      <label>时长（秒）<input id="mu-dur" type="number" min="0" max="86400"></label>
+      <label class="wide">音频文件 MP3 *（≤50MB，选文件自动读时长）<input id="mu-file" type="file" accept="audio/mpeg,.mp3"><span class="vfile" id="mu-fileinfo"></span></label>
+      <label class="wide">封面（可选 ≤5MB，方形最佳；不传前台用「焰」字占位）<input id="mu-cover" type="file" accept="image/jpeg,image/png,image/webp"><span class="vfile" id="mu-coverinfo"></span></label>
+    </div>
+    <div class="vprog" id="mu-prog" style="display:none"><div id="mu-progbar"></div></div>
+    <p class="vhint" id="mu-hint" style="margin-top:8px;display:none"></p>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="musave" type="button">保存</button><button id="mucancel" type="button">取消</button></div>
+  </div>
+  <div class="list" id="mulist"><p class="empty">加载中…</p></div>
+  <button class="more" id="mumore" type="button" style="display:none">加载更多</button>
+</div>
+
+<div id="view-attra" class="wrap" style="display:none">
+  <div class="range">
+    <button class="tab active" data-ast="" type="button">全部</button>
+    <button class="tab" data-ast="published" type="button">已上线</button>
+    <button class="tab" data-ast="hidden" type="button">已下线</button>
+    <span class="updated" id="astats"></span>
+    <button id="atadd" type="button" class="primary">新增景点</button>
+  </div>
+  <div class="panel" id="atform" style="display:none">
+    <h3 id="atform-title">新增景点</h3>
+    <div class="mgrid">
+      <label>名称 *<input id="at-name" maxlength="60"></label>
+      <label>Slug *（详情地址 /attractions/slug/，小写字母数字连字符）<input id="at-slug" placeholder="wanzai-gucheng"></label>
+      <label>状态
+        <select id="at-status">
+          <option value="published">上线</option>
+          <option value="hidden">下线</option>
+        </select>
+      </label>
+      <label>排序（小者靠前）<input id="at-sort" type="number" value="0"></label>
+      <label>标签（逗号分隔，最多 4 个）<input id="at-tags" maxlength="60" placeholder="古城,夜景"></label>
+      <label class="wide">一句话简介 *（瀑布流卡片展示）<input id="at-summary" maxlength="200"></label>
+      <label class="wide">正文（空行自动分段）<textarea id="at-body" rows="6"></textarea></label>
+      <label>地址<input id="at-address" maxlength="100"></label>
+      <label>开放时间<input id="at-hours" maxlength="60"></label>
+      <label>门票<input id="at-tickets" maxlength="60"></label>
+      <label>交通<input id="at-transport" maxlength="100"></label>
+      <label class="wide">封面（可选 ≤5MB，竖图/横图均可，瀑布流原比例展示）<input id="at-cover" type="file" accept="image/jpeg,image/png,image/webp"><span class="vfile" id="at-coverinfo"></span></label>
+    </div>
+    <p class="vhint" id="at-hint" style="margin-top:8px;display:none"></p>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="atsave" type="button">保存</button><button id="atcancel" type="button">取消</button></div>
+  </div>
+  <div class="list" id="atlist"><p class="empty">加载中…</p></div>
+  <button class="more" id="atmore" type="button" style="display:none">加载更多</button>
+</div>
+
 <div id="view-acct" class="wrap" style="display:none">
   <div class="panel">
     <h3>当前登录</h3>
@@ -1813,7 +2186,7 @@ function api(path, opts) {
 }
 
 /* ---------- 视图切换（当前板块记在 location.hash：刷新/前进后退不丢） ---------- */
-var VIEWS = ['msg', 'visit', 'merch', 'tv', 'books', 'acct'];
+var VIEWS = ['msg', 'visit', 'merch', 'tv', 'books', 'music', 'attra', 'acct'];
 var suppressHash = false;
 function showView(v, skipHash) {
   if (VIEWS.indexOf(v) === -1) v = 'msg';
@@ -1823,18 +2196,24 @@ function showView(v, skipHash) {
   el('view-merch').style.display = v === 'merch' ? '' : 'none';
   el('view-tv').style.display = v === 'tv' ? '' : 'none';
   el('view-books').style.display = v === 'books' ? '' : 'none';
+  el('view-music').style.display = v === 'music' ? '' : 'none';
+  el('view-attra').style.display = v === 'attra' ? '' : 'none';
   el('view-acct').style.display = v === 'acct' ? '' : 'none';
   el('vtab-msg').classList.toggle('active', v === 'msg');
   el('vtab-visit').classList.toggle('active', v === 'visit');
   el('vtab-merch').classList.toggle('active', v === 'merch');
   el('vtab-tv').classList.toggle('active', v === 'tv');
   el('vtab-books').classList.toggle('active', v === 'books');
+  el('vtab-music').classList.toggle('active', v === 'music');
+  el('vtab-attra').classList.toggle('active', v === 'attra');
   el('vtab-acct').classList.toggle('active', v === 'acct');
   if (v === 'msg') load(true);
   if (v === 'visit') { loadStats(); loadVisitors(true); }
   if (v === 'merch') loadMerchants(true);
   if (v === 'tv') loadTv(true);
   if (v === 'books') loadBooks(true);
+  if (v === 'music') loadMusic(true);
+  if (v === 'attra') loadAttra(true);
   if (v === 'acct') loadAccounts();
   if (!skipHash && '#/' + v !== location.hash) {
     suppressHash = true;
@@ -2090,6 +2469,8 @@ el('refresh').addEventListener('click', function () {
   else if (currentView === 'merch') { loadMerchants(true); }
   else if (currentView === 'tv') { loadTv(true); }
   else if (currentView === 'books') { loadBooks(true); }
+  else if (currentView === 'music') { loadMusic(true); }
+  else if (currentView === 'attra') { loadAttra(true); }
   else if (currentView === 'acct') { loadAccounts(); }
   else { load(true); }
 });
@@ -2763,6 +3144,356 @@ el('bsave').addEventListener('click', function () {
     .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); });
 });
 el('bmore').addEventListener('click', function () { bState.offset += ${PAGE_SIZE}; loadBooks(false); });
+
+/* ---------- 万载音乐管理（2026-09-06） ---------- */
+var muState = { status: '', offset: 0 };
+var editingTrackId = null;
+var M_ST = { published: '已上线', hidden: '已隐藏' };
+
+document.querySelectorAll('#view-music .range [data-must]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    muState.status = b.getAttribute('data-must');
+    document.querySelectorAll('#view-music .range [data-must]').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadMusic(true);
+  });
+});
+
+function loadMusic(reset) {
+  if (reset) muState.offset = 0;
+  var q = '?offset=' + muState.offset + (muState.status ? '&status=' + muState.status : '');
+  api('/api/music' + q).then(function (d) {
+    var list = d.tracks || [];
+    var counts = d.byStatus || {};
+    var line = '共 ' + d.total + ' 首 · 已上线 ' + (counts.published || 0) + ' · 已隐藏 ' + (counts.hidden || 0);
+    if (d.storage != null) line += ' · 已用存储 ' + (d.storage / 1048576).toFixed(1) + ' MB';
+    el('mustats').textContent = line;
+    var box = el('mulist');
+    if (reset) box.innerHTML = '';
+    if (reset && list.length === 0) {
+      box.innerHTML = '<p class="empty">还没有曲目，点右上「新增曲目」上传第一首 MP3。</p>';
+    } else {
+      list.forEach(function (x) { box.appendChild(renderTrack(x)); });
+    }
+    el('mumore').style.display = (muState.offset + ${PAGE_SIZE} < d.total && list.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('mulist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderTrack(x) {
+  var div = document.createElement('div');
+  div.className = 'msg' + (x.status === 'published' ? '' : ' read');
+  var thumb = coverUrl(x.cover)
+    ? '<img class="vthumb" loading="lazy" alt="" src="' + esc(coverUrl(x.cover)) + '">'
+    : '<div class="vthumb"></div>';
+  var badges =
+    '<span class="k-badge">曲序 ' + (x.sort || 0) + '</span>' +
+    '<span class="mst ' + (x.status === 'published' ? 'mst-approved' : 'mst-rejected') + '">' + (M_ST[x.status] || x.status) + '</span>';
+  div.innerHTML =
+    '<div class="vrow1">' + thumb +
+    '<div style="min-width:0;flex:1">' +
+      '<div class="row1"><span class="name">' + esc(x.title) + '</span>' + badges +
+      (x.status === 'published' ? '<a class="mslug" href="' + SITE_HOME + '/music/" target="_blank" rel="noopener">前台收听 ↗</a>' : '') +
+      '</div>' +
+      '<div class="meta">' + (x.artist ? esc(x.artist) + ' · ' : '') + (vDur(x.duration) ? '时长 ' + vDur(x.duration) + ' · ' : '') + '播放 ' + (x.plays || 0) + ' 次 · ' + esc(fmtTime(x.created_at)) + '</div>' +
+    '</div></div>' +
+    '<div class="ops">' +
+    '<button type="button" data-act="toggle">' + (x.status === 'published' ? '隐藏' : '上线') + '</button>' +
+    '<button type="button" data-act="edit">编辑</button>' +
+    '<button type="button" data-act="del">删除</button></div>';
+  div.querySelector('.ops').addEventListener('click', function (e) {
+    var act = e.target.getAttribute('data-act');
+    if (act === 'toggle') {
+      api('/api/music/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: x.status === 'published' ? 'hidden' : 'published' })
+      }).then(function () { loadMusic(true); });
+    } else if (act === 'edit') {
+      openTrackForm(x);
+    } else if (act === 'del') {
+      // 二次点击确认（同视频删除）：首击变红待确认，4 秒未点自动复原；第二击删除（音频/封面一并清理，不可恢复）
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'danger';
+        btn.textContent = '确认删除（含音频）';
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.removeAttribute('data-armed');
+          btn.className = '';
+          btn.textContent = '删除';
+        }, 4000);
+        return;
+      }
+      api('/api/music/' + x.id, { method: 'DELETE' }).then(function () { loadMusic(true); });
+    }
+  });
+  return div;
+}
+
+function openTrackForm(x) {
+  editingTrackId = x ? x.id : null;
+  el('muform-title').textContent = x ? '编辑曲目 #' + x.id : '新增曲目';
+  el('mu-title').value = x ? x.title || '' : '';
+  el('mu-artist').value = x ? x.artist || '' : '';
+  el('mu-status').value = x ? x.status || 'published' : 'published';
+  el('mu-sort').value = x ? x.sort || 0 : 0;
+  el('mu-dur').value = x && x.duration ? x.duration : '';
+  el('mu-file').value = '';
+  el('mu-fileinfo').textContent = x && x.file_key ? '当前音频：' + x.file_key + '（不换文件则留空）' : '';
+  el('mu-cover').value = '';
+  el('mu-coverinfo').textContent = x && x.cover ? '当前封面：' + x.cover : '';
+  muProgress(null); muHint(null);
+  el('muform').style.display = '';
+  el('muform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeTrackForm() { el('muform').style.display = 'none'; editingTrackId = null; muProgress(null); }
+
+function muProgress(p) {
+  var bar = el('mu-prog');
+  if (p == null) { bar.style.display = 'none'; el('mu-progbar').style.width = '0'; return; }
+  bar.style.display = '';
+  el('mu-progbar').style.width = Math.round(p * 100) + '%';
+}
+function muHint(msg) {
+  var h = el('mu-hint');
+  h.textContent = msg || '';
+  h.style.display = msg ? '' : 'none';
+}
+
+// 选文件即预读时长（Audio 元数据）+ 大小提示（50MB 上限）
+el('mu-file').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  var info = el('mu-fileinfo');
+  if (!f) { info.textContent = ''; return; }
+  info.textContent = f.name + ' · ' + (f.size / 1048576).toFixed(1) + ' MB' + (f.size > 50 * 1048576 ? '（超 50MB，请先压缩）' : '');
+  var a = document.createElement('audio');
+  a.preload = 'metadata';
+  a.onloadedmetadata = function () {
+    if (a.duration && isFinite(a.duration)) el('mu-dur').value = Math.round(a.duration);
+    URL.revokeObjectURL(a.src);
+  };
+  a.src = URL.createObjectURL(f);
+});
+
+el('muadd').addEventListener('click', function () { openTrackForm(null); });
+el('mucancel').addEventListener('click', closeTrackForm);
+el('musave').addEventListener('click', function () {
+  var payload = {
+    title: val('mu-title'), artist: val('mu-artist'), status: val('mu-status'),
+    sort: Number(val('mu-sort') || 0),
+    duration: el('mu-dur').value ? Number(el('mu-dur').value) : 0
+  };
+  if (!payload.title) { alert('请填写曲名'); return; }
+  var file = el('mu-file').files && el('mu-file').files[0];
+  var cover = el('mu-cover').files && el('mu-cover').files[0];
+  if (!editingTrackId && !file) { alert('请选择要上传的 MP3 文件'); return; }
+  if (file) {
+    if (file.size > 50 * 1048576) { alert('音频超过 50MB，请先压缩。'); return; }
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (ext !== 'mp3') { alert('仅支持 MP3 格式。'); return; }
+  }
+  if (cover && cover.size > 5 * 1048576) { alert('封面图超过 5MB。'); return; }
+
+  var btn = el('musave');
+  btn.disabled = true;
+  var seq = Promise.resolve();
+  if (file) {
+    muProgress(0);
+    muHint('音频上传中，请勿关闭页面…');
+    seq = seq.then(function () {
+      return putFile('/api/music/upload', file, function (p) { muProgress(p); });
+    }).then(function (d) { payload.file_key = d.key; });
+  }
+  if (cover) {
+    seq = seq.then(function () {
+      muHint('封面上传中…');
+      return putFile('/api/music/cover', cover);
+    }).then(function (d) { payload.cover = d.key; });
+  }
+  seq.then(function () {
+    muHint('保存中…');
+    return api(editingTrackId ? '/api/music/' + editingTrackId : '/api/music', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }).then(function () {
+    closeTrackForm();
+    loadMusic(true);
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') alert('保存失败：' + e.message);
+  }).then(function () {
+    btn.disabled = false;
+    muProgress(null);
+    muHint(null);
+  });
+});
+el('mumore').addEventListener('click', function () { muState.offset += ${PAGE_SIZE}; loadMusic(false); });
+
+/* ---------- 旅游景点管理（2026-09-06） ---------- */
+var aState = { status: '', offset: 0 };
+var editingAttraId = null;
+var A_ST = { published: '已上线', hidden: '已下线' };
+var SLUG_RE_JS = /^[a-z0-9][a-z0-9-]{0,59}$/;
+
+document.querySelectorAll('#view-attra .range [data-ast]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    aState.status = b.getAttribute('data-ast');
+    document.querySelectorAll('#view-attra .range [data-ast]').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadAttra(true);
+  });
+});
+
+function loadAttra(reset) {
+  if (reset) aState.offset = 0;
+  var q = '?offset=' + aState.offset + (aState.status ? '&status=' + aState.status : '');
+  api('/api/attractions' + q).then(function (d) {
+    var list = d.attractions || [];
+    var counts = d.byStatus || {};
+    var line = '共 ' + d.total + ' 处 · 已上线 ' + (counts.published || 0) + ' · 已下线 ' + (counts.hidden || 0);
+    if (d.storage != null) line += ' · 已用存储 ' + (d.storage / 1048576).toFixed(1) + ' MB';
+    el('astats').textContent = line;
+    var box = el('atlist');
+    if (reset) box.innerHTML = '';
+    if (reset && list.length === 0) {
+      box.innerHTML = '<p class="empty">还没有景点，点右上「新增景点」创建第一处（上线后前台 /attractions/ 瀑布流展示）。</p>';
+    } else {
+      list.forEach(function (x) { box.appendChild(renderAttra(x)); });
+    }
+    el('atmore').style.display = (aState.offset + ${PAGE_SIZE} < d.total && list.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('atlist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderAttra(x) {
+  var div = document.createElement('div');
+  div.className = 'msg' + (x.status === 'published' ? '' : ' read');
+  var thumb = coverUrl(x.cover)
+    ? '<img class="vthumb" loading="lazy" alt="" src="' + esc(coverUrl(x.cover)) + '">'
+    : '<div class="vthumb"></div>';
+  var badges =
+    '<span class="k-badge">' + esc(x.slug) + '</span>' +
+    (x.tags ? '<span class="k-badge">' + esc(x.tags) + '</span>' : '') +
+    '<span class="k-badge">排序 ' + (x.sort || 0) + '</span>' +
+    '<span class="mst ' + (x.status === 'published' ? 'mst-approved' : 'mst-rejected') + '">' + (A_ST[x.status] || x.status) + '</span>';
+  div.innerHTML =
+    '<div class="vrow1">' + thumb +
+    '<div style="min-width:0;flex:1">' +
+      '<div class="row1"><span class="name">' + esc(x.name) + '</span>' + badges +
+      (x.status === 'published' ? '<a class="mslug" href="' + SITE_HOME + '/attractions/' + esc(x.slug) + '/" target="_blank" rel="noopener">查看页面 ↗</a>' : '') +
+      '</div>' +
+      '<div class="time">' + esc(x.summary) + '</div>' +
+      '<div class="meta">' + esc(fmtTime(x.updated_at)) + '</div>' +
+    '</div></div>' +
+    '<div class="ops">' +
+    '<button type="button" data-act="toggle">' + (x.status === 'published' ? '下线' : '上线') + '</button>' +
+    '<button type="button" data-act="edit">编辑</button>' +
+    '<button type="button" data-act="del">删除</button></div>';
+  div.querySelector('.ops').addEventListener('click', function (e) {
+    var act = e.target.getAttribute('data-act');
+    if (act === 'toggle') {
+      api('/api/attractions/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: x.status === 'published' ? 'hidden' : 'published' })
+      }).then(function () { loadAttra(true); });
+    } else if (act === 'edit') {
+      openAttraForm(x);
+    } else if (act === 'del') {
+      // 二次点击确认（同视频删除）：首击变红待确认，4 秒未点自动复原；第二击删除（封面一并清理，不可恢复）
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'danger';
+        btn.textContent = '确认删除';
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.removeAttribute('data-armed');
+          btn.className = '';
+          btn.textContent = '删除';
+        }, 4000);
+        return;
+      }
+      api('/api/attractions/' + x.id, { method: 'DELETE' }).then(function () { loadAttra(true); });
+    }
+  });
+  return div;
+}
+
+function openAttraForm(x) {
+  editingAttraId = x ? x.id : null;
+  el('atform-title').textContent = x ? '编辑景点 #' + x.id : '新增景点';
+  el('at-name').value = x ? x.name || '' : '';
+  el('at-slug').value = x ? x.slug || '' : '';
+  el('at-status').value = x ? x.status || 'published' : 'published';
+  el('at-sort').value = x ? x.sort || 0 : 0;
+  el('at-tags').value = x ? x.tags || '' : '';
+  el('at-summary').value = x ? x.summary || '' : '';
+  el('at-body').value = x ? x.body || '' : '';
+  el('at-address').value = x ? x.address || '' : '';
+  el('at-hours').value = x ? x.hours || '' : '';
+  el('at-tickets').value = x ? x.tickets || '' : '';
+  el('at-transport').value = x ? x.transport || '' : '';
+  el('at-cover').value = '';
+  el('at-coverinfo').textContent = x && x.cover ? '当前封面：' + x.cover : '';
+  atHint(null);
+  el('atform').style.display = '';
+  el('atform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeAttraForm() { el('atform').style.display = 'none'; editingAttraId = null; }
+
+function atHint(msg) {
+  var h = el('at-hint');
+  h.textContent = msg || '';
+  h.style.display = msg ? '' : 'none';
+}
+
+el('atadd').addEventListener('click', function () { openAttraForm(null); });
+el('atcancel').addEventListener('click', closeAttraForm);
+el('atsave').addEventListener('click', function () {
+  var payload = {
+    name: val('at-name'), slug: val('at-slug'), status: val('at-status'),
+    sort: Number(val('at-sort') || 0), tags: val('at-tags'),
+    summary: val('at-summary'), body: val('at-body'),
+    address: val('at-address'), hours: val('at-hours'),
+    tickets: val('at-tickets'), transport: val('at-transport')
+  };
+  if (!payload.name || !payload.summary) { alert('请填写名称和一句话简介'); return; }
+  if (!editingAttraId && !payload.slug) { alert('请填写 Slug'); return; }
+  if (payload.slug && !SLUG_RE_JS.test(payload.slug)) { alert('Slug 仅限小写字母、数字和连字符，且以字母或数字开头。'); return; }
+  var cover = el('at-cover').files && el('at-cover').files[0];
+  if (cover && cover.size > 5 * 1048576) { alert('封面图超过 5MB。'); return; }
+
+  var btn = el('atsave');
+  btn.disabled = true;
+  var seq = Promise.resolve();
+  if (cover) {
+    seq = seq.then(function () {
+      atHint('封面上传中…');
+      return putFile('/api/attractions/cover', cover);
+    }).then(function (d) { payload.cover = d.key; });
+  }
+  seq.then(function () {
+    atHint('保存中…');
+    return api(editingAttraId ? '/api/attractions/' + editingAttraId : '/api/attractions', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }).then(function () {
+    closeAttraForm();
+    loadAttra(true);
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') alert('保存失败：' + e.message);
+  }).then(function () {
+    btn.disabled = false;
+    atHint(null);
+  });
+});
+el('atmore').addEventListener('click', function () { aState.offset += ${PAGE_SIZE}; loadAttra(false); });
 
 /* ---------- 账号管理（运营账号，权限与主账号相同） ---------- */
 var me = '';

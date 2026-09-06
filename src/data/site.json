@@ -34,12 +34,20 @@
       ]
     },
     {
-      "href": "/tourism/",
-      "label": "旅游线路"
+      "href": "/attractions/",
+      "label": "旅游",
+      "menu": [
+        { "href": "/attractions/", "label": "旅游景点" },
+        { "href": "/tourism/", "label": "旅游线路" }
+      ]
     },
     {
       "href": "/tv/",
-      "label": "万载TV"
+      "label": "万载TV",
+      "menu": [
+        { "href": "/tv/", "label": "万载TV" },
+        { "href": "/music/", "label": "万载音乐" }
+      ]
     },
     {
       "href": "/library/",
