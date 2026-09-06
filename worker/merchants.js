@@ -51,13 +51,22 @@ const APPROVED_WHERE =
 const ORDER_BY =
   "ORDER BY CASE tier WHEN 'featured' THEN 0 WHEN 'verified' THEN 1 ELSE 2 END, sort_weight DESC, id DESC";
 
-async function approvedMerchants(env, cat) {
-  const sql = cat
-    ? `SELECT * FROM merchants WHERE ${APPROVED_WHERE} AND category = ?1 ${ORDER_BY}`
-    : `SELECT * FROM merchants WHERE ${APPROVED_WHERE} ${ORDER_BY}`;
-  const { results } = cat
-    ? await env.DB.prepare(sql).bind(cat).all()
-    : await env.DB.prepare(sql).all();
+async function approvedMerchants(env, cat, q) {
+  const conds = [APPROVED_WHERE];
+  const vals = [];
+  if (cat) {
+    conds.push(`category = ?${vals.length + 1}`);
+    vals.push(cat);
+  }
+  if (q) {
+    const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    conds.push(
+      `(name LIKE ?${vals.length + 1} ESCAPE '\\' OR intro LIKE ?${vals.length + 2} ESCAPE '\\' OR detail LIKE ?${vals.length + 3} ESCAPE '\\')`
+    );
+    vals.push(like, like, like);
+  }
+  const sql = `SELECT * FROM merchants WHERE ${conds.join(' AND ')} ${ORDER_BY}`;
+  const { results } = await env.DB.prepare(sql).bind(...vals).all();
   return results || [];
 }
 
@@ -72,16 +81,29 @@ async function approvedBySlug(env, slug) {
 
 async function merchantsHome(env, url, cat) {
   const chrome = await getChrome(env);
-  const list = await approvedMerchants(env, cat);
+  const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
+  const list = await approvedMerchants(env, cat, q);
   const featured = list.filter((x) => x.tier === 'featured');
   const rest = list.filter((x) => x.tier !== 'featured');
 
-  const catTabs = Object.entries(CATEGORIES)
-    .map(
+  const keepQ = q ? `?q=${encodeURIComponent(q)}` : '';
+  const catTabs = [
+    `<a class="mc-tab${cat === '' ? ' on' : ''}" href="/merchants/${keepQ}">全部</a>`,
+    ...Object.entries(CATEGORIES).map(
       ([key, label]) =>
-        `<a class="mc-tab${key === cat ? ' on' : ''}" href="/merchants/${key ? `?cat=${key}` : ''}">${label}</a>`
-    )
-    .join('');
+        `<a class="mc-tab${key === cat ? ' on' : ''}" href="/merchants/?cat=${key}${q ? `&q=${encodeURIComponent(q)}` : ''}">${label}</a>`
+    ),
+  ].join('');
+
+  const searchBox = `
+      <form class="mc-search" action="/merchants/" method="get" role="search">
+        ${cat ? `<input type="hidden" name="cat" value="${esc(cat)}">` : ''}
+        <input type="search" name="q" value="${esc(q)}" maxlength="30" placeholder="搜索商户名称、简介…" aria-label="搜索商户">
+        <button type="submit">搜索</button>
+      </form>`;
+  const foundLine = q
+    ? `<p class="mc-found">找到 <b>${list.length}</b> 家含「${esc(q)}」的商户 <a href="/merchants/${cat ? `?cat=${cat}` : ''}">清除搜索</a></p>`
+    : '';
 
   const card = (x) => {
     const cover = x.cover
@@ -113,7 +135,7 @@ async function merchantsHome(env, url, cat) {
     ? `<div class="mc-grid">${rest.map(card).join('')}</div>`
     : featured.length
       ? ''
-      : `<div class="mc-empty"><p>首批商户入驻审核中，敬请期待。</p><p class="sub">商家朋友想抢先展示？欢迎联系我们。</p></div>`;
+      : `<div class="mc-empty"><p>${q ? `没有找到含「${esc(q)}」的商户，换个关键词试试。` : '首批商户入驻审核中，敬请期待。'}</p><p class="sub">${q ? '' : '商家朋友想抢先展示？欢迎联系我们。'}</p></div>`;
 
   const html = pageShell(chrome, {
     title: '焰境好店 — 万载本地商户推荐 | 焰境·万载',
@@ -130,7 +152,9 @@ async function merchantsHome(env, url, cat) {
     </section>
     <section class="mc-main">
       <div class="container">
+        ${searchBox}
         <nav class="mc-tabs" aria-label="商户分类">${catTabs}</nav>
+        ${foundLine}
         ${featuredStrip}
         ${grid}
         <div class="mc-cta">

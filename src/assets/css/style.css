@@ -2004,3 +2004,53 @@ a.feature-card:hover {
   border-radius: 14px;
   background: var(--c-bg-alt);
 }
+
+/* 目录页搜索（M3 补充） */
+.mc-search {
+  display: flex;
+  gap: 10px;
+  max-width: 520px;
+  margin-bottom: 20px;
+}
+
+.mc-search input[type="search"] {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--c-text);
+  background: var(--c-bg);
+  border: 1px solid var(--c-hairline);
+  border-radius: 999px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.mc-search input[type="search"]:focus {
+  border-color: var(--c-accent);
+}
+
+.mc-search button {
+  padding: 11px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--c-accent);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.mc-search button:hover { background: var(--c-accent-dark); }
+
+.mc-found {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: var(--c-text-2);
+}
+
+.mc-found b { color: var(--c-accent); }
+.mc-found a { color: var(--c-accent); }
+.mc-found a:hover { text-decoration: underline; }
