@@ -5,7 +5,6 @@
 「焰境·万载」是围绕**江西省万载县**（中国花炮之乡）打造的官方宣传网站：千年烟花文化、非物质文化遗产、特色美食物产、旅游线路与赏烟地点，一站式了解这座赣西小城。
 
 - 🌐 **线上地址**：**https://whizzzest.com**
-- 🛠 管理后台：https://admin.whizzzest.com（仅限团队）
 - 📬 联系我们：whizzzest@outlook.com
 
 ## 网站内容
@@ -54,7 +53,6 @@ wrangler deploy
 ├─ worker/          # Worker 入口与 SMTP 通知
 ├─ public/          # 原样复制到 dist 根（_headers / favicon 等）
 ├─ scripts/         # 内容提取脚本
-├─ admin/           # 管理后台（独立 Worker）
 └─ build.js         # 零依赖构建脚本
 ```
 
