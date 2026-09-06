@@ -352,17 +352,29 @@ button {
   color: var(--c-text-2);
 }
 
-/* 扁平 Hero 内的返回上级链接（非遗子页等） */
+/* 返回上级链接（非遗子页等）：扁平 Hero 浅底 / 图 Hero 深底共用结构 */
 
-.hero-flat .hero-crumb {
+.hero-flat .hero-crumb,
+.hero-inner .hero-crumb {
   display: inline-block;
   margin-bottom: 14px;
   font-size: 15px;
+}
+
+.hero-flat .hero-crumb {
   color: var(--c-text-2);
 }
 
 .hero-flat .hero-crumb:hover {
   color: var(--c-accent);
+}
+
+.hero-inner .hero-crumb {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.hero-inner .hero-crumb:hover {
+  color: #fff;
 }
 
 /* ---------------- 按钮 ---------------- */

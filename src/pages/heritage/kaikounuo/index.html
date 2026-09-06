@@ -1,4 +1,4 @@
-<!-- {"title":"万载开口傩 — 焰境·万载","description":"万载开口傩又称「跳魈」，2008 年入选第二批国家级非物质文化遗产名录——每角必唱、唱做念打齐全，600 余年历史的民俗文化活动。","ogImage":"/assets/img/nuowu.jpeg"} -->
+<!-- {"title":"万载开口傩 — 焰境·万载","description":"万载开口傩又称「跳魈」，2008 年入选第二批国家级非物质文化遗产名录——每角必唱、唱做念打齐全，600 余年历史的民俗文化活动。","ogImage":"/assets/img/kaikounuo.jpeg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,8 +6,11 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <div class="container">
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
         <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
         <h1>{{data.hero.title}}</h1>
         <p class="hero-sub">{{data.hero.subtitle}}</p>

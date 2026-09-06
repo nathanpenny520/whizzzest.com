@@ -1,4 +1,4 @@
-<!-- {"title":"万载花炮 — 焰境·万载","description":"万载花炮制作技艺 2008 年入选第一批国家级非物质文化遗产扩展项目名录——千年历史、4000 多个规格品种，驰名中外的花炮之乡。","ogImage":"/assets/img/huapao_future.jpeg"} -->
+<!-- {"title":"万载花炮 — 焰境·万载","description":"万载花炮制作技艺 2008 年入选第一批国家级非物质文化遗产扩展项目名录——千年历史、4000 多个规格品种，驰名中外的花炮之乡。","ogImage":"/assets/img/wanzaihuapao.jpg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,8 +6,11 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <div class="container">
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
         <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
         <h1>{{data.hero.title}}</h1>
         <p class="hero-sub">{{data.hero.subtitle}}</p>

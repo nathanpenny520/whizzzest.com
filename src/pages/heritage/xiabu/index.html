@@ -1,4 +1,4 @@
-<!-- {"title":"夏布织造 — 焰境·万载","description":"万载夏布织造技艺 2009 年入选第三批国家级非物质文化遗产名录——1600 余年历史，苎麻为原料，轻薄透气的夏季理想面料。"} -->
+<!-- {"title":"夏布织造 — 焰境·万载","description":"万载夏布织造技艺 2009 年入选第三批国家级非物质文化遗产名录——1600 余年历史，苎麻为原料，轻薄透气的夏季理想面料。","ogImage":"/assets/img/xiabu.jpg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,8 +6,11 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <div class="container">
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
         <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
         <h1>{{data.hero.title}}</h1>
         <p class="hero-sub">{{data.hero.subtitle}}</p>

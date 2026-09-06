@@ -1,4 +1,4 @@
-<!-- {"title":"非遗体验 — 焰境·万载","description":"万载非遗体验项目（花炮制作、傩面具彩绘、夏布织造、得胜鼓研学）正在筹备中，敬请期待。"} -->
+<!-- {"title":"非遗体验 — 焰境·万载","description":"万载非遗体验项目（花炮制作、傩面具彩绘、夏布织造、得胜鼓研学）正在筹备中，敬请期待。","ogImage":"/assets/img/feiyiexperience.jpg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,8 +6,11 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <div class="container">
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
         <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
         <h1>{{data.hero.title}}</h1>
         <p class="hero-sub">{{data.hero.subtitle}}</p>
