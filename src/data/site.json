@@ -41,6 +41,10 @@
       "label": "万载TV"
     },
     {
+      "href": "/library/",
+      "label": "文库"
+    },
+    {
       "href": "/merchants/",
       "label": "商户"
     }

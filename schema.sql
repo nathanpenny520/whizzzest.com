@@ -143,3 +143,56 @@ CREATE TABLE IF NOT EXISTS video_series (
   cover TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- 文库（2026-09-06，docs/文库方案.md）：小说/图文连载，作者投稿 → admin 审核 → 主站 /library/ 上线
+-- status: pending 待审 | approved 上线 | rejected 已驳回 | hidden 站长下线；slug 审核通过生成 b<id>
+-- 冗余 chapter_count/word_count 在章节变更时重算；views 为作品详情+阅读页浏览合计
+CREATE TABLE IF NOT EXISTS books (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',  -- novel 小说 | story 故事 | essay 随笔 | other 其他
+  intro TEXT NOT NULL,
+  cover TEXT,                              -- R2 键 book/c-*.jpg（主站 /media/ 代理公开读取）
+  author_name TEXT,                        -- 展示笔名（投稿时填，可空）
+  writer_id INTEGER,                       -- writer_users.id；admin 后台直建时为 NULL（免审）
+  status TEXT NOT NULL DEFAULT 'pending',
+  reject_reason TEXT,
+  sort_weight INTEGER NOT NULL DEFAULT 0,
+  chapter_count INTEGER NOT NULL DEFAULT 0,
+  word_count INTEGER NOT NULL DEFAULT 0,
+  views INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_books_pub ON books(status, sort_weight DESC, updated_at DESC);
+
+-- 章节：body 为分段纯文本（[图] 占位行，渲染时按 images 顺序替换 <figure>）；
+-- 章节级审核：已上线作品加新章/改章不影响上架，新章 approved 后才可读
+CREATE TABLE IF NOT EXISTS book_chapters (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id INTEGER NOT NULL REFERENCES books(id),
+  idx INTEGER NOT NULL,                    -- 章节序号（1 起），阅读页 URL 用
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  images TEXT,                             -- JSON 数组：R2 键列表 book/b<bookId>/…
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | rejected
+  reject_reason TEXT,
+  word_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chapters_book ON book_chapters(book_id, idx);
+CREATE INDEX IF NOT EXISTS idx_chapters_status ON book_chapters(status, id DESC);
+
+-- 作者账号（writer.whizzzest.com，docs/文库方案.md）：与商户门户完全独立的账号体系，
+-- 同手机号/邮箱可在两边各注册（不同表不同会话密钥）；登录方式与商户一致
+CREATE TABLE IF NOT EXISTS writer_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT UNIQUE NOT NULL,
+  email TEXT,
+  pass_hash TEXT NOT NULL,                 -- PBKDF2-SHA256(pass_salt, 10万次)
+  pass_salt TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wu_email ON writer_users(email);

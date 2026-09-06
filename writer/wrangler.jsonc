@@ -1,0 +1,29 @@
+{
+  // 焰境·万载 — 文库作者门户 Worker（writer.whizzzest.com，docs/文库方案.md）
+  // 职责：作者注册/登录、作品投稿（封面+多章图文）、章节管理、审核状态查看
+  // 安全：整域 noindex；PBKDF2 密码哈希；登录/注册/发码 IP 限流；独立会话密钥
+  // 凭据：wrangler secret 配 WRITER_SESSION_SECRET（本地明文在 .dev.vars）；
+  //       邮件复用 SMTP_USER / SMTP_PASS（验证码经 notifications@ 发送）
+  // 账号：writer_users 与商户 merchant_users 完全独立，同手机号可在两边各注册
+  // 媒体：封面/章节插图存 R2 桶 whizzzest-media（book/ 前缀），公开读取走主站 /media/ 代理
+  "name": "whizzzest-writer",
+  "compatibility_date": "2026-09-01",
+  "main": "index.js",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whizzzest",
+      "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "whizzzest-media"
+    }
+  ],
+  "routes": [
+    { "pattern": "writer.whizzzest.com", "custom_domain": true }
+  ]
+}

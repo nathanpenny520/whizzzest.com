@@ -12,6 +12,7 @@
 import { sendMail } from './smtp.js';
 import { handleMerchants } from './merchants.js';
 import { handleTv, handleMedia, handleTvLatest } from './tv.js';
+import { handleLibrary } from './library.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
 const VID_COOKIE = 'vid';
@@ -66,6 +67,9 @@ export default {
     if (url.pathname === '/tv' || url.pathname.startsWith('/tv/')) {
       // 万载TV 视频频道（docs/万载TV方案.md）：频道页/详情页/sitemap
       res = await handleTv(request, env, url, ctx);
+    } else if (url.pathname === '/library' || url.pathname.startsWith('/library/')) {
+      // 焰境文库（docs/文库方案.md）：书架/详情/阅读页/sitemap
+      res = await handleLibrary(request, env, url, ctx);
     } else if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
       res = await handleMerchants(request, env, url);
     } else {

@@ -17,6 +17,8 @@
       "/media/*",
       "/merchants",
       "/merchants/*",
+      "/library",
+      "/library/*",
       "/tv",
       "/tv/*",
       "/",

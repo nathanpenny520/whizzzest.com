@@ -185,6 +185,25 @@ async function handleApi(request, env, path) {
   // 从B站拉取信息：标题/简介/时长 + 封面转存 R2（B站图床有 Referer 防盗链，服务端抓回转存绕开）
   if (path === '/api/tv/fetch-bili' && method === 'POST') return fetchBili(env, request);
 
+  // 文库管理（docs/文库方案.md）：作品审核 + 章节审核；DELETE 级联章节与 R2 图片
+  if (path === '/api/books' && method === 'GET') return listBooks(env, request);
+  if (path === '/api/books' && method === 'POST') return createBook(env, request);
+  if ((m = path.match(/^\/api\/books\/(\d+)$/)) && method === 'POST') {
+    return updateBook(env, Number(m[1]), request);
+  }
+  if ((m = path.match(/^\/api\/books\/(\d+)$/)) && method === 'DELETE') {
+    return removeBook(env, Number(m[1]));
+  }
+  if ((m = path.match(/^\/api\/books\/(\d+)\/chapters$/)) && method === 'GET') {
+    return listBookChapters(env, Number(m[1]));
+  }
+  if ((m = path.match(/^\/api\/books\/(\d+)\/chapters\/(\d+)$/)) && method === 'POST') {
+    return reviewChapter(env, Number(m[1]), Number(m[2]), request);
+  }
+  if ((m = path.match(/^\/api\/books\/(\d+)\/chapters\/(\d+)$/)) && method === 'DELETE') {
+    return removeChapter(env, Number(m[1]), Number(m[2]));
+  }
+
   return json({ ok: false, error: 'not_found' }, 404);
 }
 
@@ -735,7 +754,7 @@ async function listVideos(env, request) {
   return json({ ok: true, total, byStatus, storage: await mediaUsage(env), videos: results || [] });
 }
 
-// R2 已用容量（tv/ 前缀求和；列表页每次现算太重，5 分钟缓存）
+// R2 已用容量（媒体桶全量求和：tv/ 视频 + book/ 文库插图封面共用一桶；5 分钟缓存）
 let vStorageCache = { at: 0, bytes: 0 };
 async function mediaUsage(env) {
   if (!env.MEDIA) return null;
@@ -744,7 +763,7 @@ async function mediaUsage(env) {
   let cursor;
   try {
     do {
-      const list = await env.MEDIA.list({ prefix: 'tv/', cursor });
+      const list = await env.MEDIA.list({ cursor });
       list.objects.forEach((o) => { bytes += o.size; });
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
@@ -954,6 +973,189 @@ async function uploadVideoCover(env, request) {
     return json({ ok: false, error: 'upload_failed' }, 500);
   }
   return json({ ok: true, key });
+}
+
+/* ---------------- 文库管理（D1 books/book_chapters，docs/文库方案.md） ---------------- */
+
+const B_CATEGORIES = ['novel', 'story', 'essay', 'other'];
+const B_STATUSES = ['pending', 'approved', 'rejected', 'hidden'];
+const CH_STATUSES = ['pending', 'approved', 'rejected'];
+
+async function listBooks(env, request) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status');
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const counts = await env.DB.prepare('SELECT status, COUNT(*) n FROM books GROUP BY status').all();
+  const byStatus = {};
+  let total = 0;
+  (counts.results || []).forEach((r) => { byStatus[r.status] = r.n; total += r.n; });
+
+  const sql = B_STATUSES.includes(status)
+    ? `SELECT b.*, (SELECT COUNT(*) FROM book_chapters c WHERE c.book_id = b.id AND c.status = 'pending') AS pending_ch
+       FROM books b WHERE b.status = ?1 ORDER BY b.id DESC LIMIT ?2 OFFSET ?3`
+    : `SELECT b.*, (SELECT COUNT(*) FROM book_chapters c WHERE c.book_id = b.id AND c.status = 'pending') AS pending_ch
+       FROM books b ORDER BY CASE b.status WHEN 'pending' THEN 0 ELSE 1 END, b.id DESC LIMIT ?1 OFFSET ?2`;
+  const { results } = B_STATUSES.includes(status)
+    ? await env.DB.prepare(sql).bind(status, PAGE_SIZE, offset).all()
+    : await env.DB.prepare(sql).bind(PAGE_SIZE, offset).all();
+
+  return json({ ok: true, total, byStatus, storage: await mediaUsage(env), books: results || [] });
+}
+
+/** admin 直建作品：默认 approved 免审（slug 自动生成）；封面可用站内路径或 R2 键后补 */
+async function createBook(env, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+  const f = {
+    title: String(body.title ?? '').trim().slice(0, 80),
+    category: String(body.category ?? '').trim().slice(0, 20),
+    author_name: String(body.author_name ?? '').trim().slice(0, 40) || null,
+    intro: String(body.intro ?? '').trim().slice(0, 500),
+    cover: String(body.cover ?? '').trim().slice(0, 300) || null,
+    status: String(body.status ?? 'approved').trim(),
+  };
+  if (!f.title || !f.intro || !B_CATEGORIES.includes(f.category) || !B_STATUSES.includes(f.status)) {
+    return json({ ok: false, error: 'invalid_fields' }, 400);
+  }
+  const r = await env.DB.prepare(
+    `INSERT INTO books (title, category, intro, author_name, cover, status)
+     VALUES (?1,?2,?3,?4,?5,?6)`
+  ).bind(f.title, f.category, f.intro, f.author_name, f.cover, f.status).run();
+  const id = r.meta.last_row_id;
+  if (f.status === 'approved') {
+    await env.DB.prepare('UPDATE books SET slug = ?1 WHERE id = ?2').bind('b' + id, id).run();
+  }
+  return json({ ok: true, id });
+}
+
+/** 部分更新：审核（status/reject_reason）与元数据（title/category/author_name/intro/sort_weight）共用 */
+async function updateBook(env, id, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+
+  const f = {};
+  for (const k of ['title', 'category', 'author_name', 'intro', 'status', 'reject_reason']) {
+    if (!(k in body)) continue;
+    f[k] = String(body[k] ?? '').trim().slice(0, k === 'intro' ? 500 : 200) || null;
+  }
+  if ('sort_weight' in body) f.sort_weight = Math.max(0, Math.min(999, Math.round(Number(body.sort_weight) || 0)));
+  if ('title' in f && !f.title) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('category' in f && f.category && !B_CATEGORIES.includes(f.category)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('status' in f && f.status && !B_STATUSES.includes(f.status)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if (f.status === 'rejected' && !f.reject_reason) return json({ ok: false, error: 'reject_reason_required' }, 400);
+  if (f.reject_reason === null) delete f.reject_reason; // 只传空串不清原因
+
+  const old = await env.DB.prepare('SELECT id, slug FROM books WHERE id = ?1').bind(id).first();
+  if (!old) return json({ ok: false, error: 'not_found' }, 404);
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(f)) {
+    sets.push(`${k} = ?${vals.length + 1}`);
+    vals.push(v);
+  }
+  if (!sets.length) return json({ ok: false, error: 'no_fields' }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await env.DB.prepare(`UPDATE books SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`).bind(...vals, id).run();
+
+  // 上线且无 slug：补 b<id>（元数据重审通过后 slug 保留）
+  if ((f.status === 'approved' || !('status' in f)) && !old.slug) {
+    await env.DB.prepare('UPDATE books SET slug = ?1 WHERE id = ?2').bind('b' + id, id).run();
+  }
+  return json({ ok: true });
+}
+
+/** 删除作品：章节行 + 章节插图 + 封面级联；R2 清理尽力而为 */
+async function removeBook(env, id) {
+  const book = await env.DB.prepare('SELECT id, cover FROM books WHERE id = ?1').bind(id).first();
+  const { meta } = await env.DB.prepare('DELETE FROM books WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  await env.DB.prepare('DELETE FROM book_chapters WHERE book_id = ?1').bind(id).run();
+
+  if (env.MEDIA) {
+    const keys = [];
+    try {
+      const rows = await env.DB.prepare('SELECT images FROM book_chapters WHERE book_id = ?1').bind(id).all();
+      // 上面的 DELETE 已执行；此处查询仅为兼容旧数据兜底（正常返回空）
+      for (const row of rows.results || []) keys.push(...safeImages2(row.images));
+    } catch { /* 表已清空时忽略 */ }
+    if (book?.cover && !book.cover.startsWith('/')) keys.push(book.cover);
+    for (const k of keys) {
+      try { await env.MEDIA.delete(k); } catch (err) { console.error(`R2 cleanup failed for ${k}:`, err); }
+    }
+    try {
+      let cursor;
+      do {
+        const list = await env.MEDIA.list({ prefix: `book/b${id}/`, cursor });
+        await Promise.all(list.objects.map((o) => env.MEDIA.delete(o.key)));
+        cursor = list.truncated ? list.cursor : undefined;
+      } while (cursor);
+    } catch (err) {
+      console.error(`R2 prefix cleanup failed for book ${id}:`, err);
+    }
+  }
+  return json({ ok: true });
+}
+
+function safeImages2(json) {
+  try {
+    const v = JSON.parse(json || '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 章节列表（含正文，供后台「先读后审」） */
+async function listBookChapters(env, bookId) {
+  const { results } = await env.DB.prepare(
+    'SELECT id, idx, title, body, images, status, reject_reason, word_count, updated_at FROM book_chapters WHERE book_id = ?1 ORDER BY idx'
+  ).bind(bookId).all();
+  return json({ ok: true, chapters: results || [] });
+}
+
+/** 章节审核：通过（读者可见）或驳回（原因回传作者作品台） */
+async function reviewChapter(env, bookId, cid, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+  const status = String(body.status ?? '');
+  if (!CH_STATUSES.includes(status)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  const reason = status === 'rejected'
+    ? (String(body.reject_reason ?? '').trim().slice(0, 200) || null)
+    : null;
+  if (status === 'rejected' && !reason) return json({ ok: false, error: 'reject_reason_required' }, 400);
+
+  const { meta } = await env.DB.prepare(
+    `UPDATE book_chapters SET status = ?1, reject_reason = ?2, updated_at = datetime('now')
+     WHERE id = ?3 AND book_id = ?4`
+  ).bind(status, reason, cid, bookId).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  await env.DB.prepare(`UPDATE books SET updated_at = datetime('now') WHERE id = ?1`).bind(bookId).run();
+  return json({ ok: true });
+}
+
+/** 删除章节（admin）：级联插图 + 重算作品计数 */
+async function removeChapter(env, bookId, cid) {
+  const ch = await env.DB.prepare('SELECT id, images FROM book_chapters WHERE id = ?1 AND book_id = ?2')
+    .bind(cid, bookId).first();
+  const { meta } = await env.DB.prepare('DELETE FROM book_chapters WHERE id = ?1 AND book_id = ?2')
+    .bind(cid, bookId).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+
+  if (env.MEDIA) {
+    for (const k of safeImages2(ch?.images)) {
+      try { await env.MEDIA.delete(k); } catch (err) { console.error(`R2 cleanup failed for ${k}:`, err); }
+    }
+  }
+  await env.DB.prepare(
+    `UPDATE books SET
+       chapter_count = (SELECT COUNT(*) FROM book_chapters WHERE book_id = ?1),
+       word_count = (SELECT COALESCE(SUM(word_count), 0) FROM book_chapters WHERE book_id = ?1),
+       updated_at = datetime('now')
+     WHERE id = ?1`
+  ).bind(bookId).run();
+  return json({ ok: true });
 }
 
 /* ---------------- 工具 ---------------- */
@@ -1262,6 +1464,12 @@ ${BASE_CSS}
   /* 万载TV 视频管理 */
   .vrow1 { display: flex; align-items: flex-start; gap: 12px; }
   .vthumb { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: #f0f0f2; flex: 0 0 auto; }
+  /* 文库管理 */
+  .bkthumb { width: 58px; height: 82px; object-fit: cover; border-radius: 6px; background: #f0f0f2; flex: 0 0 auto; }
+  .chdetail { margin: -6px 0 14px; padding: 14px 16px; background: #fafafc; border-radius: 12px; border: 1px solid rgba(0,0,0,.05); }
+  .chitem { border-top: 1px solid rgba(0,0,0,.06); padding: 12px 0; }
+  .chitem:first-child { border-top: 0; padding-top: 4px; }
+  .chbody { margin-top: 8px; padding: 10px 12px; background: #fff; border: 1px solid rgba(0,0,0,.05); border-radius: 10px; font-size: 13px; white-space: pre-wrap; word-break: break-word; color: #333; max-height: 280px; overflow-y: auto; line-height: 1.7; }
   .vprog { height: 6px; background: #f0f0f2; border-radius: 999px; margin-top: 14px; overflow: hidden; }
   .vprog div { height: 100%; width: 0; background: linear-gradient(90deg, #d64524, #f2a03d); transition: width .2s; }
   .vhint { color: #86868b; font-size: 12px; }
@@ -1290,6 +1498,7 @@ ${BASE_CSS}
       <a class="anav-link" id="vtab-visit" href="#/visit">访客</a>
       <a class="anav-link" id="vtab-merch" href="#/merch">商户</a>
       <a class="anav-link" id="vtab-tv" href="#/tv">视频</a>
+      <a class="anav-link" id="vtab-books" href="#/books">文库</a>
       <a class="anav-link" id="vtab-acct" href="#/acct">账号</a>
     </nav>
     <div class="anav-right">
@@ -1312,6 +1521,7 @@ ${BASE_CSS}
     <li class="anav-drawer-item"><a class="anav-link" href="#/visit">访客</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/merch">商户</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/tv">视频</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/books">文库</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/acct">账号</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="https://whizzzest.com/" target="_blank" rel="noopener">前往官网 ↗</a></li>
     <li class="anav-drawer-item"><a class="anav-link" id="logout-m" href="#">退出登录</a></li>
@@ -1504,6 +1714,45 @@ ${BASE_CSS}
   <button class="more" id="tmore" type="button" style="display:none">加载更多</button>
 </div>
 
+<div id="view-books" class="wrap" style="display:none">
+  <div class="range">
+    <button class="tab active" data-bst="" type="button">全部</button>
+    <button class="tab" data-bst="pending" type="button">待审</button>
+    <button class="tab" data-bst="approved" type="button">已上线</button>
+    <button class="tab" data-bst="rejected" type="button">已驳回</button>
+    <button class="tab" data-bst="hidden" type="button">已下线</button>
+    <span class="updated" id="bstats"></span>
+    <button id="badd" type="button" class="primary">新增作品</button>
+  </div>
+  <div class="panel" id="bform" style="display:none">
+    <h3 id="bform-title">新增作品（免审直发）</h3>
+    <div class="mgrid">
+      <label>书名 *<input id="b-title" maxlength="80"></label>
+      <label>分类
+        <select id="b-cat">
+          <option value="novel">小说</option><option value="story">故事</option>
+          <option value="essay">随笔</option><option value="other">其他</option>
+        </select>
+      </label>
+      <label>笔名<input id="b-author" maxlength="40"></label>
+      <label>状态
+        <select id="b-status">
+          <option value="approved">已上线</option>
+          <option value="pending">待审核</option>
+          <option value="hidden">已下线</option>
+        </select>
+      </label>
+      <label>置顶权重（大者靠前）<input id="b-weight" type="number" value="0"></label>
+      <label class="wide">封面（R2 键 book/… 或站内路径 /assets/img/…，可空）<input id="b-cover"></label>
+      <label class="wide">简介 *<textarea id="b-intro" rows="3"></textarea></label>
+    </div>
+    <div class="ops"><button class="primary" id="bsave" type="button">保存</button><button id="bcancel" type="button">取消</button></div>
+    <p class="vhint" style="margin-top:10px">章节在作者门户（writer.whizzzest.com）写作；此处创建/编辑作品信息，章节审核点作品卡的「章节审核」。</p>
+  </div>
+  <div class="list" id="blist"><p class="empty">加载中…</p></div>
+  <button class="more" id="bmore" type="button" style="display:none">加载更多</button>
+</div>
+
 <div id="view-acct" class="wrap" style="display:none">
   <div class="panel">
     <h3>当前登录</h3>
@@ -1564,7 +1813,7 @@ function api(path, opts) {
 }
 
 /* ---------- 视图切换（当前板块记在 location.hash：刷新/前进后退不丢） ---------- */
-var VIEWS = ['msg', 'visit', 'merch', 'tv', 'acct'];
+var VIEWS = ['msg', 'visit', 'merch', 'tv', 'books', 'acct'];
 var suppressHash = false;
 function showView(v, skipHash) {
   if (VIEWS.indexOf(v) === -1) v = 'msg';
@@ -1573,16 +1822,19 @@ function showView(v, skipHash) {
   el('view-visit').style.display = v === 'visit' ? '' : 'none';
   el('view-merch').style.display = v === 'merch' ? '' : 'none';
   el('view-tv').style.display = v === 'tv' ? '' : 'none';
+  el('view-books').style.display = v === 'books' ? '' : 'none';
   el('view-acct').style.display = v === 'acct' ? '' : 'none';
   el('vtab-msg').classList.toggle('active', v === 'msg');
   el('vtab-visit').classList.toggle('active', v === 'visit');
   el('vtab-merch').classList.toggle('active', v === 'merch');
   el('vtab-tv').classList.toggle('active', v === 'tv');
+  el('vtab-books').classList.toggle('active', v === 'books');
   el('vtab-acct').classList.toggle('active', v === 'acct');
   if (v === 'msg') load(true);
   if (v === 'visit') { loadStats(); loadVisitors(true); }
   if (v === 'merch') loadMerchants(true);
   if (v === 'tv') loadTv(true);
+  if (v === 'books') loadBooks(true);
   if (v === 'acct') loadAccounts();
   if (!skipHash && '#/' + v !== location.hash) {
     suppressHash = true;
@@ -1837,6 +2089,7 @@ el('refresh').addEventListener('click', function () {
   if (currentView === 'visit') { loadStats(); loadVisitors(true); }
   else if (currentView === 'merch') { loadMerchants(true); }
   else if (currentView === 'tv') { loadTv(true); }
+  else if (currentView === 'books') { loadBooks(true); }
   else if (currentView === 'acct') { loadAccounts(); }
   else { load(true); }
 });
@@ -2309,6 +2562,207 @@ el('tsave').addEventListener('click', function () {
   });
 });
 el('tmore').addEventListener('click', function () { tState.offset += ${PAGE_SIZE}; loadTv(false); });
+
+/* ---------- 文库管理（docs/文库方案.md） ---------- */
+var bState = { status: '', offset: 0 };
+var editingBookId = null;
+var B_CAT = { novel: '小说', story: '故事', essay: '随笔', other: '其他' };
+var B_ST = { pending: '待审核', approved: '已上线', rejected: '已驳回', hidden: '已下线' };
+
+document.querySelectorAll('#view-books .range [data-bst]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    bState.status = b.getAttribute('data-bst');
+    document.querySelectorAll('#view-books .range [data-bst]').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadBooks(true);
+  });
+});
+
+function loadBooks(reset) {
+  if (reset) bState.offset = 0;
+  var q = '?offset=' + bState.offset + (bState.status ? '&status=' + bState.status : '');
+  api('/api/books' + q).then(function (d) {
+    var list = d.books || [];
+    var counts = d.byStatus || {};
+    var line = '共 ' + d.total + ' 部 · 待审 ' + (counts.pending || 0) + ' · 已上线 ' + (counts.approved || 0);
+    if (d.storage != null) line += ' · 媒体桶已用 ' + (d.storage / 1048576).toFixed(1) + ' MB';
+    el('bstats').textContent = line;
+    var box = el('blist');
+    if (reset) box.innerHTML = '';
+    if (reset && list.length === 0) {
+      box.innerHTML = '<p class="empty">还没有作品。作者投稿会出现在这里，也可点右上「新增作品」直发。</p>';
+    } else {
+      list.forEach(function (x) { box.appendChild(renderBook(x)); });
+    }
+    el('bmore').style.display = (bState.offset + ${PAGE_SIZE} < d.total && list.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('blist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderBook(x) {
+  var div = document.createElement('div');
+  div.className = 'msg' + (x.status === 'pending' ? '' : ' read');
+  var thumb = x.cover
+    ? '<img class="bkthumb" loading="lazy" alt="" src="' + SITE_HOME + (x.cover.indexOf('/') === 0 ? '' : '/media/') + esc(x.cover) + '">'
+    : '<div class="bkthumb"></div>';
+  var pend = x.pending_ch > 0 ? '<span class="mst mst-pending">' + x.pending_ch + ' 章待审</span>' : '';
+  div.innerHTML =
+    '<div class="vrow1">' + thumb +
+    '<div style="min-width:0;flex:1">' +
+      '<div class="row1"><span class="name">' + esc(x.title) + '</span>' +
+      '<span class="k-badge">' + esc(B_CAT[x.category] || x.category) + '</span>' +
+      (x.author_name ? '<span class="k-badge">' + esc(x.author_name) + '</span>' : '') +
+      '<span class="mst mst-' + esc(x.status) + '">' + esc(B_ST[x.status] || x.status) + '</span>' + pend +
+      (x.slug && x.status === 'approved'
+        ? '<a class="mslug" href="' + SITE_HOME + '/library/' + esc(x.slug) + '/" target="_blank" rel="noopener">查看页面 ↗</a>' : '') +
+      '</div>' +
+      '<div class="meta">' + (x.writer_id ? '作者投稿 · ' : '站长直发 · ') + (x.chapter_count || 0) + ' 章 · ' +
+      ((x.word_count || 0).toLocaleString()) + ' 字 · 浏览 ' + (x.views || 0) + ' · ' + esc(fmtTime(x.updated_at)) + '</div>' +
+      (x.status === 'rejected' && x.reject_reason ? '<div class="meta" style="color:#d64524">驳回原因：' + esc(x.reject_reason) + '</div>' : '') +
+      (x.intro ? '<div class="time">' + esc(x.intro) + '</div>' : '') +
+      '<div class="ops">' +
+      (x.status === 'pending' ? '<button type="button" data-act="ok" class="primary">通过上线</button><button type="button" data-act="rej">驳回</button>' : '') +
+      (x.status === 'approved' ? '<button type="button" data-act="off">下线</button>' : '') +
+      (x.status === 'hidden' ? '<button type="button" data-act="ok2" class="primary">恢复上线</button>' : '') +
+      '<button type="button" data-act="edit">编辑信息</button>' +
+      '<button type="button" data-act="ch">章节审核</button>' +
+      '<button type="button" data-act="del">删除</button></div>' +
+    '</div></div>';
+  div.querySelector('.ops').addEventListener('click', function (e) {
+    var act = e.target.getAttribute('data-act');
+    if (act === 'ok' || act === 'ok2') {
+      api('/api/books/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' })
+      }).then(function () { loadBooks(true); });
+    } else if (act === 'rej') {
+      var reason = prompt('驳回原因（会展示给作者）：');
+      if (reason === null) return;
+      api('/api/books/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected', reject_reason: reason || '内容待完善' })
+      }).then(function () { loadBooks(true); });
+    } else if (act === 'off') {
+      api('/api/books/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'hidden' })
+      }).then(function () { loadBooks(true); });
+    } else if (act === 'edit') {
+      openBookForm(x);
+    } else if (act === 'ch') {
+      toggleChapters(x, div);
+    } else if (act === 'del') {
+      // 二次点击确认（同商户/视频）：首击变红待确认，4 秒未点自动复原；第二击才真正删除（含章节与图片，不可恢复）
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'danger';
+        btn.textContent = '确认删除（含章节）';
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.removeAttribute('data-armed');
+          btn.className = '';
+          btn.textContent = '删除';
+        }, 4000);
+        return;
+      }
+      api('/api/books/' + x.id, { method: 'DELETE' }).then(function () { loadBooks(true); });
+    }
+  });
+  return div;
+}
+
+/** 展开/收起某作品的章节审核面板（先读后审：正文全量展示） */
+function toggleChapters(book, card) {
+  var existing = card.nextElementSibling;
+  if (existing && existing.className === 'chdetail') { existing.remove(); return; }
+  var det = document.createElement('div');
+  det.className = 'chdetail';
+  det.innerHTML = '<p class="empty">章节加载中…</p>';
+  card.after(det);
+  api('/api/books/' + book.id + '/chapters').then(function (d) {
+    var rows = (d.chapters || []).map(function (c) {
+      var imgs = [];
+      try { imgs = JSON.parse(c.images || '[]') || []; } catch (err) { imgs = []; }
+      var imgHtml = imgs.length
+        ? '<div class="thumbs" style="margin-top:8px">' + imgs.map(function (k) {
+            return '<img class="land" loading="lazy" alt="" src="' + SITE_HOME + (k.indexOf('/') === 0 ? '' : '/media/') + esc(k) + '">';
+          }).join('') + '</div>'
+        : '';
+      return '<div class="chitem">' +
+        '<div class="row1"><span class="name" style="font-size:14px">第' + c.idx + '章 · ' + esc(c.title) + '</span>' +
+        '<span class="mst ' + (c.status === 'approved' ? 'mst-approved' : c.status === 'rejected' ? 'mst-rejected' : 'mst-pending') + '">' +
+        (c.status === 'approved' ? '已上线' : c.status === 'rejected' ? '已驳回' : '待审') + '</span>' +
+        '<span class="vhint">' + (c.word_count || 0) + ' 字</span></div>' +
+        (c.status === 'rejected' && c.reject_reason ? '<div class="vhint">驳回原因：' + esc(c.reject_reason) + '</div>' : '') +
+        '<div class="chbody">' + esc(c.body) + '</div>' + imgHtml +
+        '<div class="ops">' +
+        (c.status !== 'approved' ? '<button type="button" data-chok="' + c.id + '">通过上线</button>' : '') +
+        (c.status !== 'rejected' ? '<button type="button" data-chrej="' + c.id + '">驳回</button>' : '') +
+        '<button type="button" data-chdel="' + c.id + '" class="danger">删除</button></div>' +
+        '</div>';
+    }).join('');
+    det.innerHTML = rows || '<p class="empty">该作品还没有章节（作者尚未写作）。</p>';
+    det.addEventListener('click', function (e) {
+      var ok = e.target.getAttribute('data-chok');
+      var rej = e.target.getAttribute('data-chrej');
+      var del = e.target.getAttribute('data-chdel');
+      if (ok) {
+        api('/api/books/' + book.id + '/chapters/' + ok, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status: 'approved' })
+        }).then(function () { toggleChapters(book, card); loadBooks(false); });
+      } else if (rej) {
+        var reason = prompt('驳回原因（会展示给作者）：');
+        if (reason === null) return;
+        api('/api/books/' + book.id + '/chapters/' + rej, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status: 'rejected', reject_reason: reason || '内容待完善' })
+        }).then(function () { toggleChapters(book, card); loadBooks(false); });
+      } else if (del) {
+        if (!confirm('确定删除该章节？章节图片将一并删除，不可恢复。')) return;
+        api('/api/books/' + book.id + '/chapters/' + del, { method: 'DELETE' })
+          .then(function () { toggleChapters(book, card); loadBooks(false); });
+      }
+    });
+  }).catch(function (e) {
+    det.innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function openBookForm(x) {
+  editingBookId = x ? x.id : null;
+  el('bform-title').textContent = x ? '编辑作品 #' + x.id + '（' + esc(B_ST[x.status] || x.status) + '）' : '新增作品（免审直发）';
+  el('b-title').value = x ? x.title || '' : '';
+  el('b-cat').value = x ? x.category || 'novel' : 'novel';
+  el('b-author').value = x ? x.author_name || '' : '';
+  el('b-status').value = x ? x.status || 'approved' : 'approved';
+  el('b-weight').value = x ? x.sort_weight || 0 : 0;
+  el('b-cover').value = x ? x.cover || '' : '';
+  el('b-intro').value = x ? x.intro || '' : '';
+  el('bform').style.display = '';
+  el('bform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeBookForm() { el('bform').style.display = 'none'; editingBookId = null; }
+
+el('badd').addEventListener('click', function () { openBookForm(null); });
+el('bcancel').addEventListener('click', closeBookForm);
+el('bsave').addEventListener('click', function () {
+  var payload = {
+    title: val('b-title'), category: val('b-cat'), author_name: val('b-author'),
+    status: val('b-status'), sort_weight: Number(val('b-weight') || 0),
+    cover: val('b-cover'), intro: val('b-intro')
+  };
+  if (!payload.title || !payload.intro) { alert('请填写书名和简介'); return; }
+  api(editingBookId ? '/api/books/' + editingBookId : '/api/books', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function () { closeBookForm(); loadBooks(true); })
+    .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); });
+});
+el('bmore').addEventListener('click', function () { bState.offset += ${PAGE_SIZE}; loadBooks(false); });
 
 /* ---------- 账号管理（运营账号，权限与主账号相同） ---------- */
 var me = '';
