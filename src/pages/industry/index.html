@@ -51,7 +51,7 @@
       <div class="container">
         <article class="split split-rev reveal">
           <div class="split-media">
-            <img src="/assets/img/{{data.cultureTourism.img}}" alt="{{data.cultureTourism.title}}" loading="lazy" decoding="async">
+            <img src="/assets/img/{{data.cultureTourism.img}}" alt="{{data.cultureTourism.title}}" loading="lazy" decoding="async" {{#if data.cultureTourism.ar}}style="aspect-ratio:{{data.cultureTourism.ar}}"{{/if}}>
           </div>
           <div class="split-body">
             <span class="kicker">03 · 文旅</span>
@@ -61,7 +61,7 @@
         </article>
         <article class="split reveal">
           <div class="split-media">
-            <img src="/assets/img/{{data.future.img}}" alt="{{data.future.title}}" loading="lazy" decoding="async">
+            <img src="/assets/img/{{data.future.img}}" alt="{{data.future.title}}" loading="lazy" decoding="async" {{#if data.future.ar}}style="aspect-ratio:{{data.future.ar}}"{{/if}}>
           </div>
           <div class="split-body">
             <span class="kicker">04 · 未来</span>

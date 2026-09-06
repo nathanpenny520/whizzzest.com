@@ -251,8 +251,10 @@ button {
 .hero {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  min-height: min(76vh, 720px);
+  align-items: center;
+  /* 导航高 48px 在文档流内，hero 取「视口 − 导航」即首屏正好铺满 */
+  min-height: calc(100vh - var(--nav-h));
+  min-height: calc(100svh - var(--nav-h));
   color: #fff;
   text-align: center;
   isolation: isolate;
@@ -400,9 +402,8 @@ button {
 }
 
 .card-media {
-  aspect-ratio: 4 / 3;
   width: 100%;
-  object-fit: cover;
+  height: auto; /* 完整展示不裁剪；栅格改用 masonry 列排避免高度参差 */
 }
 
 .card-body {
@@ -491,8 +492,7 @@ button {
 
 .split-media img {
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto; /* 原始比例完整展示，不裁剪（比例由构建数据 aspect-ratio 预置，零偏移） */
 }
 
 .split-body .kicker {
@@ -530,9 +530,8 @@ button {
 }
 
 .route-media {
-  aspect-ratio: 16 / 8;
   width: 100%;
-  object-fit: cover;
+  height: auto;
 }
 
 .route-body {
@@ -925,12 +924,8 @@ button {
 
 /* ---------------- 内页图 Hero ---------------- */
 
-.hero-inner {
-  min-height: min(56vh, 520px);
-}
-
 .hero-inner .hero-content {
-  padding: 72px 22px 64px;
+  padding: 72px 22px;
 }
 
 .hero-inner h1 {
@@ -1258,4 +1253,24 @@ button {
 
 .cta-band:not(.section-alt) {
   background: var(--c-bg);
+}
+
+/* ---------------- 瀑布流列排（图片原比例卡片，避免栅格高度参差留白） ---------------- */
+
+.masonry {
+  columns: 3;
+  column-gap: 24px;
+}
+
+.masonry > * {
+  break-inside: avoid;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1023px) {
+  .masonry { columns: 2; }
+}
+
+@media (max-width: 700px) {
+  .masonry { columns: 1; }
 }

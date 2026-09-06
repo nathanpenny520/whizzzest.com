@@ -21,7 +21,7 @@
         <div class="grid grid-2">
           {{#each data.spots as spot}}
           <article class="card reveal">
-            <img class="card-media" src="/assets/img/{{spot.img}}" alt="{{spot.name}}" loading="lazy" decoding="async">
+            <img class="card-media" src="/assets/img/{{spot.img}}" alt="{{spot.name}}" loading="lazy" decoding="async" {{#if spot.ar}}style="aspect-ratio:{{spot.ar}}"{{/if}}>
             <div class="card-body">
               <h3>{{spot.name}}</h3>
               <p>{{spot.desc}}</p>

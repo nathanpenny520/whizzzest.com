@@ -7,19 +7,23 @@
   "carousel": [
     {
       "img": "yzxf_bswz.jpeg",
-      "alt": "一朝相逢，便是万载"
+      "alt": "一朝相逢，便是万载",
+      "ar": "2432/1696"
     },
     {
       "img": "guchen_xuejing.png",
-      "alt": "万载古城"
+      "alt": "万载古城",
+      "ar": "1080/619"
     },
     {
       "img": "sanshiba_pool.jpeg",
-      "alt": "三十把水库"
+      "alt": "三十把水库",
+      "ar": "2592/1632"
     },
     {
       "img": "xianyuanyanxue.jpg",
-      "alt": "万载仙源研学"
+      "alt": "万载仙源研学",
+      "ar": "1080/721"
     }
   ],
   "featuresTitle": "核心特色",
@@ -43,21 +47,24 @@
       "desc": "万载拥有丰富的非物质文化遗产，包括万载花炮、得胜鼓、万载开口傩、夏布织造等。这些传统文化遗产承载着万载人民的智慧和创造力，是万载文化的重要组成部分。",
       "learnMore": "了解更多",
       "href": "/heritage/",
-      "img": "nuowu.jpeg"
+      "img": "nuowu.jpeg",
+      "ar": "2592/1600"
     },
     {
       "title": "美食特产",
       "desc": "万载美食以其独特的风味和制作工艺闻名，万载六大碗、万载剁肉、罗城扎粉等传统菜肴，以及百合粉、南酸枣糕等特产，都是不可错过的舌尖美味。",
       "learnMore": "了解更多",
       "href": "/cuisine/",
-      "img": "liudawan.jpeg"
+      "img": "liudawan.jpeg",
+      "ar": "2496/1664"
     },
     {
       "title": "烟花产业",
       "desc": "万载作为中国四大花炮主产区之一，烟花产业历史悠久，技术先进。近年来，万载花炮产业不断转型升级，产品畅销全球，成为当地的支柱富民产业之一。",
       "learnMore": "了解更多",
       "href": "/industry/",
-      "img": "longhu_yanhuowanhui.jpeg"
+      "img": "longhu_yanhuowanhui.jpeg",
+      "ar": "2752/1504"
     }
   ],
   "cta": {

@@ -55,7 +55,7 @@
       <div class="container">
         <article class="split reveal{{#if_odd}} split-rev{{/if_odd}}">
           <div class="split-media">
-            <img src="/assets/img/{{sec.img}}" alt="{{sec.title}}" loading="lazy" decoding="async">
+            <img src="/assets/img/{{sec.img}}" alt="{{sec.title}}" loading="lazy" decoding="async" {{#if sec.ar}}style="aspect-ratio:{{sec.ar}}"{{/if}}>
           </div>
           <div class="split-body">
             <h2 class="split-title">{{sec.title}}</h2>

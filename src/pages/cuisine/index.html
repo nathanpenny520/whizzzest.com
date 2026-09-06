@@ -22,10 +22,10 @@
         <div class="section-head reveal">
           <h2>{{group.title}}</h2>
         </div>
-        <div class="grid grid-3">
+        <div class="masonry">
           {{#each group.dishes as d}}
           <div class="card reveal">
-            <img class="card-media" src="/assets/img/{{d.img}}" alt="{{d.title}}" loading="lazy" decoding="async">
+            <img class="card-media" src="/assets/img/{{d.img}}" alt="{{d.title}}" loading="lazy" decoding="async" {{#if d.ar}}style="aspect-ratio:{{d.ar}}"{{/if}}>
             <div class="card-body">
               <h3>{{d.title}}</h3>
               {{#each d.paras as p}}<p>{{p}}</p>{{/each}}

@@ -61,9 +61,33 @@ def paras(*vals):
     return [v for v in vals if v]
 
 
+_AR_CACHE = {}
+
+
+def img_ar(fname):
+    """用 macOS 内置 sips 读取图片尺寸，返回 CSS aspect-ratio 值（如 '1200/800'）。
+    供模板写 style="aspect-ratio:…"，图片按原始比例完整展示、零裁剪零布局偏移。"""
+    if not fname:
+        return ""
+    if fname in _AR_CACHE:
+        return _AR_CACHE[fname]
+    p = os.path.join("src/assets/img", fname)
+    ar = ""
+    if os.path.exists(p):
+        out = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", p],
+                             capture_output=True, text=True).stdout
+        w = re.search(r"pixelWidth:\s*(\d+)", out)
+        h = re.search(r"pixelHeight:\s*(\d+)", out)
+        if w and h:
+            ar = f"{w.group(1)}/{h.group(1)}"
+    _AR_CACHE[fname] = ar
+    return ar
+
+
 def dish(zh_food, key):
     sec = zh_food["sections"][key]
-    return {"key": key, "title": sec["title"], "paras": paras(sec.get("desc1"), sec.get("desc")), "img": IMG[key]}
+    img = IMG[key]
+    return {"key": key, "title": sec["title"], "paras": paras(sec.get("desc1"), sec.get("desc")), "img": img, "ar": img_ar(img)}
 
 
 def travel_routes_from_ts():
@@ -85,6 +109,7 @@ def travel_routes_from_ts():
     img_map = {"古城文化之旅": "guc_wenhua_tra.jpg", "山水文化之旅": "shans_wenhua_tra.jpeg", "红色文化之旅": "hongs_wenhua_tra.jpg"}
     for r in routes:
         r["img"] = img_map.get(r["name"], "wanzai_travelling.jpeg")
+        r["ar"] = img_ar(r["img"])
     return routes
 
 
@@ -124,13 +149,12 @@ def main():
 
     # ---------------- 首页 ----------------
     home = zh["home"]
+    home_imgs = [("nuowu.jpeg", "/heritage/", home["culture"]), ("liudawan.jpeg", "/cuisine/", home["food"]), ("longhu_yanhuowanhui.jpeg", "/industry/", home["industry"])]
     index = {
         "hero": home["hero"],
         "carousel": [
-            {"img": "yzxf_bswz.jpeg", "alt": "一朝相逢，便是万载"},
-            {"img": "guchen_xuejing.png", "alt": "万载古城"},
-            {"img": "sanshiba_pool.jpeg", "alt": "三十把水库"},
-            {"img": "xianyuanyanxue.jpg", "alt": "万载仙源研学"},
+            {"img": f, "alt": alt, "ar": img_ar(f)}
+            for f, alt in (("yzxf_bswz.jpeg", "一朝相逢，便是万载"), ("guchen_xuejing.png", "万载古城"), ("sanshiba_pool.jpeg", "三十把水库"), ("xianyuanyanxue.jpg", "万载仙源研学"))
         ],
         "featuresTitle": home["features"]["title"],
         "features": [
@@ -139,9 +163,8 @@ def main():
             {"title": home["features"]["tourism"]["title"], "desc": home["features"]["tourism"]["desc"]},
         ],
         "sections": [
-            {"title": home["culture"]["title"], "desc": home["culture"]["desc"], "learnMore": home["culture"]["learnMore"], "href": "/heritage/", "img": "nuowu.jpeg"},
-            {"title": home["food"]["title"], "desc": home["food"]["desc"], "learnMore": home["food"]["learnMore"], "href": "/cuisine/", "img": "liudawan.jpeg"},
-            {"title": home["industry"]["title"], "desc": home["industry"]["desc"], "learnMore": home["industry"]["learnMore"], "href": "/industry/", "img": "longhu_yanhuowanhui.jpeg"},
+            {"title": c["title"], "desc": c["desc"], "learnMore": c["learnMore"], "href": href, "img": f, "ar": img_ar(f)}
+            for f, href, c in home_imgs
         ],
         "cta": home["cta"],
     }
@@ -198,8 +221,8 @@ def main():
                 {"title": ind["techUpgrade"]["title"], "paras": paras(ind["techUpgrade"].get("desc1"), ind["techUpgrade"].get("desc2"), ind["techUpgrade"].get("desc3"))},
             ],
         },
-        "cultureTourism": {"title": ind["cultureTourism"]["title"], "paras": paras(ind["cultureTourism"].get("desc1"), ind["cultureTourism"].get("desc2"), ind["cultureTourism"].get("desc3")), "img": "guchen_yanhua.jpeg"},
-        "future": {"title": ind["future"]["title"], "paras": paras(ind["future"].get("desc1"), ind["future"].get("desc2")), "img": "huapao_future.jpeg"},
+        "cultureTourism": {"title": ind["cultureTourism"]["title"], "paras": paras(ind["cultureTourism"].get("desc1"), ind["cultureTourism"].get("desc2"), ind["cultureTourism"].get("desc3")), "img": "guchen_yanhua.jpeg", "ar": img_ar("guchen_yanhua.jpeg")},
+        "future": {"title": ind["future"]["title"], "paras": paras(ind["future"].get("desc1"), ind["future"].get("desc2")), "img": "huapao_future.jpeg", "ar": img_ar("huapao_future.jpeg")},
         "cta": {**zh["industry"]["cta"], "btn": zh["industry"]["cta"].get("cta", common["viewRoutes"]), "href": "/spots/"},
     }
 
@@ -219,8 +242,8 @@ def main():
         "viewingLabel": s["bestViewing"],
         "transportLabel": s["transportation"],
         "spots": [
-            {"name": s["ancientCity"], "desc": s["ancientCityDesc1"], "viewing": s["ancientCityViewing"], "transport": s["ancientCityTransport"], "img": "guchen_niaokan.jpeg"},
-            {"name": s["longhuPark"], "desc": s["longhuParkDesc1"], "viewing": s["longhuParkViewing"], "transport": s["longhuParkTransport"], "img": "longhu_niaokan.jpeg"},
+            {"name": s["ancientCity"], "desc": s["ancientCityDesc1"], "viewing": s["ancientCityViewing"], "transport": s["ancientCityTransport"], "img": "guchen_niaokan.jpeg", "ar": img_ar("guchen_niaokan.jpeg")},
+            {"name": s["longhuPark"], "desc": s["longhuParkDesc1"], "viewing": s["longhuParkViewing"], "transport": s["longhuParkTransport"], "img": "longhu_niaokan.jpeg", "ar": img_ar("longhu_niaokan.jpeg")},
         ],
         "tipsTitle": vs["tips"]["title"],
         "tips": [
