@@ -144,7 +144,7 @@ async function handleApi(request, env, path, url) {
     if (!TIER_PRICE[tier]) return json({ ok: false, error: 'invalid_tier' }, 400);
     await env.DB.prepare(
       "UPDATE merchants SET tier_request = ?1, paid_requested_at = datetime('now') WHERE id = ?2"
-    ).bind(tier, merchant.id).run();
+    ).bind(tier, user.id).run();
     return json({ ok: true });
   }
 
