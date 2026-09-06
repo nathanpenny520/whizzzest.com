@@ -3,12 +3,15 @@
  *  - www → 裸域 301（方案 §8.2）
  *  - POST /api/contact  联系表单：Honeypot → D1（权威记录）→ 企业邮通知（尽力而为，§7）
  *  - POST /api/pv-dwell 页面停留时长回报（页面关闭时 navigator.sendBeacon）
+ *  - /tv/*              万载TV 视频频道动态渲染（D1 权威，docs/万载TV方案.md）
+ *  - /media/*           TV 视频/封面 R2 代理（admin Worker 上传）
  *  - 文档导航请求 → 访客监控：匿名 Cookie（vid 1 年 / sid 会话 30min）+ 环境解析
  *    （浏览器/OS/语言/流量类型）→ D1 visits；HTML 注入回报脚本，ctx.waitUntil 不阻塞响应
  *  - 其余请求交给静态资产（dist/）
  */
 import { sendMail } from './smtp.js';
 import { handleMerchants } from './merchants.js';
+import { handleTv, handleMedia } from './tv.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
 const VID_COOKIE = 'vid';
@@ -48,9 +51,17 @@ export default {
       return new Response(obj.body, { headers });
     }
 
+    // 万载TV 媒体代理（R2 对象，admin Worker 上传，docs/万载TV方案.md）——不可浏览文档，直接返回不进访客采集
+    if (url.pathname === '/media' || url.pathname.startsWith('/media/')) {
+      return handleMedia(request, env, url);
+    }
+
     // 商户页动态渲染（/merchants/*，docs/商户功能方案.md M1）
     let res;
-    if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
+    if (url.pathname === '/tv' || url.pathname.startsWith('/tv/')) {
+      // 万载TV 视频频道（docs/万载TV方案.md）：频道页/详情页/sitemap
+      res = await handleTv(request, env, url, ctx);
+    } else if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
       res = await handleMerchants(request, env, url);
     } else {
       // 静态资产请求

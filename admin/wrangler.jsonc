@@ -14,10 +14,15 @@
     }
   ],
   // 商户图片桶（删除商户时级联清理 m<id>/ 前缀对象；与 merchant/ 根 worker 同桶）
+  // 万载TV 媒体桶（视频/封面直传，tv/ 前缀；主站经 /media/* 代理公开读取，docs/万载TV方案.md）
   "r2_buckets": [
     {
       "binding": "IMG",
       "bucket_name": "whizzzest-merchant"
+    },
+    {
+      "binding": "MEDIA",
+      "bucket_name": "whizzzest-media"
     }
   ],
   "routes": [

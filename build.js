@@ -350,13 +350,17 @@ ${pages
     <loc>${SITE_URL}/merchants/</loc>
     <changefreq>weekly</changefreq>
   </url>
+  <url>
+    <loc>${SITE_URL}/tv/</loc>
+    <changefreq>weekly</changefreq>
+  </url>
 </urlset>
 `;
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap);
 
   fs.writeFileSync(
     path.join(DIST, 'robots.txt'),
-    `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\nSitemap: ${SITE_URL}/merchants/sitemap.xml\n`
+    `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\nSitemap: ${SITE_URL}/merchants/sitemap.xml\nSitemap: ${SITE_URL}/tv/sitemap.xml\n`
   );
 
   // 静态资源

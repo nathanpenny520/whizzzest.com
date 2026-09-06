@@ -8,13 +8,17 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    // 只有需要 Worker 逻辑的路径先过 Worker（访客采集的文档路径 / API / 商户动态页 / R2 图片代理），
+    // 只有需要 Worker 逻辑的路径先过 Worker（访客采集的文档路径 / API / 商户动态页 / 万载TV / R2 代理），
     // 其余静态资产（图片/CSS/JS）直达边缘，省一次 Worker 调用
     "run_worker_first": [
       "/api/*",
       "/assets-merchant/*",
+      "/media",
+      "/media/*",
       "/merchants",
       "/merchants/*",
+      "/tv",
+      "/tv/*",
       "/",
       "/about",
       "/about/*",
@@ -40,10 +44,15 @@
     }
   ],
   // 商户图片桶（merchant Worker 上传，本 Worker /assets-merchant/* 代理公开读取）
+  // 万载TV 媒体桶（admin Worker 上传，本 Worker /media/* 代理公开读取，docs/万载TV方案.md）
   "r2_buckets": [
     {
       "binding": "IMG",
       "bucket_name": "whizzzest-merchant"
+    },
+    {
+      "binding": "MEDIA",
+      "bucket_name": "whizzzest-media"
     }
   ],
   "routes": [

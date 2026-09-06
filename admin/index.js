@@ -3,7 +3,7 @@
  *
  * 安全层次：Cloudflare Access（第一道门，dashboard 开通）→ 本应用账号登录（第二道门）
  *  - GET  /login                 登录页（用户名选填：留空 = 主账号「站长」ADMIN_PASSWORD）
- *  - GET  /                      管理页（留言 / 访客 / 商户 / 账号；视图记忆在 location.hash，刷新不丢）
+ *  - GET  /                      管理页（留言 / 访客 / 商户 / 视频 / 账号；视图记忆在 location.hash，刷新不丢）
  *  - POST /api/login             账号密码登录 → 签名会话 Cookie（HttpOnly/Secure/SameSite=Strict）
  *  - POST /api/logout            退出登录
  *  - GET  /api/me                当前登录账号（导航右上角展示用）
@@ -13,6 +13,13 @@
  *  - GET  /api/messages          留言列表（?filter=unread|all&offset=0），含 total/unread 计数
  *  - POST /api/messages/:id/read 标记已读/未读 {read: true|false}
  *  - DELETE /api/messages/:id    删除留言
+ *
+ * 万载TV 视频管理（docs/万载TV方案.md）：
+ *  - GET/POST /api/tv             视频列表 / 新建（JSON 元数据）
+ *  - POST /api/tv/:id             部分更新（发布/隐藏、焦点位；换文件/封面时级联删旧 R2 对象）
+ *  - DELETE /api/tv/:id           删除（级联清理 R2 视频/封面）
+ *  - PUT /api/tv/upload?ext=mp4   视频流式上传（File 直作 body → request.body 转发 R2，≤95MB）
+ *  - PUT /api/tv/cover            封面上传（≤5MB，魔数校验 JPG/PNG/WebP）
  *
  * 访客分析（数据来自主站 Worker 写入的 visits 表）：
  *  - GET  /api/stats?days=7|30|90   概览卡片 + 每日趋势 + 页面/来源/设备/浏览器/OS/语言/地区 + 最近浏览
@@ -58,7 +65,7 @@ export default {
         "script-src 'unsafe-inline'", // MVP：内联脚本，无外部依赖
         "style-src 'unsafe-inline'",
         "connect-src 'self'",
-        "img-src 'self' data:",
+        "img-src 'self' data: https://whizzzest.com", // 视频封面缩略图来自主站（/assets 或 /media 代理）
         "object-src 'none'",
         "base-uri 'none'",
         "frame-ancestors 'none'",
@@ -162,6 +169,19 @@ async function handleApi(request, env, path) {
   if ((m = path.match(/^\/api\/merchants\/(\d+)\/redeem$/)) && method === 'POST') {
     return redeemMerchant(env, Number(m[1]), request);
   }
+
+  // 万载TV 视频管理（docs/万载TV方案.md）；DELETE 级联删除 R2 视频/封面
+  if (path === '/api/tv' && method === 'GET') return listVideos(env, request);
+  if (path === '/api/tv' && method === 'POST') return saveVideo(env, request);
+  if ((m = path.match(/^\/api\/tv\/(\d+)$/)) && method === 'POST') {
+    return saveVideo(env, request, Number(m[1]));
+  }
+  if ((m = path.match(/^\/api\/tv\/(\d+)$/)) && method === 'DELETE') {
+    return removeVideo(env, Number(m[1]));
+  }
+  // 流式上传：视频 File 直作 PUT body（Worker 转发 request.body → R2，不整读内存）；封面 ≤5MB
+  if (path === '/api/tv/upload' && method === 'PUT') return uploadVideoFile(env, request);
+  if (path === '/api/tv/cover' && method === 'PUT') return uploadVideoCover(env, request);
 
   return json({ ok: false, error: 'not_found' }, 404);
 }
@@ -683,6 +703,198 @@ async function removeMerchant(env, id) {
   return json({ ok: true });
 }
 
+/* ---------------- 万载TV 视频管理（D1 videos，docs/万载TV方案.md） ---------------- */
+
+const V_CATEGORIES = ['drama', 'fireworks', 'heritage', 'food', 'tourism', 'other'];
+const V_SOURCES = ['bilibili', 'upload'];
+const V_STATUSES = ['published', 'hidden'];
+const BVID_RE = /^BV[0-9A-Za-z]{8,12}$/;
+const MAX_VIDEO_BYTES = 95 * 1024 * 1024; // Cloudflare 免费版请求体上限 100MB，留余量
+const MAX_COVER_BYTES = 5 * 1024 * 1024;
+const VIDEO_TYPES = { mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' };
+
+async function listVideos(env, request) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status');
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const counts = await env.DB.prepare('SELECT status, COUNT(*) n FROM videos GROUP BY status').all();
+  const byStatus = {};
+  let total = 0;
+  (counts.results || []).forEach((r) => { byStatus[r.status] = r.n; total += r.n; });
+
+  const sql = V_STATUSES.includes(status)
+    ? `SELECT * FROM videos WHERE status = ?1 ORDER BY id DESC LIMIT ?2 OFFSET ?3`
+    : `SELECT * FROM videos ORDER BY id DESC LIMIT ?1 OFFSET ?2`;
+  const { results } = V_STATUSES.includes(status)
+    ? await env.DB.prepare(sql).bind(status, PAGE_SIZE, offset).all()
+    : await env.DB.prepare(sql).bind(PAGE_SIZE, offset).all();
+
+  return json({ ok: true, total, byStatus, storage: await mediaUsage(env), videos: results || [] });
+}
+
+// R2 已用容量（tv/ 前缀求和；列表页每次现算太重，5 分钟缓存）
+let vStorageCache = { at: 0, bytes: 0 };
+async function mediaUsage(env) {
+  if (!env.MEDIA) return null;
+  if (Date.now() - vStorageCache.at < 5 * 60 * 1000) return vStorageCache.bytes;
+  let bytes = 0;
+  let cursor;
+  try {
+    do {
+      const list = await env.MEDIA.list({ prefix: 'tv/', cursor });
+      list.objects.forEach((o) => { bytes += o.size; });
+      cursor = list.truncated ? list.cursor : undefined;
+    } while (cursor);
+  } catch (err) {
+    console.error('media usage failed:', err);
+    return vStorageCache.at ? vStorageCache.bytes : null;
+  }
+  vStorageCache = { at: Date.now(), bytes };
+  return bytes;
+}
+
+/** 新建（id 为空）或部分更新；换文件/封面时级联删旧 R2 对象 */
+async function saveVideo(env, request, id) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+
+  // 文本字段白名单（空串按 NULL 存）；数字字段单独整理
+  const f = {};
+  for (const [k, max] of Object.entries({
+    title: 80, category: 20, source: 10, bvid: 20, file_key: 300,
+    cover: 300, series: 60, intro: 600, status: 10,
+  })) {
+    if (!(k in body)) continue;
+    const v = String(body[k] ?? '').trim().slice(0, max);
+    f[k] = ['bvid', 'file_key', 'cover', 'series', 'intro'].includes(k) && v === '' ? null : v;
+  }
+  for (const k of ['duration', 'episode', 'featured']) {
+    if (!(k in body)) continue;
+    f[k] = Math.max(0, Math.min(k === 'duration' ? 86400 : 9999, Math.round(Number(body[k]) || 0)));
+  }
+  if (f.featured) f.featured = 1;
+  if (f.episode === 0) f.episode = null; // 0 视为未填
+
+  if ('title' in f && !f.title) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('category' in f && !V_CATEGORIES.includes(f.category)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('source' in f && !V_SOURCES.includes(f.source)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('status' in f && !V_STATUSES.includes(f.status)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('bvid' in f && f.bvid && !BVID_RE.test(f.bvid)) return json({ ok: false, error: 'bad_bvid' }, 400);
+
+  // 新建：标题 + 来源数据齐备，B站 BV 号防重复
+  if (!id) {
+    if (!f.title || !V_SOURCES.includes(f.source)) return json({ ok: false, error: 'invalid_fields' }, 400);
+    if (f.source === 'bilibili' && !f.bvid) return json({ ok: false, error: 'bvid_required' }, 400);
+    if (f.source === 'upload' && !f.file_key) return json({ ok: false, error: 'file_required' }, 400);
+    if (f.source === 'bilibili') {
+      const dup = await env.DB.prepare('SELECT id FROM videos WHERE bvid = ?1').bind(f.bvid).first();
+      if (dup) return json({ ok: false, error: 'dup_bvid' }, 409);
+    }
+    const r = await env.DB.prepare(
+      `INSERT INTO videos (title, category, source, bvid, file_key, cover, duration, series, episode, intro, featured, status)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)`
+    )
+      .bind(
+        f.title, f.category || 'other', f.source, f.bvid || null, f.file_key || null, f.cover || null,
+        f.duration || 0, f.series || null, f.episode || null, f.intro || null, f.featured || 0, f.status || 'published'
+      )
+      .run();
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
+
+  // 编辑：部分更新
+  const old = await env.DB.prepare('SELECT * FROM videos WHERE id = ?1').bind(id).first();
+  if (!old) return json({ ok: false, error: 'not_found' }, 404);
+  if ('source' in f && f.source === 'bilibili' && !(f.bvid ?? old.bvid)) {
+    return json({ ok: false, error: 'bvid_required' }, 400);
+  }
+  if ('source' in f && f.source === 'upload' && !(f.file_key ?? old.file_key)) {
+    return json({ ok: false, error: 'file_required' }, 400);
+  }
+  if ('bvid' in f && (f.bvid ?? old.bvid)) {
+    const dup = await env.DB.prepare('SELECT id FROM videos WHERE bvid = ?1 AND id != ?2')
+      .bind(f.bvid ?? old.bvid, id).first();
+    if (dup) return json({ ok: false, error: 'dup_bvid' }, 409);
+  }
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(f)) {
+    sets.push(`${k} = ?${vals.length + 1}`);
+    vals.push(v);
+  }
+  if (!sets.length) return json({ ok: false, error: 'no_fields' }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await env.DB.prepare(`UPDATE videos SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`).bind(...vals, id).run();
+
+  // R2 旧对象清理：仅在换 key 时删（/ 开头是站内路径，不归 R2 管）
+  const r2Key = (k) => k && !k.startsWith('/');
+  const newFile = 'file_key' in f ? f.file_key : old.file_key;
+  if (r2Key(old.file_key) && old.file_key !== newFile) {
+    try { await env.MEDIA.delete(old.file_key); } catch (err) { console.error('old video cleanup failed:', err); }
+  }
+  const newCover = 'cover' in f ? f.cover : old.cover;
+  if (r2Key(old.cover) && old.cover !== newCover) {
+    try { await env.MEDIA.delete(old.cover); } catch (err) { console.error('old cover cleanup failed:', err); }
+  }
+  return json({ ok: true });
+}
+
+async function removeVideo(env, id) {
+  const old = await env.DB.prepare('SELECT file_key, cover FROM videos WHERE id = ?1').bind(id).first();
+  const { meta } = await env.DB.prepare('DELETE FROM videos WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  // 级联清理 R2 视频/封面：尽力而为，失败不回滚 D1
+  if (env.MEDIA && old) {
+    for (const k of [old.file_key, old.cover]) {
+      if (k && !k.startsWith('/')) {
+        try { await env.MEDIA.delete(k); } catch (err) { console.error(`R2 cleanup failed for ${k}:`, err); }
+      }
+    }
+  }
+  return json({ ok: true });
+}
+
+/** 视频流式上传：File 直作 PUT body（content-length 已知）→ request.body 流式转发 R2，不整读进内存 */
+async function uploadVideoFile(env, request) {
+  if (!env.MEDIA) return json({ ok: false, error: 'storage_missing' }, 500);
+  const ext = (new URL(request.url).searchParams.get('ext') || '').toLowerCase();
+  if (!VIDEO_TYPES[ext]) return json({ ok: false, error: 'bad_ext' }, 400);
+  const len = Number(request.headers.get('content-length') || 0);
+  if (!len) return json({ ok: false, error: 'empty_file' }, 400);
+  if (len > MAX_VIDEO_BYTES) return json({ ok: false, error: 'too_large' }, 413);
+  const key = `tv/v-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  try {
+    await env.MEDIA.put(key, request.body, { httpMetadata: { contentType: VIDEO_TYPES[ext] } });
+  } catch (err) {
+    console.error('video upload failed:', err);
+    return json({ ok: false, error: 'upload_failed' }, 500);
+  }
+  return json({ ok: true, key });
+}
+
+/** 封面上传：≤5MB，魔数校验 JPG/PNG/WebP（与商户门户 readImage 同款） */
+async function uploadVideoCover(env, request) {
+  if (!env.MEDIA) return json({ ok: false, error: 'storage_missing' }, 500);
+  const buf = new Uint8Array(await request.arrayBuffer());
+  if (!buf.length || buf.length > MAX_COVER_BYTES) return json({ ok: false, error: 'bad_cover' }, 400);
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  const isWebp = buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50;
+  const ext = isJpeg ? 'jpg' : isPng ? 'png' : isWebp ? 'webp' : null;
+  if (!ext) return json({ ok: false, error: 'bad_cover' }, 400);
+  const key = `tv/c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  try {
+    await env.MEDIA.put(key, buf, { httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` } });
+  } catch (err) {
+    console.error('cover upload failed:', err);
+    return json({ ok: false, error: 'upload_failed' }, 500);
+  }
+  return json({ ok: true, key });
+}
+
 /* ---------------- 工具 ---------------- */
 
 async function hmacHex(secret, msg) {
@@ -986,6 +1198,13 @@ ${BASE_CSS}
   .mst-approved { background: #e5f3e8; color: #1a7f37; }
   .mst-rejected { background: #f0f0f2; color: #6e6e73; }
   .mst-expired { background: #fbf3dd; color: #9a6b00; }
+  /* 万载TV 视频管理 */
+  .vrow1 { display: flex; align-items: flex-start; gap: 12px; }
+  .vthumb { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: #f0f0f2; flex: 0 0 auto; }
+  .vprog { height: 6px; background: #f0f0f2; border-radius: 999px; margin-top: 14px; overflow: hidden; }
+  .vprog div { height: 100%; width: 0; background: linear-gradient(90deg, #d64524, #f2a03d); transition: width .2s; }
+  .vhint { color: #86868b; font-size: 12px; }
+  .vfile { font-size: 13px; color: #6e6e73; margin-top: 6px; }
   .mrow-pay { margin-top: 10px; padding: 8px 12px; background: #fbf3dd; color: #9a6b00; border-radius: 10px; font-size: 13px; }
   .mslug { font-size: 12px; color: #6e6e73; }
   .mslug:hover { color: #d64524; }
@@ -1009,6 +1228,7 @@ ${BASE_CSS}
       <a class="anav-link active" id="vtab-msg" href="#/msg">留言</a>
       <a class="anav-link" id="vtab-visit" href="#/visit">访客</a>
       <a class="anav-link" id="vtab-merch" href="#/merch">商户</a>
+      <a class="anav-link" id="vtab-tv" href="#/tv">视频</a>
       <a class="anav-link" id="vtab-acct" href="#/acct">账号</a>
     </nav>
     <div class="anav-right">
@@ -1030,6 +1250,7 @@ ${BASE_CSS}
     <li class="anav-drawer-item"><a class="anav-link" href="#/msg">留言</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/visit">访客</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/merch">商户</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/tv">视频</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="#/acct">账号</a></li>
     <li class="anav-drawer-item"><a class="anav-link" href="https://whizzzest.com/" target="_blank" rel="noopener">前往官网 ↗</a></li>
     <li class="anav-drawer-item"><a class="anav-link" id="logout-m" href="#">退出登录</a></li>
@@ -1165,6 +1386,59 @@ ${BASE_CSS}
   <button class="more" id="mmore" type="button" style="display:none">加载更多</button>
 </div>
 
+<div id="view-tv" class="wrap" style="display:none">
+  <div class="range">
+    <button class="tab active" data-vst="" type="button">全部</button>
+    <button class="tab" data-vst="published" type="button">已发布</button>
+    <button class="tab" data-vst="hidden" type="button">已隐藏</button>
+    <span class="updated" id="tstats"></span>
+    <button id="tadd" type="button" class="primary">新增视频</button>
+  </div>
+  <div class="panel" id="tform" style="display:none">
+    <h3 id="tform-title">新增视频</h3>
+    <div class="mgrid">
+      <label>标题 *<input id="t-title" maxlength="80"></label>
+      <label>分类
+        <select id="t-cat">
+          <option value="drama">短剧</option><option value="fireworks">烟花</option>
+          <option value="heritage">非遗</option><option value="food">美食</option>
+          <option value="tourism">文旅</option><option value="other">其他</option>
+        </select>
+      </label>
+      <label>状态
+        <select id="t-status">
+          <option value="published">发布</option>
+          <option value="hidden">隐藏</option>
+        </select>
+      </label>
+      <label>来源
+        <select id="t-src">
+          <option value="bilibili">B站嵌入</option>
+          <option value="upload">直接上传（MP4/WebM，≤95MB）</option>
+        </select>
+      </label>
+      <label id="row-bvid">B站 BV 号 *<input id="t-bvid" placeholder="BV1xx411c7mD"></label>
+      <label id="row-file" style="display:none">视频文件（选文件自动读时长）<input id="t-file" type="file" accept="video/mp4,video/webm,.mp4,.m4v,.webm"><span class="vfile" id="t-fileinfo"></span></label>
+      <label>剧名 / 合集（短剧用，可空）<input id="t-series" maxlength="60" placeholder="一朝相逢便是万载"></label>
+      <label>集数（可空）<input id="t-ep" type="number" min="1" max="9999"></label>
+      <label>焦点位（频道页大位）
+        <select id="t-feat">
+          <option value="0">否</option>
+          <option value="1">是</option>
+        </select>
+      </label>
+      <label>时长（秒）<input id="t-dur" type="number" min="0" max="86400"></label>
+      <label class="wide">简介<input id="t-intro" maxlength="600"></label>
+      <label class="wide">封面图（可选，≤5MB；B站封面有防盗链，建议传一张）<input id="t-cover" type="file" accept="image/jpeg,image/png,image/webp"><span class="vfile" id="t-coverinfo"></span></label>
+    </div>
+    <div class="vprog" id="t-prog" style="display:none"><div id="t-progbar"></div></div>
+    <p class="vhint" id="t-hint" style="margin-top:8px;display:none"></p>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="tsave" type="button">保存</button><button id="tcancel" type="button">取消</button></div>
+  </div>
+  <div class="list" id="tlist"><p class="empty">加载中…</p></div>
+  <button class="more" id="tmore" type="button" style="display:none">加载更多</button>
+</div>
+
 <div id="view-acct" class="wrap" style="display:none">
   <div class="panel">
     <h3>当前登录</h3>
@@ -1225,7 +1499,7 @@ function api(path, opts) {
 }
 
 /* ---------- 视图切换（当前板块记在 location.hash：刷新/前进后退不丢） ---------- */
-var VIEWS = ['msg', 'visit', 'merch', 'acct'];
+var VIEWS = ['msg', 'visit', 'merch', 'tv', 'acct'];
 var suppressHash = false;
 function showView(v, skipHash) {
   if (VIEWS.indexOf(v) === -1) v = 'msg';
@@ -1233,14 +1507,17 @@ function showView(v, skipHash) {
   el('view-msg').style.display = v === 'msg' ? '' : 'none';
   el('view-visit').style.display = v === 'visit' ? '' : 'none';
   el('view-merch').style.display = v === 'merch' ? '' : 'none';
+  el('view-tv').style.display = v === 'tv' ? '' : 'none';
   el('view-acct').style.display = v === 'acct' ? '' : 'none';
   el('vtab-msg').classList.toggle('active', v === 'msg');
   el('vtab-visit').classList.toggle('active', v === 'visit');
   el('vtab-merch').classList.toggle('active', v === 'merch');
+  el('vtab-tv').classList.toggle('active', v === 'tv');
   el('vtab-acct').classList.toggle('active', v === 'acct');
   if (v === 'msg') load(true);
   if (v === 'visit') { loadStats(); loadVisitors(true); }
   if (v === 'merch') loadMerchants(true);
+  if (v === 'tv') loadTv(true);
   if (v === 'acct') loadAccounts();
   if (!skipHash && '#/' + v !== location.hash) {
     suppressHash = true;
@@ -1494,6 +1771,7 @@ document.querySelectorAll('#view-visit .panel').forEach(function (p) {
 el('refresh').addEventListener('click', function () {
   if (currentView === 'visit') { loadStats(); loadVisitors(true); }
   else if (currentView === 'merch') { loadMerchants(true); }
+  else if (currentView === 'tv') { loadTv(true); }
   else if (currentView === 'acct') { loadAccounts(); }
   else { load(true); }
 });
@@ -1665,6 +1943,256 @@ el('fsave').addEventListener('click', function () {
     .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); });
 });
 el('mmore').addEventListener('click', function () { mState.offset += ${PAGE_SIZE}; loadMerchants(false); });
+
+/* ---------- 万载TV 视频管理（docs/万载TV方案.md） ---------- */
+var tState = { status: '', offset: 0 };
+var editingTvId = null;
+var V_CAT = { drama: '短剧', fireworks: '烟花', heritage: '非遗', food: '美食', tourism: '文旅', other: '其他' };
+var SITE_HOME = 'https://whizzzest.com';
+
+document.querySelectorAll('#view-tv .range [data-vst]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    tState.status = b.getAttribute('data-vst');
+    document.querySelectorAll('#view-tv .range [data-vst]').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadTv(true);
+  });
+});
+
+// 封面展示地址：/ 开头 = 主站静态图，否则为 R2 键走 /media/ 代理
+function coverUrl(c) {
+  if (!c) return '';
+  return SITE_HOME + (c.indexOf('/') === 0 ? c : '/media/' + c);
+}
+
+function vDur(sec) {
+  sec = Number(sec) || 0;
+  if (sec <= 0) return '';
+  var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  var p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return h ? h + ':' + p(m) + ':' + p(s) : m + ':' + p(s);
+}
+
+function loadTv(reset) {
+  if (reset) tState.offset = 0;
+  var q = '?offset=' + tState.offset + (tState.status ? '&status=' + tState.status : '');
+  api('/api/tv' + q).then(function (d) {
+    var list = d.videos || [];
+    var counts = d.byStatus || {};
+    var line = '共 ' + d.total + ' 条 · 已发布 ' + (counts.published || 0) + ' · 已隐藏 ' + (counts.hidden || 0);
+    if (d.storage != null) line += ' · 已用存储 ' + (d.storage / 1048576).toFixed(1) + ' MB';
+    el('tstats').textContent = line;
+    var box = el('tlist');
+    if (reset) box.innerHTML = '';
+    if (reset && list.length === 0) {
+      box.innerHTML = '<p class="empty">还没有视频，点右上「新增视频」录入第一条（B站 BV 号或直接上传）。</p>';
+    } else {
+      list.forEach(function (x) { box.appendChild(renderVideo(x)); });
+    }
+    el('tmore').style.display = (tState.offset + ${PAGE_SIZE} < d.total && list.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('tlist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderVideo(x) {
+  var div = document.createElement('div');
+  div.className = 'msg' + (x.status === 'published' ? '' : ' read');
+  var thumb = coverUrl(x.cover)
+    ? '<img class="vthumb" loading="lazy" alt="" src="' + esc(coverUrl(x.cover)) + '">'
+    : '<div class="vthumb"></div>';
+  var badges =
+    '<span class="k-badge">' + esc(V_CAT[x.category] || x.category) + '</span>' +
+    '<span class="k-badge">' + (x.source === 'bilibili' ? 'B站嵌入' : '上传') + '</span>' +
+    (x.series ? '<span class="k-badge">' + esc(x.series) + (x.episode ? ' 第' + x.episode + '集' : '') + '</span>' : '') +
+    (x.featured ? '<span class="k-badge">焦点位</span>' : '') +
+    '<span class="mst ' + (x.status === 'published' ? 'mst-approved' : 'mst-rejected') + '">' + (x.status === 'published' ? '已发布' : '已隐藏') + '</span>';
+  div.innerHTML =
+    '<div class="vrow1">' + thumb +
+    '<div style="min-width:0;flex:1">' +
+      '<div class="row1"><span class="name">' + esc(x.title) + '</span>' + badges +
+      (x.status === 'published' ? '<a class="mslug" href="' + SITE_HOME + '/tv/' + x.id + '/" target="_blank" rel="noopener">查看页面 ↗</a>' : '') +
+      '</div>' +
+      (x.intro ? '<div class="time">' + esc(x.intro) + '</div>' : '') +
+      '<div class="meta">' + (vDur(x.duration) ? '时长 ' + vDur(x.duration) + ' · ' : '') + '播放 ' + (x.views || 0) + ' 次 · ' + esc(fmtTime(x.created_at)) + '</div>' +
+    '</div></div>' +
+    '<div class="ops">' +
+    '<button type="button" data-act="toggle">' + (x.status === 'published' ? '隐藏' : '发布') + '</button>' +
+    (x.featured ? '' : '<button type="button" data-act="feat">设为焦点位</button>') +
+    '<button type="button" data-act="edit">编辑</button>' +
+    '<button type="button" data-act="del">删除</button></div>';
+  div.querySelector('.ops').addEventListener('click', function (e) {
+    var act = e.target.getAttribute('data-act');
+    if (act === 'toggle') {
+      api('/api/tv/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: x.status === 'published' ? 'hidden' : 'published' })
+      }).then(function () { loadTv(true); });
+    } else if (act === 'feat') {
+      api('/api/tv/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ featured: 1 })
+      }).then(function () { loadTv(true); });
+    } else if (act === 'edit') {
+      openTvForm(x);
+    } else if (act === 'del') {
+      // 二次点击确认（同商户删除）：首击变红待确认，4 秒未点自动复原；第二击才真正删除（含视频/封面，不可恢复）
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'danger';
+        btn.textContent = '确认删除（含视频）';
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.removeAttribute('data-armed');
+          btn.className = '';
+          btn.textContent = '删除';
+        }, 4000);
+        return;
+      }
+      api('/api/tv/' + x.id, { method: 'DELETE' }).then(function () { loadTv(true); });
+    }
+  });
+  return div;
+}
+
+function openTvForm(x) {
+  editingTvId = x ? x.id : null;
+  el('tform-title').textContent = x ? '编辑视频 #' + x.id : '新增视频';
+  el('t-title').value = x ? x.title || '' : '';
+  el('t-cat').value = x ? x.category || 'drama' : 'drama';
+  el('t-status').value = x ? x.status || 'published' : 'published';
+  el('t-src').value = x ? x.source || 'bilibili' : 'bilibili';
+  el('t-bvid').value = x ? x.bvid || '' : '';
+  el('t-file').value = '';
+  el('t-fileinfo').textContent = '';
+  el('t-series').value = x ? x.series || '' : '';
+  el('t-ep').value = x && x.episode ? x.episode : '';
+  el('t-feat').value = x && x.featured ? '1' : '0';
+  el('t-dur').value = x && x.duration ? x.duration : '';
+  el('t-intro').value = x ? x.intro || '' : '';
+  el('t-cover').value = '';
+  el('t-coverinfo').textContent = x && x.cover ? '当前封面：' + x.cover : '';
+  syncSrcRows();
+  hint(null);
+  el('tform').style.display = '';
+  el('tform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeTvForm() { el('tform').style.display = 'none'; editingTvId = null; progress(null); }
+
+function syncSrcRows() {
+  var up = el('t-src').value === 'upload';
+  el('row-bvid').style.display = up ? 'none' : '';
+  el('row-file').style.display = up ? '' : 'none';
+}
+el('t-src').addEventListener('change', syncSrcRows);
+
+// 选文件即读元数据：时长自动带出 + 大小提示（95MB 上限，免费版请求体 100MB 留余量）
+el('t-file').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  var info = el('t-fileinfo');
+  if (!f) { info.textContent = ''; return; }
+  info.textContent = f.name + ' · ' + (f.size / 1048576).toFixed(1) + ' MB' + (f.size > 95 * 1048576 ? '（超 95MB，请先压缩）' : '');
+  var v = document.createElement('video');
+  v.preload = 'metadata';
+  v.onloadedmetadata = function () {
+    if (v.duration && isFinite(v.duration)) el('t-dur').value = Math.round(v.duration);
+    URL.revokeObjectURL(v.src);
+  };
+  v.src = URL.createObjectURL(f);
+});
+
+function progress(p) {
+  var bar = el('t-prog');
+  if (p == null) { bar.style.display = 'none'; el('t-progbar').style.width = '0'; return; }
+  bar.style.display = '';
+  el('t-progbar').style.width = Math.round(p * 100) + '%';
+}
+function hint(msg) {
+  var h = el('t-hint');
+  h.textContent = msg || '';
+  h.style.display = msg ? '' : 'none';
+}
+
+/** File 直作 PUT body 上传（XHR 才有 upload 进度事件）；返回 {ok, key} */
+function putFile(url, file, onP) {
+  return new Promise(function (resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    if (onP) {
+      xhr.upload.addEventListener('progress', function (e) {
+        if (e.lengthComputable) onP(e.loaded / e.total);
+      });
+    }
+    xhr.onload = function () {
+      var d = null;
+      try { d = JSON.parse(xhr.responseText); } catch (err) { /* 非 JSON 视为失败 */ }
+      if (xhr.status === 200 && d && d.ok) return resolve(d);
+      reject(new Error((d && d.error) || ('HTTP ' + xhr.status)));
+    };
+    xhr.onerror = function () { reject(new Error('网络错误')); };
+    xhr.send(file);
+  });
+}
+
+el('tadd').addEventListener('click', function () { openTvForm(null); });
+el('tcancel').addEventListener('click', closeTvForm);
+el('tsave').addEventListener('click', function () {
+  var payload = {
+    title: val('t-title'), category: val('t-cat'), status: val('t-status'),
+    source: val('t-src'), bvid: val('t-bvid'),
+    series: val('t-series'), episode: el('t-ep').value ? Number(el('t-ep').value) : 0,
+    featured: Number(val('t-feat') || 0),
+    duration: el('t-dur').value ? Number(el('t-dur').value) : 0,
+    intro: val('t-intro')
+  };
+  if (!payload.title) { alert('请填写标题'); return; }
+  if (payload.source === 'bilibili' && !/^BV[0-9A-Za-z]{8,12}$/.test(payload.bvid)) {
+    alert('BV 号格式不正确（形如 BV1xx411c7mD）'); return;
+  }
+  var file = el('t-file').files && el('t-file').files[0];
+  var cover = el('t-cover').files && el('t-cover').files[0];
+  if (payload.source === 'upload' && !editingTvId && !file) { alert('请选择要上传的视频文件'); return; }
+  if (file && file.size > 95 * 1048576) { alert('视频超过 95MB：请先压缩，或改用「B站嵌入」来源。'); return; }
+  var ext = file ? (file.name.split('.').pop() || '').toLowerCase() : '';
+  if (file && ['mp4', 'm4v', 'webm'].indexOf(ext) === -1) { alert('仅支持 MP4 / WebM 格式。'); return; }
+  if (cover && cover.size > 5 * 1048576) { alert('封面图超过 5MB。'); return; }
+
+  var btn = el('tsave');
+  btn.disabled = true;
+  var seq = Promise.resolve();
+  if (file) {
+    progress(0);
+    hint('视频上传中，请勿关闭页面…');
+    seq = seq.then(function () {
+      return putFile('/api/tv/upload?ext=' + ext, file, function (p) { progress(p); });
+    }).then(function (d) { payload.file_key = d.key; });
+  }
+  if (cover) {
+    seq = seq.then(function () {
+      hint('封面上传中…');
+      return putFile('/api/tv/cover', cover);
+    }).then(function (d) { payload.cover = d.key; });
+  }
+  seq.then(function () {
+    hint('保存中…');
+    return api(editingTvId ? '/api/tv/' + editingTvId : '/api/tv', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }).then(function () {
+    closeTvForm();
+    loadTv(true);
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') alert('保存失败：' + e.message);
+  }).then(function () {
+    btn.disabled = false;
+    progress(null);
+    hint(null);
+  });
+});
+el('tmore').addEventListener('click', function () { tState.offset += ${PAGE_SIZE}; loadTv(false); });
 
 /* ---------- 账号管理（运营账号，权限与主账号相同） ---------- */
 var me = '';

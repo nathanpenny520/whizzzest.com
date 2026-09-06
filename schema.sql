@@ -110,3 +110,29 @@ CREATE TABLE IF NOT EXISTS admin_users (
   pass_salt TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- 万载TV 视频频道（2026-09-06，docs/万载TV方案.md）
+-- source: bilibili B站嵌入（bvid）| upload R2 直传（file_key，桶 whizzzest-media，主站 /media/* 代理）
+-- cover: R2 键（不带 / 前缀 → /media/…）或站内路径（/assets/img/…）；B站封面有防盗链需后台上传
+-- series/episode：短剧剧集聚合（如《一朝相逢便是万载》第 N 集）
+-- status: published 上线 | hidden 隐藏；featured：频道页焦点大位
+CREATE TABLE IF NOT EXISTS videos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',  -- drama|fireworks|heritage|food|tourism|other
+  source TEXT NOT NULL DEFAULT 'bilibili',
+  bvid TEXT,
+  file_key TEXT,
+  cover TEXT,
+  duration INTEGER DEFAULT 0,              -- 秒；上传时浏览器端预读元数据自动带出
+  series TEXT,
+  episode INTEGER,
+  intro TEXT,
+  featured INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'published',
+  views INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_videos_pub ON videos(status, category, id DESC);
+CREATE INDEX IF NOT EXISTS idx_videos_series ON videos(series);

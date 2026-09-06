@@ -28,6 +28,10 @@
       "label": "赏烟地点"
     },
     {
+      "href": "/tv/",
+      "label": "万载TV"
+    },
+    {
       "href": "/merchants/",
       "label": "商户"
     },
