@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createHash } = require('crypto');
 
 const ROOT = __dirname;
 const SRC = path.join(ROOT, 'src');
@@ -237,6 +238,28 @@ ${pages
   // 静态资源
   copyDir(path.join(ROOT, 'public'), DIST);
   copyDir(path.join(SRC, 'assets'), path.join(DIST, 'assets'));
+
+  // 资源指纹：CSS/JS 内容变化 → 引用加 ?v=hash。/assets/* 缓存一年 immutable（_headers），
+  // 无版本号的话访客会拿到旧样式（浏览器不会重新验证），有版本号则内容一变 URL 即变。
+  const hashFile = (p) => createHash('md5').update(fs.readFileSync(p)).digest('hex').slice(0, 8);
+  const versions = {
+    '/assets/css/style.css': hashFile(path.join(DIST, 'assets/css/style.css')),
+    '/assets/js/main.js': hashFile(path.join(DIST, 'assets/js/main.js')),
+  };
+  const bumpAssetUrls = (file) => {
+    let html = read(file);
+    for (const [asset, v] of Object.entries(versions)) {
+      html = html.replaceAll(asset, `${asset}?v=${v}`);
+    }
+    fs.writeFileSync(file, html);
+  };
+  (function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (entry.name.endsWith('.html')) bumpAssetUrls(p);
+    }
+  })(DIST);
 
   const kb = (p) => (fs.statSync(p).size / 1024).toFixed(1);
   console.log(`✔ ${built.length} 页构建完成 → dist/（${Date.now() - t0}ms）`);
