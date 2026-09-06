@@ -1093,7 +1093,7 @@ function loadStats() {
     el('c-live').textContent = d.live5;
     drawChart(d.daily || []);
     fillTable('top-pages', d.top_pages, function (p) {
-      return '<td>' + esc(p.path) + '</td><td>' + p.pv + '</td><td>' + p.uv + '</td><td>' + fmtDur(p.avg_s) + '</td>';
+      return '<tr><td>' + esc(p.path) + '</td><td>' + p.pv + '</td><td>' + p.uv + '</td><td>' + fmtDur(p.avg_s) + '</td></tr>';
     });
     fillBars('kinds', (d.kinds || []).map(function (k) { return { label: k.label || k.kind, uv: k.sessions, pv: k.pv }; }));
     fillBars('sources', (d.sources || []).map(function (s) { return { label: s.src, uv: s.sessions, pv: s.pv }; }));
@@ -1122,8 +1122,10 @@ function loadStats() {
 }
 
 function fillTable(id, rows, fn) {
+  // 行回调须返回 <tr>…</tr>；漏写时兜底补上 —— 否则全部单元格并入一行，
+  // fixed 布局下多出的列宽为 0，路径文字会 1 字/行竖排（热门页面表格曾踩此坑）
   el(id).innerHTML = (rows && rows.length)
-    ? rows.map(fn).join('')
+    ? rows.map(function (x) { var r = fn(x); return /^<tr[\s>]/.test(r) ? r : '<tr>' + r + '</tr>'; }).join('')
     : '<tr><td class="empty">暂无数据</td></tr>';
 }
 
