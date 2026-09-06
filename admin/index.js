@@ -1,11 +1,15 @@
 /**
  * 焰境·万载 — 管理后台 Worker（admin.whizzzest.com，整域即后台）
  *
- * 安全层次：Cloudflare Access（第一道门，dashboard 开通）→ 本应用密码登录（第二道门）
- *  - GET  /login                 登录页
- *  - GET  /                      管理页（留言管理 + 访客分析）
- *  - POST /api/login             密码登录 → 签名会话 Cookie（HttpOnly/Secure/SameSite=Strict）
+ * 安全层次：Cloudflare Access（第一道门，dashboard 开通）→ 本应用账号登录（第二道门）
+ *  - GET  /login                 登录页（用户名选填：留空 = 主账号「站长」ADMIN_PASSWORD）
+ *  - GET  /                      管理页（留言 / 访客 / 商户 / 账号；视图记忆在 location.hash，刷新不丢）
+ *  - POST /api/login             账号密码登录 → 签名会话 Cookie（HttpOnly/Secure/SameSite=Strict）
  *  - POST /api/logout            退出登录
+ *  - GET  /api/me                当前登录账号（导航右上角展示用）
+ *  - GET  /api/accounts          运营账号列表（D1 admin_users，权限与站长相同）
+ *  - POST /api/accounts          添加账号 {username, password}（PBKDF2 10 万次）
+ *  - DELETE /api/accounts/:id    删除账号
  *  - GET  /api/messages          留言列表（?filter=unread|all&offset=0），含 total/unread 计数
  *  - POST /api/messages/:id/read 标记已读/未读 {read: true|false}
  *  - DELETE /api/messages/:id    删除留言
@@ -15,7 +19,8 @@
  *  - GET  /api/visitors             访客列表（?offset=0），按匿名 Cookie ID / IP 分组
  *  - GET  /api/visitors/:gid        单个访客的会话与页面轨迹
  *
- * 会话：无状态 HMAC 签名（过期时间戳 + 签名），改 ADMIN_SESSION_SECRET 即全体下线。
+ * 会话：无状态 HMAC 签名（uid + 过期时间戳 + 签名；uid=0 主账号，>0 为 admin_users.id），
+ *       改 ADMIN_SESSION_SECRET 即全体下线。
  * 凭据：wrangler secret 配 ADMIN_PASSWORD / ADMIN_SESSION_SECRET，不进代码、不进仓库。
  */
 
@@ -24,7 +29,8 @@ const SESSION_TTL_S = SESSION_TTL_MS / 1000;
 const COOKIE_NAME = 'wa_session';
 const PAGE_SIZE = 50;
 // 后台页内嵌 favicon（SVG data URI，与主站标签页同款）
-const FAVICON_LINK = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB0PSIxNzcwNjM5ODE2OTM3IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTUxMi44IDQyMC44Yy0xNTYuOCAyMzQuNC0xNDEuNiA1NzYuOC00OCA1NzguNCA5Ni44IDIuNC0xNC40LTM5NC40IDQ4LTU3OC40ek00ODAuOCAzOTUuMmMtMjI3LjIgNzQuNC0zOTIgMzExLjItMzI4LjggMzYxLjYgNjQuOCA1MiAxOTEuMi0yNzIgMzI4LjgtMzYxLjZ6TTQ4Ny4yIDM3NkMyOTAuNCAyODggMjQgMzMyIDMxLjIgMzk5LjJjNy4yIDY4LjggMzA3LjItNDkuNiA0NTYtMjMuMnpNNTEyLjggMzU0LjRjLTg5LjYtMTY5LjYtMzAwLTMwMC44LTMzMS4yLTI1Ni0zMiA0Ni40IDI0MS42IDE1MiAzMzEuMiAyNTZ6TTUzMS4yIDM1NC40QzYyNi40IDIyOCA2MzIgMzQuNCA1ODAuOCAyOS42Yy01Mi44LTQuOC03LjIgMjIzLjItNDkuNiAzMjQuOHpNNTQ4IDM2Ni40YzE0NC44IDMuMiAyOTUuMi05NC40IDI3Mi0xMzUuMi0yNC00MS42LTE3My42IDExMi0yNzIgMTM1LjJ6TTU2MS42IDM5OS4yYzE2MCAxMTkuMiA0MjAgMTYwLjggNDMxLjIgMTA5LjYgMTEuMi01Mi44LTI5OS4yLTQ4LjgtNDMxLjItMTA5LjZ6TTUzOS4yIDQyNi40YzI5LjYgMjE2IDIxMS4yIDQxNy42IDI2NC44IDM3NS4yIDU1LjItNDMuMi0yMDcuMi0yMzMuNi0yNjQuOC0zNzUuMnoiIGZpbGw9IiNFODM1MTgiIHAtaWQ9Ijg1MzkiPjwvcGF0aD48cGF0aCBkPSJNOTE5LjIgNjIyLjRsMTYgMzIuOCAzNiA0LjgtMjUuNiAyNS42IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjUuNiAzNi00Ljh6IiBmaWxsPSIjRjREMzFGIiBwLWlkPSI4NTQwIj48L3BhdGg+PHBhdGggZD0iTTUyMCAzMzkuMmwxNiAzMi44IDM2IDUuNi0yNS42IDI0LjggNS42IDM2LTMyLTE2LjgtMzIgMTYuOCA2LjQtMzYtMjYuNC0yNC44IDM2LTUuNnpNMjM5LjIgNzkyLjhsMTQuNCAzMC40IDM0LjQgNC44LTI0LjggMjQgNS42IDMzLjYtMjkuNi0xNi0zMC40IDE2IDUuNi0zMy42LTI0LjgtMjQgMzQuNC00Ljh6TTE1MS4yIDE4OGgtMzJ2LTMyYzAtMi40LTEuNi00LTQtNHMtNCAxLjYtNCA0djMyaC0zMmMtMi40IDAtNCAxLjYtNCA0czEuNiA0IDQgNGgzMnYzMmMwIDIuNCAxLjYgNCA0IDRzNC0xLjYgNC00di0zMmgzMmMyLjQgMCA0LTEuNiA0LTRzLTEuNi00LTQtNHoiIGZpbGw9IiNGNUUzMjgiIHAtaWQ9Ijg1NDEiPjwvcGF0aD48L3N2Zz4=">';
+const FAVICON_URI = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB0PSIxNzcwNjM5ODE2OTM3IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTUxMi44IDQyMC44Yy0xNTYuOCAyMzQuNC0xNDEuNiA1NzYuOC00OCA1NzguNCA5Ni44IDIuNC0xNC40LTM5NC40IDQ4LTU3OC40ek00ODAuOCAzOTUuMmMtMjI3LjIgNzQuNC0zOTIgMzExLjItMzI4LjggMzYxLjYgNjQuOCA1MiAxOTEuMi0yNzIgMzI4LjgtMzYxLjZ6TTQ4Ny4yIDM3NkMyOTAuNCAyODggMjQgMzMyIDMxLjIgMzk5LjJjNy4yIDY4LjggMzA3LjItNDkuNiA0NTYtMjMuMnpNNTEyLjggMzU0LjRjLTg5LjYtMTY5LjYtMzAwLTMwMC44LTMzMS4yLTI1Ni0zMiA0Ni40IDI0MS42IDE1MiAzMzEuMiAyNTZ6TTUzMS4yIDM1NC40QzYyNi40IDIyOCA2MzIgMzQuNCA1ODAuOCAyOS42Yy01Mi44LTQuOC03LjIgMjIzLjItNDkuNiAzMjQuOHpNNTQ4IDM2Ni40YzE0NC44IDMuMiAyOTUuMi05NC40IDI3Mi0xMzUuMi0yNC00MS42LTE3My42IDExMi0yNzIgMTM1LjJ6TTU2MS42IDM5OS4yYzE2MCAxMTkuMiA0MjAgMTYwLjggNDMxLjIgMTA5LjYgMTEuMi01Mi44LTI5OS4yLTQ4LjgtNDMxLjItMTA5LjZ6TTUzOS4yIDQyNi40YzI5LjYgMjE2IDIxMS4yIDQxNy42IDI2NC44IDM3NS4yIDU1LjItNDMuMi0yMDcuMi0yMzMuNi0yNjQuOC0zNzUuMnoiIGZpbGw9IiNFODM1MTgiIHAtaWQ9Ijg1MzkiPjwvcGF0aD48cGF0aCBkPSJNOTE5LjIgNjIyLjRsMTYgMzIuOCAzNiA0LjgtMjUuNiAyNS42IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjUuNiAzNi00Ljh6IiBmaWxsPSIjRjREMzFGIiBwLWlkPSI4NTQwIj48L3BhdGg+PHBhdGggZD0iTTUyMCAzMzkuMmwxNiAzMi44IDM2IDUuNi0yNS42IDI0LjggNS42IDM2LTMyLTE2LjgtMzIgMTYuOCA2LjQtMzYtMjYuNC0yNC44IDM2LTUuNnpNMjM5LjIgNzkyLjhsMTQuNCAzMC40IDM0LjQgNC44LTI0LjggMjQgNS42IDMzLjYtMjkuNi0xNi0zMC40IDE2IDUuNi0zMy42LTI0LjgtMjQgMzQuNC00Ljh6TTE1MS4yIDE4OGgtMzJ2LTMyYzAtMi40LTEuNi00LTQtNHMtNCAxLjYtNCA0djMyaC0zMmMtMi40IDAtNCAxLjYtNCA0czEuNiA0IDQgNGgzMnYzMmMwIDIuNCAxLjYgNCA0IDRzNC0xLjYgNC00di0zMmgzMmMyLjQgMCA0LTEuNiA0LTRzLTEuNi00LTQtNHoiIGZpbGw9IiNGNUUzMjgiIHAtaWQ9Ijg1NDEiPjwvcGF0aD48L3N2Zz4=';
+const FAVICON_LINK = `<link rel="icon" type="image/svg+xml" href="${FAVICON_URI}">`;
 
 export default {
   async fetch(request, env) {
@@ -76,7 +82,7 @@ async function handlePage(request, env, path) {
   if (path === '/login') return html(LOGIN_HTML);
 
   if (path === '/') {
-    if (!(await isAuthed(request, env))) return redirect('/login');
+    if ((await sessionUid(request, env)) === null) return redirect('/login');
     return html(APP_HTML);
   }
   return redirect('/');
@@ -98,17 +104,35 @@ async function handleApi(request, env, path) {
   }
 
   // 其余 API 一律先过会话
-  if (!(await isAuthed(request, env))) return json({ ok: false, error: 'unauthorized' }, 401);
+  const uid = await sessionUid(request, env);
+  if (uid === null) return json({ ok: false, error: 'unauthorized' }, 401);
 
-  // 变更请求校验来源（配合 SameSite=Strict 双保险）
+  // 变更请求校验来源（配合 SameSite=Strict 双保险）：Origin 的 host 必须与 Host 头一致
+  // （生产同为 admin.whizzzest.com；本地 wrangler dev 时两者同为 127.0.0.1:<port>，自然放行）
   if (method !== 'GET' && method !== 'HEAD') {
     const origin = request.headers.get('origin');
-    if (origin && origin !== 'https://admin.whizzzest.com') {
-      return json({ ok: false, error: 'bad_origin' }, 403);
+    if (origin) {
+      let sameOrigin = false;
+      try {
+        sameOrigin = new URL(origin).host === request.headers.get('host');
+      } catch { /* 非法 origin 一律拒绝 */ }
+      if (!sameOrigin) {
+        return json({ ok: false, error: 'bad_origin' }, 403);
+      }
     }
   }
 
   let m;
+  if (path === '/api/me' && method === 'GET') {
+    return json({ ok: true, user: await resolveUser(env, uid) });
+  }
+
+  // 运营账号管理（admin_users，权限与主账号相同）
+  if (path === '/api/accounts' && method === 'GET') return listAccounts(env);
+  if (path === '/api/accounts' && method === 'POST') return createAccount(env, request);
+  if ((m = path.match(/^\/api\/accounts\/(\d+)$/)) && method === 'DELETE') {
+    return removeAccount(env, Number(m[1]));
+  }
   if ((m = path.match(/^\/api\/messages\/(\d+)\/read$/)) && method === 'POST') {
     return setRead(env, Number(m[1]), request);
   }
@@ -172,32 +196,98 @@ async function handleLogin(request, env) {
     return json({ ok: false, error: 'invalid_json' }, 400);
   }
 
-  const given = await sha256Hex(String(body?.password ?? ''));
-  const expected = await sha256Hex(env.ADMIN_PASSWORD);
-  if (!timingSafeEqual(given, expected)) {
-    return json({ ok: false, error: 'invalid_credentials' }, 401);
+  const username = String(body?.username ?? '').trim();
+  const password = String(body?.password ?? '');
+
+  // 用户名留空 = 主账号「站长」（ADMIN_PASSWORD 密钥）；填了用户名走 D1 运营账号
+  let uid = 0;
+  if (username) {
+    const row = await env.DB
+      .prepare('SELECT id, pass_hash, pass_salt FROM admin_users WHERE username = ?1')
+      .bind(username)
+      .first();
+    if (!row) return json({ ok: false, error: 'invalid_credentials' }, 401);
+    if (!timingSafeEqual(await pbkdf2Hex(password, row.pass_salt), row.pass_hash)) {
+      return json({ ok: false, error: 'invalid_credentials' }, 401);
+    }
+    uid = row.id;
+  } else {
+    const given = await sha256Hex(password);
+    const expected = await sha256Hex(env.ADMIN_PASSWORD);
+    if (!timingSafeEqual(given, expected)) {
+      return json({ ok: false, error: 'invalid_credentials' }, 401);
+    }
   }
 
   const exp = String(Date.now() + SESSION_TTL_MS);
-  const sig = await hmacHex(env.ADMIN_SESSION_SECRET, exp);
+  const sig = await hmacHex(env.ADMIN_SESSION_SECRET, uid + '.' + exp);
   const res = json({ ok: true });
   res.headers.set(
     'Set-Cookie',
-    `${COOKIE_NAME}=${exp}.${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_S}`
+    `${COOKIE_NAME}=${uid}.${exp}.${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_S}`
   );
   return res;
 }
 
-async function isAuthed(request, env) {
-  if (!env.ADMIN_SESSION_SECRET) return false;
+/** 会话校验：返回 uid（0 = 主账号「站长」，>0 = admin_users.id）；无效返回 null */
+async function sessionUid(request, env) {
+  if (!env.ADMIN_SESSION_SECRET) return null;
   const cookie = request.headers.get('cookie') || '';
-  const m = cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]+)`));
-  if (!m) return false;
-  const [exp, sig] = m[1].split('.');
+  const m = cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([0-9]+)\\.([0-9]+)\\.([a-f0-9]{64})`));
+  if (!m) return null;
+  const [, uid, exp, sig] = m;
   const expNum = Number(exp);
-  if (!Number.isFinite(expNum) || expNum < Date.now() || !sig) return false;
-  const expected = await hmacHex(env.ADMIN_SESSION_SECRET, exp);
-  return timingSafeEqual(sig, expected);
+  if (!Number.isFinite(expNum) || expNum < Date.now()) return null;
+  const expected = await hmacHex(env.ADMIN_SESSION_SECRET, uid + '.' + exp);
+  if (!timingSafeEqual(sig, expected)) return null;
+  return Number(uid);
+}
+
+/** uid → 展示名 */
+async function resolveUser(env, uid) {
+  if (!uid) return '站长';
+  const row = await env.DB.prepare('SELECT username FROM admin_users WHERE id = ?1').bind(uid).first();
+  return row?.username || '账号已删除';
+}
+
+/* ---------------- 运营账号管理（D1 admin_users） ---------------- */
+
+const USER_RE = /^[A-Za-z0-9_-]{2,20}$/;
+const MAX_ACCOUNTS = 10;
+
+async function listAccounts(env) {
+  const { results } = await env.DB
+    .prepare('SELECT id, username, created_at FROM admin_users ORDER BY id')
+    .all();
+  return json({ ok: true, accounts: results || [] });
+}
+
+async function createAccount(env, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+  const username = String(body?.username ?? '').trim();
+  const password = String(body?.password ?? '');
+  if (!USER_RE.test(username)) return json({ ok: false, error: 'bad_username' }, 400);
+  if (password.length < 8 || password.length > 64) return json({ ok: false, error: 'bad_password' }, 400);
+
+  const { n } = await env.DB.prepare('SELECT COUNT(*) n FROM admin_users').first();
+  if (n >= MAX_ACCOUNTS) return json({ ok: false, error: 'too_many' }, 400);
+
+  const salt = crypto.randomUUID().replace(/-/g, '');
+  try {
+    await env.DB.prepare(
+      'INSERT INTO admin_users (username, pass_hash, pass_salt) VALUES (?1, ?2, ?3)'
+    ).bind(username, await pbkdf2Hex(password, salt), salt).run();
+  } catch {
+    return json({ ok: false, error: 'dup_username' }, 400);
+  }
+  return json({ ok: true });
+}
+
+async function removeAccount(env, id) {
+  const { meta } = await env.DB.prepare('DELETE FROM admin_users WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  return json({ ok: true });
 }
 
 /* ---------------- 留言管理（D1） ---------------- */
@@ -593,6 +683,18 @@ async function sha256Hex(s) {
   return toHex(digest);
 }
 
+// 与商户门户同款：PBKDF2-SHA256(10 万次)，运营账号密码不明文存储
+async function pbkdf2Hex(password, saltHex) {
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const salt = new Uint8Array(saltHex.match(/.{2}/g).map((b) => parseInt(b, 16)));
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', iterations: 100000, salt }, key, 256
+  );
+  return toHex(bits);
+}
+
 function toHex(buf) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -629,13 +731,76 @@ const BASE_CSS = `
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  header {
-    position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px;
-    padding: 14px 4px; background: rgba(251,251,253,.82); backdrop-filter: saturate(180%) blur(20px);
+  /* 顶栏：对齐官网 .nav 的毛玻璃导航（logo 左 + 板块链接 + 官网入口/账号在右） */
+  header.anav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(251,251,253,.8);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
     border-bottom: 1px solid rgba(0,0,0,.08);
   }
-  h1 { font-size: 16px; font-weight: 600; margin-right: auto; }
-  h1 span { color: #6e6e73; font-weight: 400; font-size: 12px; margin-left: 8px; }
+  .anav-inner {
+    max-width: 1060px; margin: 0 auto; padding: 0 22px; height: 48px;
+    display: flex; align-items: center; gap: 24px;
+  }
+  .anav-logo {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600;
+    letter-spacing: .01em; white-space: nowrap; color: #1d1d1f; text-decoration: none;
+  }
+  .anav-logo img { width: 22px; height: 22px; display: block; }
+  .anav-menu { display: flex; align-items: center; gap: 30px; margin-right: auto; }
+  .anav-link {
+    font-size: 12px; letter-spacing: .01em; color: rgba(29,29,31,.8);
+    text-decoration: none; transition: color .2s;
+  }
+  .anav-link:hover { color: #1d1d1f; }
+  .anav-link.active { color: #1d1d1f; font-weight: 600; }
+  .anav-right { display: flex; align-items: center; gap: 12px; }
+  /* 右上角账号菜单 */
+  .acct { position: relative; }
+  .acct-drop {
+    position: absolute; right: 0; top: calc(100% + 10px); min-width: 180px; z-index: 120;
+    background: #fff; border: 1px solid rgba(0,0,0,.06); border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.12); padding: 8px;
+  }
+  .acct-drop button {
+    display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 13px;
+    background: none; border: 0; border-radius: 8px; color: #1d1d1f; cursor: pointer;
+  }
+  .acct-drop button:hover { background: #f5f5f7; color: #1d1d1f; }
+  .acct-cur { padding: 8px 12px 6px; font-size: 12px; color: #6e6e73; white-space: nowrap; }
+  .acct-cur b { color: #1d1d1f; }
+  .acct-sep { height: 1px; background: rgba(0,0,0,.06); margin: 6px 4px; }
+  /* 移动端汉堡 + 抽屉（与官网同款：抽屉放 header 外，避免毛玻璃的包含块问题） */
+  .anav-burger {
+    display: none; width: 40px; height: 40px; position: relative;
+    background: none; border: 0; padding: 0; cursor: pointer;
+  }
+  .anav-burger-line {
+    position: absolute; left: 10px; right: 10px; height: 1.5px; background: #1d1d1f;
+    transition: transform .3s, top .3s;
+  }
+  .anav-burger-line:nth-child(1) { top: 16px; }
+  .anav-burger-line:nth-child(2) { top: 23px; }
+  .anav-burger[aria-expanded="true"] .anav-burger-line:nth-child(1) { top: 19.5px; transform: rotate(45deg); }
+  .anav-burger[aria-expanded="true"] .anav-burger-line:nth-child(2) { top: 19.5px; transform: rotate(-45deg); }
+  .anav-drawer { display: none; }
+  @media (max-width: 900px) {
+    .anav-menu { display: none; }
+    .anav-burger { display: block; }
+    .anav-drawer {
+      display: block; position: fixed; inset: 48px 0 0 0; z-index: 90;
+      background: rgba(251,251,253,.96);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      opacity: 0; visibility: hidden; transform: translateY(-8px);
+      transition: opacity .3s, transform .3s, visibility .3s;
+    }
+    .anav-drawer.open { opacity: 1; visibility: visible; transform: none; }
+    .anav-drawer-list { padding: 24px 40px; list-style: none; }
+    .anav-drawer-item { padding: 13px 0; border-bottom: 1px solid rgba(0,0,0,.08); }
+    .anav-drawer-item .anav-link { font-size: 15px; }
+  }
   button {
     padding: 7px 14px; font-size: 13px; color: #1d1d1f; background: #fff;
     border: 1px solid rgba(0,0,0,.12); border-radius: 980px; cursor: pointer;
@@ -704,13 +869,16 @@ ${FAVICON_LINK}
 <body>
 <form class="card" id="f">
   <h1>焰境·万载 · 管理后台</h1>
-  <p class="sub">whizzzest.com 留言与访客数据管理</p>
-  <label for="pw">管理密码</label>
-  <input id="pw" type="password" autocomplete="current-password" required autofocus>
+  <p class="sub">whizzzest.com 站点数据管理</p>
+  <label for="user">用户名（选填，运营账号）</label>
+  <input id="user" autocomplete="username" placeholder="主账号「站长」留空即可">
+  <label for="pw">密码</label>
+  <input id="pw" type="password" autocomplete="current-password" required>
   <button id="btn" type="submit">登 录</button>
   <div class="err" id="err"></div>
 </form>
 <script>
+document.getElementById('user').value = new URLSearchParams(location.search).get('u') || '';
 var f = document.getElementById('f');
 f.addEventListener('submit', function (e) {
   e.preventDefault();
@@ -720,13 +888,13 @@ f.addEventListener('submit', function (e) {
   fetch('/api/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ password: document.getElementById('pw').value })
+    body: JSON.stringify({ username: document.getElementById('user').value, password: document.getElementById('pw').value })
   }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
     .then(function (r) {
       if (r.s === 200 && r.d.ok) { location.href = '/'; return; }
       var msg = r.d.error === 'rate_limited' ? '尝试过于频繁，请 10 分钟后再试'
         : r.d.error === 'config_missing' ? '服务端未配置凭据'
-        : r.d.error === 'invalid_credentials' ? '密码不正确' : '登录失败，请重试';
+        : r.d.error === 'invalid_credentials' ? '用户名或密码不正确' : '登录失败，请重试';
       err.textContent = msg; err.style.display = 'block'; btn.disabled = false;
     })
     .catch(function () { err.textContent = '网络错误，请重试'; err.style.display = 'block'; btn.disabled = false; });
@@ -815,14 +983,41 @@ ${BASE_CSS}
 </style>
 </head>
 <body>
-<header>
-  <h1>焰境·万载</h1>
-  <button id="vtab-msg" class="tab active" type="button">留言</button>
-  <button id="vtab-visit" class="tab" type="button">访客</button>
-  <button id="vtab-merch" class="tab" type="button">商户</button>
-  <button id="refresh" type="button">刷新</button>
-  <button id="logout" type="button">退出</button>
+<header class="anav">
+  <div class="anav-inner">
+    <a class="anav-logo" href="/" aria-label="焰境·万载 管理后台">
+      <img src="${FAVICON_URI}" alt="" width="22" height="22" aria-hidden="true">焰境·万载
+    </a>
+    <nav class="anav-menu" aria-label="后台板块">
+      <a class="anav-link active" id="vtab-msg" href="#/msg">留言</a>
+      <a class="anav-link" id="vtab-visit" href="#/visit">访客</a>
+      <a class="anav-link" id="vtab-merch" href="#/merch">商户</a>
+      <a class="anav-link" id="vtab-acct" href="#/acct">账号</a>
+    </nav>
+    <div class="anav-right">
+      <a class="anav-link" href="https://whizzzest.com/" target="_blank" rel="noopener">前往官网 ↗</a>
+      <button id="refresh" type="button">刷新</button>
+      <div class="acct" id="acct-box">
+        <button id="acct-chip" type="button" title="账号菜单"><span id="acct-name">…</span> ▾</button>
+        <div class="acct-drop" id="acct-drop" hidden></div>
+      </div>
+      <button class="anav-burger" id="burger" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="anav-drawer">
+        <span class="anav-burger-line" aria-hidden="true"></span>
+        <span class="anav-burger-line" aria-hidden="true"></span>
+      </button>
+    </div>
+  </div>
 </header>
+<div class="anav-drawer" id="anav-drawer">
+  <ul class="anav-drawer-list" aria-label="后台板块">
+    <li class="anav-drawer-item"><a class="anav-link" href="#/msg">留言</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/visit">访客</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/merch">商户</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="#/acct">账号</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" href="https://whizzzest.com/" target="_blank" rel="noopener">前往官网 ↗</a></li>
+    <li class="anav-drawer-item"><a class="anav-link" id="logout-m" href="#">退出登录</a></li>
+  </ul>
+</div>
 
 <div id="view-msg" class="wrap">
   <div class="tabs" style="display:flex;gap:8px;margin:18px 0 4px;">
@@ -953,6 +1148,29 @@ ${BASE_CSS}
   <button class="more" id="mmore" type="button" style="display:none">加载更多</button>
 </div>
 
+<div id="view-acct" class="wrap" style="display:none">
+  <div class="panel">
+    <h3>当前登录</h3>
+    <p id="acct-now" style="font-size:15px;font-weight:600"></p>
+    <p class="tip" style="margin-top:6px">主账号「站长」的密码由服务器密钥 ADMIN_PASSWORD 配置，此处不可修改；下方添加的运营账号与其权限相同。切换账号：右上角账号菜单，或列表中的「切换到此账号」。</p>
+  </div>
+  <div class="panel">
+    <h3>添加账号</h3>
+    <div class="mgrid" style="grid-template-columns:1fr 1fr;max-width:520px">
+      <label>用户名（2-20 位字母/数字/_/-）<input id="a-user" maxlength="20" autocomplete="off"></label>
+      <label>密码（至少 8 位）<input id="a-pass" type="password" maxlength="64" autocomplete="new-password"></label>
+    </div>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="a-add" type="button">添加账号</button></div>
+  </div>
+  <div class="panel">
+    <h3>运营账号</h3>
+    <div class="vwrap"><table>
+      <thead><tr><th>用户名</th><th>创建时间</th><th style="width:15em">操作</th></tr></thead>
+      <tbody id="alist"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
 <script>
 var state = { filter: 'unread', offset: 0, total: 0, unread: 0 };
 var currentView = 'msg';
@@ -989,21 +1207,37 @@ function api(path, opts) {
   });
 }
 
-/* ---------- 视图切换 ---------- */
-function showView(v) {
+/* ---------- 视图切换（当前板块记在 location.hash：刷新/前进后退不丢） ---------- */
+var VIEWS = ['msg', 'visit', 'merch', 'acct'];
+var suppressHash = false;
+function showView(v, skipHash) {
+  if (VIEWS.indexOf(v) === -1) v = 'msg';
   currentView = v;
   el('view-msg').style.display = v === 'msg' ? '' : 'none';
   el('view-visit').style.display = v === 'visit' ? '' : 'none';
   el('view-merch').style.display = v === 'merch' ? '' : 'none';
+  el('view-acct').style.display = v === 'acct' ? '' : 'none';
   el('vtab-msg').classList.toggle('active', v === 'msg');
   el('vtab-visit').classList.toggle('active', v === 'visit');
   el('vtab-merch').classList.toggle('active', v === 'merch');
+  el('vtab-acct').classList.toggle('active', v === 'acct');
+  if (v === 'msg') load(true);
   if (v === 'visit') { loadStats(); loadVisitors(true); }
   if (v === 'merch') loadMerchants(true);
+  if (v === 'acct') loadAccounts();
+  if (!skipHash && '#/' + v !== location.hash) {
+    suppressHash = true;
+    location.hash = '/' + v;
+  }
 }
-el('vtab-msg').addEventListener('click', function () { showView('msg'); });
-el('vtab-visit').addEventListener('click', function () { showView('visit'); });
-el('vtab-merch').addEventListener('click', function () { showView('merch'); });
+window.addEventListener('hashchange', function () {
+  if (suppressHash) { suppressHash = false; return; }
+  showView(hashView(), true);
+});
+// 注意：APP_HTML 是模板字符串，内嵌脚本里写不了 /\/?/ 正则（\ 会被外层吃掉），用字符串替换解析 hash
+function hashView() {
+  return (location.hash || '').replace('#/', '').replace('#', '');
+}
 document.querySelectorAll('#view-visit .range [data-days]').forEach(function (b) {
   b.addEventListener('click', function () {
     visitDays = Number(b.getAttribute('data-days'));
@@ -1243,6 +1477,7 @@ document.querySelectorAll('#view-visit .panel').forEach(function (p) {
 el('refresh').addEventListener('click', function () {
   if (currentView === 'visit') { loadStats(); loadVisitors(true); }
   else if (currentView === 'merch') { loadMerchants(true); }
+  else if (currentView === 'acct') { loadAccounts(); }
   else { load(true); }
 });
 el('more').addEventListener('click', function () { state.offset += ${PAGE_SIZE}; load(false); });
@@ -1401,11 +1636,108 @@ el('fsave').addEventListener('click', function () {
 });
 el('mmore').addEventListener('click', function () { mState.offset += ${PAGE_SIZE}; loadMerchants(false); });
 
-el('logout').addEventListener('click', function () {
+/* ---------- 账号管理（运营账号，权限与主账号相同） ---------- */
+var me = '';
+function setAccountUI(name) {
+  me = name || '';
+  el('acct-name').textContent = me || '…';
+  el('acct-now').textContent = me ? '当前账号：' + me : '';
+}
+api('/api/me').then(function (d) { setAccountUI(d.user); }).catch(function () {});
+
+function loadAccounts() {
+  api('/api/accounts').then(function (d) {
+    var rows = (d.accounts || []).map(function (a) {
+      return '<tr><td>' + esc(a.username) + '</td><td>' + esc(fmtTime(a.created_at)) + '</td>' +
+        '<td><div class="ops" style="margin-top:0"><button type="button" data-switch="' + esc(a.username) + '">切换到此账号</button>' +
+        '<button type="button" data-del="' + a.id + '">删除</button></div></td></tr>';
+    }).join('');
+    el('alist').innerHTML = rows || '<tr><td colspan="3" class="empty">还没有运营账号，用上方表单添加。</td></tr>';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('alist').innerHTML = '<tr><td colspan="3" class="empty">加载失败：' + esc(e.message) + '</td></tr>';
+  });
+}
+el('a-add').addEventListener('click', function () {
+  var u = el('a-user').value.trim(), p = el('a-pass').value;
+  if (!/^[A-Za-z0-9_-]{2,20}$/.test(u)) { alert('用户名需 2-20 位字母/数字/下划线/连字符'); return; }
+  if (p.length < 8) { alert('密码至少 8 位'); return; }
+  api('/api/accounts', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: u, password: p })
+  }).then(function () { el('a-user').value = ''; el('a-pass').value = ''; loadAccounts(); })
+    .catch(function (e) {
+      if (e.message === 'unauthorized') return;
+      alert(({
+        bad_username: '用户名格式不正确', bad_password: '密码至少 8 位',
+        dup_username: '用户名已存在', too_many: '账号数量已达上限（10 个）'
+      })[e.message] || '添加失败：' + e.message);
+    });
+});
+el('alist').addEventListener('click', function (e) {
+  var sw = e.target.getAttribute('data-switch');
+  var del = e.target.getAttribute('data-del');
+  if (sw !== null) {
+    api('/api/logout', { method: 'POST' }).then(function () { location.href = '/login?u=' + encodeURIComponent(sw); });
+  } else if (del) {
+    if (!confirm('确定删除该账号？其登录将立即失效。')) return;
+    api('/api/accounts/' + del, { method: 'DELETE' }).then(loadAccounts);
+  }
+});
+
+/* ---------- 右上角账号菜单：切换 / 添加 / 退出 ---------- */
+var drop = el('acct-drop');
+el('acct-chip').addEventListener('click', function () {
+  if (drop.hidden) { renderDrop(); drop.hidden = false; }
+  else drop.hidden = true;
+});
+document.addEventListener('click', function (e) {
+  if (!el('acct-box').contains(e.target)) drop.hidden = true;
+});
+function renderDrop() {
+  api('/api/accounts').then(function (d) {
+    var html = '<div class="acct-cur">当前账号：<b>' + esc(me || '站长') + '</b></div><div class="acct-sep"></div>';
+    if (me && me !== '站长') html += '<button type="button" data-switch="">切换到 站长</button>';
+    (d.accounts || []).forEach(function (a) {
+      if (a.username !== me) html += '<button type="button" data-switch="' + esc(a.username) + '">切换到 ' + esc(a.username) + '</button>';
+    });
+    html += '<div class="acct-sep"></div>' +
+      '<button type="button" data-act="add">添加账号…</button>' +
+      '<button type="button" data-act="logout">退出登录</button>';
+    drop.innerHTML = html;
+  }).catch(function () { drop.innerHTML = '<button type="button" data-act="logout">退出登录</button>'; });
+}
+drop.addEventListener('click', function (e) {
+  var act = e.target.getAttribute('data-act');
+  var sw = e.target.getAttribute('data-switch');
+  if (sw !== null) {
+    api('/api/logout', { method: 'POST' }).then(function () { location.href = sw ? '/login?u=' + encodeURIComponent(sw) : '/login'; });
+  } else if (act === 'add') {
+    drop.hidden = true;
+    showView('acct');
+  } else if (act === 'logout') {
+    api('/api/logout', { method: 'POST' }).then(function () { location.href = '/login'; });
+  }
+});
+
+/* ---------- 移动端抽屉 ---------- */
+var burger = el('burger'), drawer = el('anav-drawer');
+burger.addEventListener('click', function () {
+  var open = drawer.classList.toggle('open');
+  burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+drawer.addEventListener('click', function (e) {
+  if (e.target.closest('a')) {
+    drawer.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+  }
+});
+el('logout-m').addEventListener('click', function (e) {
+  e.preventDefault();
   api('/api/logout', { method: 'POST' }).then(function () { location.href = '/login'; });
 });
 
-load(true);
+/* 初始视图：从 location.hash 恢复（如 #/visit），无 hash 回留言 */
+showView(hashView() || 'msg', true);
 </script>
 </body>
 </html>`;

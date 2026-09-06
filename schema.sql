@@ -69,19 +69,44 @@ CREATE TABLE IF NOT EXISTS merchants (
 );
 CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status, sort_weight DESC, id DESC);
 
--- 商户门户账号（M2，merchant.whizzzest.com）：一商户一账号，手机号+密码登录
+-- 商户门户账号（M2，merchant.whizzzest.com）：一商户一账号，手机号+密码登录；
+-- email（M2.1）：绑定的登录邮箱（可空），绑定后可用「邮箱+验证码」免密登录
 -- pass_hash = PBKDF2-SHA256(pass_salt, 10万次)，密码不明文存储
 CREATE TABLE IF NOT EXISTS merchant_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   merchant_id INTEGER NOT NULL UNIQUE REFERENCES merchants(id),
   phone TEXT UNIQUE NOT NULL,
+  email TEXT,
   pass_hash TEXT NOT NULL,
   pass_salt TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mu_email ON merchant_users(email);
 
 -- M3 变现闭环：商户自助申请升级/续费 → 站长核销
 -- tier_request: 商户申请的目标等级（verified|featured，NULL = 无待核销申请）
 -- paid_requested_at: 申请时间（admin 排序/提醒用）
 ALTER TABLE merchants ADD COLUMN tier_request TEXT;
 ALTER TABLE merchants ADD COLUMN paid_requested_at TEXT;
+
+-- M2.1 邮箱验证码登录（2026-09-06）：发往已绑定邮箱的 6 位验证码
+-- code_hash = SHA-256(6位码)，10 分钟有效，≤5 次尝试；purpose 区分 login / bind
+-- （既有库迁移：ALTER TABLE merchant_users ADD COLUMN email TEXT; + 上面那条 UNIQUE 索引）
+CREATE TABLE IF NOT EXISTS email_login_codes (
+  email TEXT PRIMARY KEY,
+  code_hash TEXT NOT NULL,
+  purpose TEXT NOT NULL DEFAULT 'login',   -- login 登录 | bind 绑定邮箱
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 管理后台多账号（2026-09-06）：ADMIN_PASSWORD 仍是主账号「站长」；
+-- admin_users 为后台「账号」Tab 自助添加的运营账号，权限与站长相同
+CREATE TABLE IF NOT EXISTS admin_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,           -- 2-20 位字母/数字/下划线/连字符
+  pass_hash TEXT NOT NULL,                 -- PBKDF2-SHA256(pass_salt, 10万次)
+  pass_salt TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

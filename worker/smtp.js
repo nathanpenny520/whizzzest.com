@@ -59,9 +59,9 @@ async function command(socket, writer, line, expect) {
 
 /**
  * 发送一封纯文本/HTML 邮件
- * @param {{user: string, pass: string, to: string, subject: string, html: string}} opts
+ * @param {{user: string, pass: string, to: string, subject: string, html: string, fromName?: string}} opts
  */
-export async function sendMail({ user, pass, to, subject, html }) {
+export async function sendMail({ user, pass, to, subject, html, fromName = '焰境·万载官网' }) {
   const socket = connect({ hostname: HOST, port: PORT }, { secureTransport: 'on', allowHalfOpen: false });
   const writer = socket.writable.getWriter();
   const enc = new TextEncoder();
@@ -78,9 +78,9 @@ export async function sendMail({ user, pass, to, subject, html }) {
     await command(socket, writer, `RCPT TO:<${to}>`, '250');
     await command(socket, writer, 'DATA', '354');
 
-    // Subject 走 RFC 2047 Base64，支持中文
+    // Subject/From 显示名走 RFC 2047 Base64，支持中文
     const headers = [
-      `From: 焰境·万载官网 <${user}>`,
+      `From: =?UTF-8?B?${btoa(unescape(encodeURIComponent(fromName)))}?= <${user}>`,
       `To: <${to}>`,
       `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
       'MIME-Version: 1.0',

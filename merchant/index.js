@@ -1,28 +1,36 @@
 /**
  * 焰境·万载 — 商户门户 Worker（merchant.whizzzest.com，M2 自助入驻）
  *
- *  - GET  /apply          入驻申请表单（multipart：资料 + 最多 9 张图片）
- *  - POST /api/apply      提交申请 → merchants(pending) + merchant_users + R2 图片 → 自动登录
- *  - GET  /login          登录（手机号 + 密码）
- *  - POST /api/login      PBKDF2 验证 → HMAC 会话 Cookie（mp_session）
- *  - GET  /dashboard      状态看板（审核中/已上线/已驳回/已到期 + 近 30 天浏览统计）
- *  - GET  /dashboard/edit 编辑资料（图片可选替换；保存后重新进入审核）
- *  - POST /api/update     保存编辑（multipart）
+ *  - GET  /apply             入驻申请表单（multipart：资料 + 最多 9 张图片）
+ *  - POST /api/apply         提交申请 → merchants(pending) + merchant_users + R2 图片 → 自动登录
+ *  - GET  /login             登录（手机号+密码 或 邮箱+验证码）
+ *  - POST /api/login         手机号+密码：PBKDF2 验证 → HMAC 会话 Cookie（mp_session）
+ *  - POST /api/email-code    发送 6 位邮箱验证码（未登录=login 用途；已登录=bind 绑定用）
+ *  - POST /api/login/email   邮箱+验证码登录（仅已绑定邮箱的账号）
+ *  - POST /api/bind-email    看板「账号安全」绑定/更换登录邮箱
+ *  - GET  /dashboard         状态看板（审核中/已上线/已驳回/已到期 + 近 30 天浏览统计）
+ *  - GET  /dashboard/edit    编辑资料（图片可选替换；保存后重新进入审核）
+ *  - POST /api/update        保存编辑（multipart）
  *  - POST /api/logout
  *
  * 安全：整域 noindex + robots 禁止；密码 PBKDF2-SHA256(10 万次) 哈希；
- *       登录/申请按 IP 限流；Honeypot；变更接口校验 Origin；会话改密钥即全体下线。
+ *       登录/申请/发码按 IP 限流；验证码 10 分钟有效 ≤5 次尝试，登录发码防邮箱枚举；
+ *       Honeypot；变更接口校验 Origin；会话改密钥即全体下线。
+ * 邮件：验证码经企业邮 notifications@whizzzest.com 发送（worker/smtp.js，465 直连），
+ *       需配 secret SMTP_USER / SMTP_PASS；客户联系邮箱 contact@whizzzest.com。
  * 图片：R2 桶 whizzzest-merchant，魔数校验（JPEG/PNG/WebP）、单张 ≤5MB、≤9 张；
  *       公开读取走主站 https://whizzzest.com/assets-merchant/<key>（主 Worker 代理）。
  */
+import { sendMail } from '../worker/smtp.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
 const COOKIE_NAME = 'mp_session';
 const PAGE_SIZE = 50; // 预留
 
-const ORIGIN = 'https://merchant.whizzzest.com';
 const SITE = 'https://whizzzest.com';
+const CONTACT_EMAIL = 'contact@whizzzest.com'; // 客户联系邮箱（弃用 outlook）
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const CATEGORIES = { food: '美食', stay: '住宿', specialty: '特产', fireworks: '花炮', other: '其他' };
 const TIER_LABEL = { free: '基础', verified: '认证商户', featured: '置顶推荐' };
@@ -118,19 +126,35 @@ async function handleApi(request, env, path, url) {
 
   if (path === '/api/apply' && method === 'POST') return handleApply(request, env);
   if (path === '/api/login' && method === 'POST') return handleLogin(request, env);
+  // 邮箱验证码与邮箱验证码登录：公开接口（自行限流）。
+  // email-code 按会话自动区分用途：无会话 → 登录发码；带会话 → 绑定/换绑发码
+  if (path === '/api/email-code' && method === 'POST') {
+    const u = await currentUser(request, env);
+    return sendEmailCode(request, env, u);
+  }
+  if (path === '/api/login/email' && method === 'POST') return handleEmailLogin(request, env);
   if (path === '/api/logout' && method === 'POST') {
     const res = json({ ok: true });
     res.headers.set('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
     return res;
   }
 
-  // 其余接口需登录 + 同源校验
+  // 其余接口需登录 + 同源校验（Origin 的 host 须与 Host 头一致；
+  // 生产同为 merchant.whizzzest.com，本地 wrangler dev 同为 127.0.0.1:<port>，自然放行）
   const user = await currentUser(request, env);
   if (!user) return json({ ok: false, error: 'unauthorized' }, 401);
   const origin = request.headers.get('origin');
-  if (origin && origin !== ORIGIN) return json({ ok: false, error: 'bad_origin' }, 403);
+  if (origin) {
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(origin).host === request.headers.get('host');
+    } catch { /* 非法 origin 一律拒绝 */ }
+    if (!sameOrigin) return json({ ok: false, error: 'bad_origin' }, 403);
+  }
 
   if (path === '/api/update' && method === 'POST') return handleUpdate(request, env, user);
+  // 绑定/更换登录邮箱（发码走上面公开分支的会话判定）
+  if (path === '/api/bind-email' && method === 'POST') return handleBindEmail(request, env, user);
 
   // 升级/续费申请：登记目标等级，等站长核销（M3）
   if (path === '/api/pay-request' && method === 'POST') {
@@ -230,15 +254,15 @@ async function handleApply(request, env) {
 /* ---------------- 登录 ---------------- */
 
 async function handleLogin(request, env) {
-  if (!env.MERCHANT_SESSION_SECRET) return redirect('/login?err=config');
+  if (!env.MERCHANT_SESSION_SECRET) return json({ ok: false, error: 'config' }, 500);
   const ip = request.headers.get('cf-connecting-ip') || '';
-  if (ip && limited('mlogin:' + ip, 10 * 60 * 1000, 5)) return redirect('/login?err=rate');
+  if (ip && limited('mlogin:' + ip, 10 * 60 * 1000, 5)) return json({ ok: false, error: 'rate' }, 429);
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return redirect('/login?err=format');
+    return json({ ok: false, error: 'format' }, 400);
   }
   const phone = String(body?.phone || '').replace(/\s/g, '');
   const password = String(body?.password || '');
@@ -246,10 +270,10 @@ async function handleLogin(request, env) {
   const row = await env.DB.prepare(
     'SELECT u.id uid, u.merchant_id, u.pass_hash, u.pass_salt FROM merchant_users u WHERE u.phone = ?1'
   ).bind(phone).first();
-  if (!row) return redirect('/login?err=bad');
+  if (!row) return json({ ok: false, error: 'bad' }, 401);
 
   const hash = await pbkdf2Hex(password, row.pass_salt);
-  if (!timingSafeEqual(hash, row.pass_hash)) return redirect('/login?err=bad');
+  if (!timingSafeEqual(hash, row.pass_hash)) return json({ ok: false, error: 'bad' }, 401);
 
   return authedResponse(env.MERCHANT_SESSION_SECRET, row.uid);
 }
@@ -276,9 +300,171 @@ async function currentUser(request, env) {
   if (Number(exp) < Date.now()) return null;
   const expected = await hmacHex(env.MERCHANT_SESSION_SECRET, uid + '.' + exp);
   if (!timingSafeEqual(sig, expected)) return null;
+  // 会话承载 merchant_users.id；行内带出 uid / 登录手机号 / 登录邮箱（账号安全面板用）
   return env.DB.prepare(
-    `SELECT m.* FROM merchants m JOIN merchant_users u ON u.merchant_id = m.id WHERE u.id = ?1`
+    `SELECT m.*, u.id AS uid, u.phone AS login_phone, u.email AS login_email
+     FROM merchants m JOIN merchant_users u ON u.merchant_id = m.id WHERE u.id = ?1`
   ).bind(Number(uid)).first();
+}
+
+/* ---------------- 邮箱验证码（登录补充 / 绑定邮箱） ---------------- */
+
+/**
+ * 发送 6 位验证码。user 为 null → 登录用途（仅向已绑定邮箱发码，恒返回成功防枚举）；
+ * user 已登录 → 绑定用途（目标邮箱不得被其他账号占用，错误如实返回）。
+ */
+async function sendEmailCode(request, env, user) {
+  if (!env.SMTP_USER || !env.SMTP_PASS) return json({ ok: false, error: 'config' }, 500);
+  const purpose = user ? 'bind' : 'login';
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: 'format' }, 400);
+  }
+  const email = String(body?.email || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(email) || email.length > 100) return json({ ok: false, error: 'format' }, 400);
+
+  const ip = request.headers.get('cf-connecting-ip') || '';
+  if (ip && limited('ecode:' + ip, 10 * 60 * 1000, 6)) return json({ ok: false, error: 'rate' }, 429);
+
+  if (user) {
+    const dup = await env.DB.prepare(
+      'SELECT id FROM merchant_users WHERE email = ?1 AND id != ?2'
+    ).bind(email, user.uid).first();
+    if (dup) return json({ ok: false, error: 'taken' }, 400);
+  } else {
+    // 登录用途：邮箱未绑定任何账号时不发码、不落库，仍返回成功（防枚举）
+    const known = await env.DB.prepare('SELECT id FROM merchant_users WHERE email = ?1').bind(email).first();
+    if (!known) return json({ ok: true });
+  }
+
+  // 同邮箱发码频控：60 秒内不重发（重发会覆盖旧码）
+  const last = await env.DB.prepare('SELECT created_at FROM email_login_codes WHERE email = ?1').bind(email).first();
+  if (last) {
+    const age = Date.now() - new Date(String(last.created_at).replace(' ', 'T') + 'Z').getTime();
+    if (age < 60_000) return json({ ok: false, error: 'too_fast' }, 429);
+  }
+
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  const code = String(100000 + (buf[0] % 900000));
+  await env.DB.prepare(
+    `INSERT INTO email_login_codes (email, code_hash, purpose, expires_at, attempts, created_at)
+     VALUES (?1, ?2, ?3, datetime('now', '+10 minutes'), 0, datetime('now'))
+     ON CONFLICT(email) DO UPDATE SET code_hash = ?2, purpose = ?3,
+       expires_at = datetime('now', '+10 minutes'), attempts = 0, created_at = datetime('now')`
+  ).bind(email, await sha256Hex(code), purpose).run();
+
+  if (user) {
+    // 绑定用途：发送失败如实报错，便于商户重试
+    try {
+      await sendCodeEmail(env, email, code, purpose);
+    } catch (err) {
+      console.error('email code send failed:', err);
+      return json({ ok: false, error: 'send_failed' }, 500);
+    }
+  } else {
+    // 登录用途：失败不外泄（照常返回成功），仅记录日志
+    try {
+      await sendCodeEmail(env, email, code, purpose);
+    } catch (err) {
+      console.error('email code send failed (login):', err);
+    }
+  }
+  return json({ ok: true });
+}
+
+async function sendCodeEmail(env, email, code, purpose) {
+  const action = purpose === 'bind' ? '绑定商户中心邮箱' : '登录焰境好店商户中心';
+  await sendMail({
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASS,
+    to: email,
+    fromName: '焰境·万载商户中心',
+    subject: '验证码（10 分钟内有效）',
+    html: `<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:480px;margin:0 auto;padding:28px 24px;color:#1d1d1f">
+  <p style="font-size:15px">你正在进行<b>${action}</b>操作，验证码：</p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:8px;color:#d64524;margin:18px 0">${code}</p>
+  <p style="font-size:13px;color:#6e6e73">验证码 10 分钟内有效，请勿泄露给他人。若非本人操作，请忽略本邮件。</p>
+  <p style="font-size:12px;color:#86868b;margin-top:22px">焰境·万载 · 焰境好店 merchant.whizzzest.com</p>
+</div>`,
+  });
+}
+
+/** 校验验证码：成功删除并返回 null；失败返回 'bad' | 'expired'（≤5 次尝试，错一次计一次） */
+async function verifyEmailCode(env, email, purpose, code) {
+  const row = await env.DB.prepare(
+    'SELECT code_hash, purpose, expires_at, attempts FROM email_login_codes WHERE email = ?1'
+  ).bind(email).first();
+  if (!row || row.purpose !== purpose || row.attempts >= 5) return 'bad';
+  if (new Date(String(row.expires_at).replace(' ', 'T') + 'Z').getTime() < Date.now()) return 'expired';
+  const okCode = timingSafeEqual(await sha256Hex(code), row.code_hash);
+  if (!okCode) {
+    await env.DB.prepare('UPDATE email_login_codes SET attempts = attempts + 1 WHERE email = ?1').bind(email).run();
+    return 'bad';
+  }
+  await env.DB.prepare('DELETE FROM email_login_codes WHERE email = ?1').bind(email).run();
+  return null;
+}
+
+/** 邮箱 + 验证码登录（手机号密码之外的补充方式） */
+async function handleEmailLogin(request, env) {
+  if (!env.MERCHANT_SESSION_SECRET) return json({ ok: false, error: 'config' }, 500);
+  const ip = request.headers.get('cf-connecting-ip') || '';
+  if (ip && limited('mlogine:' + ip, 10 * 60 * 1000, 10)) return json({ ok: false, error: 'rate' }, 429);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: 'format' }, 400);
+  }
+  const email = String(body?.email || '').trim().toLowerCase();
+  const code = String(body?.code || '').replace(/\s/g, '');
+  if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return json({ ok: false, error: 'bad' }, 401);
+
+  const verr = await verifyEmailCode(env, email, 'login', code);
+  if (verr) return json({ ok: false, error: verr }, 401);
+
+  const row = await env.DB.prepare('SELECT id FROM merchant_users WHERE email = ?1').bind(email).first();
+  if (!row) return json({ ok: false, error: 'bad' }, 401);
+  return authedResponse(env.MERCHANT_SESSION_SECRET, row.id);
+}
+
+/** 看板「账号安全」：绑定 / 更换登录邮箱 */
+async function handleBindEmail(request, env, user) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: 'format' }, 400);
+  }
+  const email = String(body?.email || '').trim().toLowerCase();
+  const code = String(body?.code || '').replace(/\s/g, '');
+  if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return json({ ok: false, error: 'format' }, 400);
+
+  const dup = await env.DB.prepare(
+    'SELECT id FROM merchant_users WHERE email = ?1 AND id != ?2'
+  ).bind(email, user.uid).first();
+  if (dup) return json({ ok: false, error: 'taken' }, 400);
+
+  const verr = await verifyEmailCode(env, email, 'bind', code);
+  if (verr) return json({ ok: false, error: verr }, 401);
+
+  try {
+    await env.DB.prepare('UPDATE merchant_users SET email = ?1 WHERE id = ?2').bind(email, user.uid).run();
+  } catch {
+    return json({ ok: false, error: 'taken' }, 400); // UNIQUE 冲突兜底
+  }
+  return json({ ok: true });
+}
+
+function maskEmail(email) {
+  const i = email.indexOf('@');
+  if (i <= 1) return email;
+  return email.slice(0, Math.min(2, i - 1)) + '***' + email.slice(i);
 }
 
 /* ---------------- 编辑资料 ---------------- */
@@ -414,7 +600,7 @@ async function dashboardHtml(env, merchant, url) {
   } else {
     stateBlock = `
       <div class="card state bad"><span class="ico">⏸</span>
-        <div><h2>展示已到期</h2><p>续费或升级等级请联系 whizzzest@outlook.com，或提交新的申请。</p>
+        <div><h2>展示已到期</h2><p>续费或升级等级请联系 ${CONTACT_EMAIL}，或提交新的申请。</p>
         <p class="row"><a class="btn" href="/dashboard/edit">更新资料</a></p></div>
       </div>`;
   }
@@ -444,10 +630,83 @@ async function dashboardHtml(env, merchant, url) {
         </table>
       </div>
       <div class="panel">
+        <h3>账号安全</h3>
+        <table>
+          <tr><th>登录手机号</th><td>${esc(merchant.login_phone || '—')}</td></tr>
+          <tr><th>登录邮箱</th><td>${merchant.login_email ? esc(maskEmail(merchant.login_email)) + ' ' : ''}<button type="button" class="btn-text" id="bind-toggle">${merchant.login_email ? '更换' : '绑定邮箱'}</button></td></tr>
+        </table>
+        <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录商户中心，无需输入密码。验证码由 notifications@whizzzest.com 发送。</p>
+        <div id="bindbox" style="display:none;margin-top:14px">
+          <div class="ops" style="flex-wrap:wrap;align-items:center">
+            <input class="inl" id="bind-email" type="email" placeholder="邮箱" style="flex:1;min-width:200px">
+            <button class="btn" id="bind-send" type="button">发送验证码</button>
+          </div>
+          <div class="ops" style="flex-wrap:wrap;align-items:center;margin-top:10px">
+            <input class="inl" id="bind-code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="width:10em">
+            <button class="primary" id="bind-ok" type="button">确认绑定</button>
+          </div>
+          <p class="err-line" id="bind-err" style="display:none;margin-top:10px"></p>
+        </div>
+      </div>
+      <div class="panel">
         <h3>展示权益</h3>
-        <p class="tip">认证商户享独立详情页、电话微信直达与数据看板；置顶推荐在目录页顶部大位展示。续费/升级请联系 <b>whizzzest@outlook.com</b>。</p>
+        <p class="tip">认证商户享独立详情页、电话微信直达与数据看板；置顶推荐在目录页顶部大位展示。续费/升级请联系 <b>${CONTACT_EMAIL}</b>。</p>
       </div>
     </div>
+  <script>
+  (function () {
+    var toggle = document.getElementById('bind-toggle');
+    if (!toggle) return;
+    toggle.addEventListener('click', function () {
+      var box = document.getElementById('bindbox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+    var ERR = {
+      format: '请输入正确的邮箱', taken: '该邮箱已被其他账号绑定',
+      too_fast: '发送太频繁，请 1 分钟后再试', rate: '尝试过于频繁，请 10 分钟后再试',
+      send_failed: '邮件发送失败，请稍后再试', config: '邮件服务未配置，请联系站长'
+    };
+    function showErr(color, text) {
+      var e = document.getElementById('bind-err');
+      e.style.color = color; e.textContent = text; e.style.display = 'block';
+    }
+    function countdown(btn) {
+      var n = 60;
+      btn.disabled = true; btn.textContent = n + 's 后重发';
+      var t = setInterval(function () {
+        n--;
+        if (n <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '发送验证码'; return; }
+        btn.textContent = n + 's 后重发';
+      }, 1000);
+    }
+    document.getElementById('bind-send').addEventListener('click', function () {
+      var btn = this;
+      fetch('/api/email-code', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: document.getElementById('bind-email').value.trim(), purpose: 'bind' }) })
+        .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+        .then(function (r) {
+          if (r.s === 200 && r.d.ok) { countdown(btn); showErr('#1a7f37', '✅ 验证码已发送，请查收邮箱（10 分钟内有效）'); return; }
+          showErr('#d64524', ERR[r.d.error] || '发送失败，请重试');
+        })
+        .catch(function () { showErr('#d64524', '网络错误，请重试'); });
+    });
+    document.getElementById('bind-ok').addEventListener('click', function () {
+      var btn = this;
+      btn.disabled = true;
+      fetch('/api/bind-email', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: document.getElementById('bind-email').value.trim(),
+          code: document.getElementById('bind-code').value.trim() }) })
+        .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+        .then(function (r) {
+          if (r.s === 200 && r.d.ok) { location.reload(); return; }
+          btn.disabled = false;
+          showErr('#d64524', ({ format: '请输入邮箱和 6 位验证码', taken: '该邮箱已被其他账号绑定',
+            bad: '验证码错误', expired: '验证码已过期，请重新发送' })[r.d.error] || '绑定失败，请重试');
+        })
+        .catch(function () { btn.disabled = false; showErr('#d64524', '网络错误，请重试'); });
+    });
+  })();
+  </script>
   `);
   return htmlText;
 }
@@ -589,6 +848,17 @@ const BASE_CSS = `
   }
   .fgrid input:focus, .fgrid select:focus, .fgrid textarea:focus { border-color: #d64524; background: #fff; }
   .fgrid input[type="file"] { padding: 9px; font-size: 13px; }
+  /* 登录双方式 / 绑定邮箱的内联控件 */
+  .inl {
+    padding: 11px 13px; font-size: 15px; color: #1d1d1f; background: #f5f5f7;
+    border: 1px solid transparent; border-radius: 12px; outline: none; font-family: inherit;
+    transition: border-color .2s, background .2s;
+  }
+  .inl:focus { border-color: #d64524; background: #fff; }
+  .fcol { display: flex; flex-direction: column; gap: 12px; }
+  .fcol > .inl { width: 100%; }
+  .tabbtn.active { background: #d64524; border-color: #d64524; color: #fff; }
+  .tabbtn.active:hover { background: #b5371a; }
   .hint { font-size: 11px; color: #86868b; }
   .err-line {
     margin-top: 18px; padding: 12px 16px; background: #fdeee8; color: #d64524;
@@ -699,35 +969,95 @@ function loginHtml(url) {
   <div class="wrap">
     ${errLine(url)}
     ${loginNotice(url)}
-    <form class="card" id="f" style="display:block">
-      <h2 style="margin-bottom:6px">商户登录</h2>
-      <p style="color:#6e6e73;font-size:13px;margin-bottom:4px">手机号 + 密码（申请入驻时设置）</p>
-      <div class="fgrid" style="grid-template-columns:1fr">
-        <label>手机号<input id="phone" maxlength="11" inputmode="numeric" autocomplete="username"></label>
-        <label>密码<input id="pw" type="password" autocomplete="current-password"></label>
+    <div class="card" style="display:block">
+      <h2 style="margin-bottom:12px">商户登录</h2>
+      <div class="ops" style="margin-bottom:16px">
+        <button type="button" class="tabbtn active" id="mt-phone">手机号 + 密码</button>
+        <button type="button" class="tabbtn" id="mt-email">邮箱 + 验证码</button>
       </div>
-      <div class="ops" style="margin-top:16px"><button class="primary" id="go" type="submit">登 录</button></div>
-      <p class="err-line" id="err" style="display:none"></p>
-    </form>
+      <form class="fcol" id="f">
+        <input class="inl" id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号">
+        <input class="inl" id="pw" type="password" autocomplete="current-password" placeholder="密码（申请入驻时设置）">
+        <button class="primary" id="go" type="submit">登 录</button>
+        <p class="err-line" id="err" style="display:none"></p>
+      </form>
+      <form class="fcol" id="fe" style="display:none">
+        <input class="inl" id="email" type="email" placeholder="已绑定的邮箱">
+        <div style="display:flex;gap:10px">
+          <input class="inl" id="code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
+          <button class="btn" id="send" type="button">发送验证码</button>
+        </div>
+        <button class="primary" id="goe" type="submit">登 录</button>
+        <p class="err-line" id="erre" style="display:none"></p>
+        <p class="tip" style="font-size:12px">仅支持已在「商户中心 → 账号安全」绑定邮箱的账号；验证码由 notifications@whizzzest.com 发送。</p>
+      </form>
+    </div>
   </div>
   <script>
-  var f = document.getElementById('f');
-  f.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var btn = document.getElementById('go');
-    btn.disabled = true;
-    fetch('/api/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ phone: document.getElementById('phone').value, password: document.getElementById('pw').value })
-    }).then(function (r) {
-      if (r.ok) { location.href = '/dashboard'; return; }
-      btn.disabled = false;
-      var err = document.getElementById('err');
-      err.textContent = r.status === 429 ? '尝试过于频繁，请 10 分钟后再试' : '手机号或密码不正确';
-      err.style.display = 'block';
-    }).catch(function () { btn.disabled = false; });
-  });
+  (function () {
+    var PHONE_ERR = { bad: '手机号或密码不正确', rate: '尝试过于频繁，请 10 分钟后再试', format: '提交内容格式有误', config: '服务端未配置完成，请联系站长' };
+    var EMAIL_ERR = { bad: '验证码错误或邮箱未绑定', expired: '验证码已过期，请重新发送', rate: '尝试过于频繁，请 10 分钟后再试', too_fast: '发送太频繁，请 1 分钟后再试', send_failed: '邮件发送失败，请稍后再试', format: '请输入邮箱和 6 位验证码', config: '邮件服务未配置，请联系站长' };
+    function showErr(id, text) { var e = document.getElementById(id); e.textContent = text; e.style.display = 'block'; }
+    function post(path, data) {
+      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { s: r.status, d: d }; }); });
+    }
+    // 登录提交：成功时 302 已被 fetch 跟随到 /dashboard（HTML），先看 r.ok 再解析错误 JSON
+    function submitPost(path, data, errId, btn, msgs) {
+      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+        .then(function (r) {
+          if (r.ok) { location.href = '/dashboard'; return; }
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            btn.disabled = false;
+            showErr(errId, (r.status === 429 ? msgs.rate : msgs[d.error]) || '登录失败，请重试');
+          });
+        })
+        .catch(function () { btn.disabled = false; showErr(errId, '网络错误，请重试'); });
+    }
+    function switchMode(email) {
+      document.getElementById('f').style.display = email ? 'none' : 'flex';
+      document.getElementById('fe').style.display = email ? 'flex' : 'none';
+      document.getElementById('mt-phone').classList.toggle('active', !email);
+      document.getElementById('mt-email').classList.toggle('active', email);
+    }
+    document.getElementById('mt-phone').addEventListener('click', function () { switchMode(false); });
+    document.getElementById('mt-email').addEventListener('click', function () { switchMode(true); });
+
+    document.getElementById('f').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('go');
+      btn.disabled = true;
+      submitPost('/api/login', { phone: document.getElementById('phone').value.trim(), password: document.getElementById('pw').value }, 'err', btn, PHONE_ERR);
+    });
+
+    document.getElementById('send').addEventListener('click', function () {
+      var btn = this;
+      if (btn.disabled) return;
+      post('/api/email-code', { email: document.getElementById('email').value.trim() })
+        .then(function (r) {
+          if (r.s === 200 && r.d.ok) {
+            var n = 60;
+            btn.disabled = true; btn.textContent = n + 's 后重发';
+            var t = setInterval(function () {
+              n--;
+              if (n <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '发送验证码'; return; }
+              btn.textContent = n + 's 后重发';
+            }, 1000);
+            showErr('erre', '✅ 若该邮箱已绑定商户，验证码已发送（10 分钟内有效）');
+            return;
+          }
+          showErr('erre', (r.s === 429 ? (r.d.error === 'too_fast' ? EMAIL_ERR.too_fast : EMAIL_ERR.rate) : EMAIL_ERR[r.d.error]) || '发送失败，请重试');
+        })
+        .catch(function () { showErr('erre', '网络错误，请重试'); });
+    });
+
+    document.getElementById('fe').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('goe');
+      btn.disabled = true;
+      submitPost('/api/login/email', { email: document.getElementById('email').value.trim(), code: document.getElementById('code').value.trim() }, 'erre', btn, EMAIL_ERR);
+    });
+  })();
   </script>
   `);
 }
@@ -785,6 +1115,11 @@ async function pbkdf2Hex(password, saltHex) {
     { name: 'PBKDF2', hash: 'SHA-256', iterations: 100000, salt }, key, 256
   );
   return toHex(bits);
+}
+
+async function sha256Hex(s) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return toHex(digest);
 }
 
 async function hmacHex(secret, msg) {
