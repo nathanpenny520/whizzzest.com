@@ -150,7 +150,7 @@ async function shelfPage(env, url, ctx) {
       <div class="bk-cta">
         <h2>你也想写万载的故事？</h2>
         <p>焰境文库向所有作者开放：注册作者账号，投稿你的小说、故事与随笔，审核通过即上线展示。</p>
-        <a class="btn btn-light" href="https://writer.whizzzest.com/register" target="_blank" rel="noopener">成为作者</a>
+        <a class="btn" href="https://writer.whizzzest.com/register" target="_blank" rel="noopener">成为作者</a>
       </div>
     </div></section>`;
 
