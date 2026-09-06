@@ -20,8 +20,6 @@ const CATEGORIES = {
 
 const SITE_URL = 'https://whizzzest.com';
 const APPLY_URL = 'https://merchant.whizzzest.com/apply';
-const APPLY_MAILTO =
-  'mailto:whizzzest@outlook.com?subject=' + encodeURIComponent('商户入驻申请 — 焰境·万载');
 
 // 商户图片：R2 对象键 → 主站代理地址；以斜杠开头视为站内静态资源路径，原样使用
 const mimg = (v) => (v && !v.startsWith('/') ? '/assets-merchant/' + v : v);
@@ -47,13 +45,16 @@ export async function handleMerchants(request, env, url) {
 /* ---------------- 数据 ---------------- */
 
 // 上线商户排序：featured → verified → free，同级按权重/新在上
+// 付费到期（paid_until）过期的商户自动对游客隐藏，续费后立即恢复
+const APPROVED_WHERE =
+  "status = 'approved' AND (paid_until IS NULL OR paid_until >= date('now'))";
 const ORDER_BY =
   "ORDER BY CASE tier WHEN 'featured' THEN 0 WHEN 'verified' THEN 1 ELSE 2 END, sort_weight DESC, id DESC";
 
 async function approvedMerchants(env, cat) {
   const sql = cat
-    ? `SELECT * FROM merchants WHERE status = 'approved' AND category = ?1 ${ORDER_BY}`
-    : `SELECT * FROM merchants WHERE status = 'approved' ${ORDER_BY}`;
+    ? `SELECT * FROM merchants WHERE ${APPROVED_WHERE} AND category = ?1 ${ORDER_BY}`
+    : `SELECT * FROM merchants WHERE ${APPROVED_WHERE} ${ORDER_BY}`;
   const { results } = cat
     ? await env.DB.prepare(sql).bind(cat).all()
     : await env.DB.prepare(sql).all();
@@ -62,7 +63,7 @@ async function approvedMerchants(env, cat) {
 
 async function approvedBySlug(env, slug) {
   return env.DB
-    .prepare("SELECT * FROM merchants WHERE status = 'approved' AND slug = ?1")
+    .prepare(`SELECT * FROM merchants WHERE ${APPROVED_WHERE} AND slug = ?1`)
     .bind(slug)
     .first();
 }
@@ -124,7 +125,7 @@ async function merchantsHome(env, url, cat) {
         <p class="mc-kicker">焰境好店</p>
         <h1>万载本地商户推荐</h1>
         <p class="mc-sub">吃得地道、住得舒心、带得走的万载 —— 游客与本地人都在用。</p>
-        <a class="btn btn-light mc-apply" href="${APPLY_MAILTO}">商户入驻</a>
+        <a class="btn btn-light mc-apply" href="${APPLY_URL}" target="_blank" rel="noopener">商户入驻</a>
       </div>
     </section>
     <section class="mc-main">
@@ -134,8 +135,8 @@ async function merchantsHome(env, url, cat) {
         ${grid}
         <div class="mc-cta">
           <h2>你是万载的店家？</h2>
-          <p>把你的店展示给每一位来万载的游客。认证商户享独立详情页、电话微信直达与专属数据看板。</p>
-          <a class="btn btn-primary" href="${APPLY_MAILTO}">立即入驻</a>
+          <p>把你的店展示给每一位来万载的游客。基础展示免费；认证商户 ¥10/年（独立详情页 + 徽标 + 数据看板），置顶推荐 ¥15/年（目录页顶部大位）。</p>
+          <a class="btn" href="${APPLY_URL}" target="_blank" rel="noopener">立即入驻</a>
         </div>
       </div>
     </section>`,
@@ -241,7 +242,7 @@ function relatedCard(x) {
 
 async function merchantsSitemap(env) {
   const { results } = await env.DB
-    .prepare("SELECT slug, updated_at FROM merchants WHERE status = 'approved' ORDER BY id DESC")
+    .prepare(`SELECT slug, updated_at FROM merchants WHERE ${APPROVED_WHERE} ORDER BY id DESC`)
     .all();
   const urls = (results || [])
     .map(

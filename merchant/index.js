@@ -26,6 +26,12 @@ const SITE = 'https://whizzzest.com';
 
 const CATEGORIES = { food: '美食', stay: '住宿', specialty: '特产', fireworks: '花炮', other: '其他' };
 const TIER_LABEL = { free: '基础', verified: '认证商户', featured: '置顶推荐' };
+// 定价（¥/年，2026-09-06 定）：认证 10、置顶 15（含认证权益）
+const TIER_PRICE = { verified: 10, featured: 15 };
+const QR_IMGS = [
+  ['微信收款码', SITE + '/pay/wechat-qr.png'],
+  ['支付宝收款码', SITE + '/pay/alipay-qr.png'],
+];
 const IMG_TYPES = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 const MAX_IMG = 9;
 const MAX_IMG_BYTES = 5 * 1024 * 1024;
@@ -125,6 +131,23 @@ async function handleApi(request, env, path, url) {
   if (origin && origin !== ORIGIN) return json({ ok: false, error: 'bad_origin' }, 403);
 
   if (path === '/api/update' && method === 'POST') return handleUpdate(request, env, user);
+
+  // 升级/续费申请：登记目标等级，等站长核销（M3）
+  if (path === '/api/pay-request' && method === 'POST') {
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: 'invalid_json' }, 400);
+    }
+    const tier = String(body?.tier || '');
+    if (!TIER_PRICE[tier]) return json({ ok: false, error: 'invalid_tier' }, 400);
+    await env.DB.prepare(
+      "UPDATE merchants SET tier_request = ?1, paid_requested_at = datetime('now') WHERE id = ?2"
+    ).bind(tier, merchant.id).run();
+    return json({ ok: true });
+  }
+
   return json({ ok: false, error: 'not_found' }, 404);
 }
 
@@ -359,16 +382,20 @@ async function dashboardHtml(env, merchant, url) {
   } else if (st === 'approved') {
     const paidUntil = merchant.paid_until;
     const daysLeft = paidUntil ? Math.ceil((new Date(paidUntil + 'T23:59:59Z') - Date.now()) / 86400000) : null;
-    const renewHint = daysLeft !== null && daysLeft <= 30
-      ? `<div class="warn"> your display 到期日 <b>${esc(paidUntil)}</b>（剩 ${daysLeft} 天）。续费请联系 whizzzest@outlook.com。</div>`
-      : '';
+    const expired = daysLeft !== null && daysLeft < 0;
+    let renewHint = '';
+    if (expired) {
+      renewHint = `<div class="warn">展示已到期（${esc(paidUntil)}）——页面已对游客隐藏，续费后立即恢复。可在下方「升级 / 续费」自助续费。</div>`;
+    } else if (daysLeft !== null && daysLeft <= 30) {
+      renewHint = `<div class="warn">到期日 <b>${esc(paidUntil)}</b>（剩 ${daysLeft} 天），可在下方「升级 / 续费」自助续费。</div>`;
+    }
     const stats = await env.DB.prepare(
       `SELECT COUNT(*) pv, COUNT(DISTINCT COALESCE(NULLIF(vid,''),'anon:'||COALESCE(ip,'x'))) uv
        FROM visits WHERE path = ?1 AND created_at >= datetime('now','-30 days')`
     ).bind(`/merchants/${merchant.slug}/`).first();
     stateBlock = `
-      <div class="card state ok"><span class="ico">✅</span>
-        <div><h2>已上线</h2><p>你的商户页面已在焰境好店展示。</p>
+      <div class="card state ${expired ? 'bad' : 'ok'}"><span class="ico">${expired ? '⏸' : '✅'}</span>
+        <div><h2>${expired ? '已到期 · 暂停展示' : '已上线'}</h2><p>${expired ? '续费后立即恢复展示。' : '你的商户页面已在焰境好店展示。'}</p>
         <p class="row"><a href="${SITE}/merchants/${esc(merchant.slug)}/" target="_blank" rel="noopener">查看我的页面 ↗</a></p></div>
       </div>${renewHint}
       <div class="cards">
@@ -376,7 +403,8 @@ async function dashboardHtml(env, merchant, url) {
         <div class="card2"><b>${stats?.uv || 0}</b><span>近 30 天访客</span></div>
         <div class="card2"><b>${esc(TIER_LABEL[merchant.tier] || merchant.tier)}</b><span>当前等级</span></div>
         <div class="card2"><b>${paidUntil ? esc(paidUntil) : '—'}</b><span>展示到期日</span></div>
-      </div>`;
+      </div>
+      ${payPanelHtml(merchant)}`;
   } else if (st === 'rejected') {
     stateBlock = `
       <div class="card state bad"><span class="ico">❌</span>
@@ -422,6 +450,56 @@ async function dashboardHtml(env, merchant, url) {
     </div>
   `);
   return htmlText;
+}
+
+/** 升级 / 续费面板（M3 变现闭环）：选等级 → 扫收款码 → 我已付款 → 站长核销 */
+function payPanelHtml(merchant) {
+  if (merchant.tier_request) {
+    const t = merchant.tier_request;
+    return `<div class="panel"><h3>升级 / 续费</h3>
+      <p class="tip">已申请 <b>${esc(TIER_LABEL[t] || t)}（¥${TIER_PRICE[t] || '?'}/年）</b>（${esc(String(merchant.paid_requested_at || '').replace(' ', ' '))} 提交），站长核销后自动生效，无需重复付款。</p></div>`;
+  }
+  const btn = (t) => {
+    const renew = merchant.tier === t;
+    return `<button type="button" class="tier-btn" data-tier="${t}" data-amt="${TIER_PRICE[t]}">${renew ? '续费' : '开通'}${TIER_LABEL[t]} ¥${TIER_PRICE[t]}/年</button>`;
+  };
+  return `<div class="panel"><h3>升级 / 续费</h3>
+    <p class="tip">当前等级：<b>${esc(TIER_LABEL[merchant.tier] || merchant.tier)}</b>。认证商户享独立详情页、认证徽标、电话微信直达与数据看板；置顶推荐另享目录页顶部大位。</p>
+    <div class="ops" style="margin-top:12px">${btn('verified')}${btn('featured')}</div>
+    <div id="paybox" style="display:none;margin-top:16px">
+      <div class="qrs">
+        ${QR_IMGS.map(([label, src]) => `
+        <figure class="qr"><img src="${src}" alt="${label}" loading="lazy"
+          onerror="this.style.display='none';this.parentElement.querySelector('.qr-miss').style.display='block'">
+        <figcaption>${label}</figcaption>
+        <div class="qr-miss" style="display:none">收款码待上传</div></figure>`).join('')}
+      </div>
+      <p class="tip" style="margin-top:12px">① 微信/支付宝扫码付款 <b>¥<span id="pay-amt">10</span></b>/年，备注商户名「${esc(merchant.name)}」；② 付款后点下方按钮，站长核销后自动开通。</p>
+      <div class="ops" style="margin-top:10px"><button class="primary" id="paidbtn" type="button">我已付款，等待核销</button></div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var tier = '';
+    document.querySelectorAll('.tier-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        tier = b.getAttribute('data-tier');
+        document.getElementById('pay-amt').textContent = b.getAttribute('data-amt');
+        document.getElementById('paybox').style.display = 'block';
+      });
+    });
+    var p = document.getElementById('paidbtn');
+    if (p) p.addEventListener('click', function () {
+      if (!tier) return;
+      p.disabled = true;
+      fetch('/api/pay-request', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tier: tier }) }).then(function (r) {
+        if (r.ok) { location.reload(); return; }
+        p.disabled = false; alert('提交失败，请重试');
+      }).catch(function () { p.disabled = false; alert('网络错误，请重试'); });
+    });
+  })();
+  </script>`;
 }
 
 function safeImages(json) {
@@ -493,6 +571,13 @@ const BASE_CSS = `
   .tip b { color: #1d1d1f; }
   .thumbs { display: flex; gap: 10px; flex-wrap: wrap; }
   .thumbs img { width: 96px; height: 72px; object-fit: cover; border-radius: 10px; background: #f5f5f7; }
+  /* 升级/续费 */
+  .tier-btn { padding: 8px 16px; }
+  .qrs { display: flex; gap: 20px; flex-wrap: wrap; }
+  .qr { text-align: center; }
+  .qr img { width: 170px; height: 170px; object-fit: contain; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 12px; padding: 6px; }
+  .qr figcaption { margin-top: 6px; font-size: 12px; color: #6e6e73; }
+  .qr-miss { width: 170px; height: 170px; display: flex; align-items: center; justify-content: center; background: #f5f5f7; border-radius: 12px; font-size: 12px; color: #86868b; }
   form.card { display: block; }
   .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 16px; }
   .fgrid label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6e6e73; }
@@ -564,7 +649,16 @@ function applyHtml(url) {
   <div class="wrap">
     <div class="card" style="display:block">
       <h2>把你的店，展示给每一位来万载的游客</h2>
-      <p>提交后我们将在 24 小时内审核。通过即上线 whizzzest.com/merchants/，<b>免费试用</b>；认证商户与置顶推荐权益见页面底部说明。</p>
+      <p>提交后我们将在 24 小时内审核。通过即上线 whizzzest.com/merchants/，基础展示免费，可随时升级。</p>
+    </div>
+    <div class="panel">
+      <h3>展示权益与定价</h3>
+      <table>
+        <tr><th>基础展示</th><td><b>免费</b> —— 审核后上线，目录页名称 + 简介卡片</td></tr>
+        <tr><th>认证商户</th><td><b>¥10</b>/年 —— 独立详情页 + 认证徽标 + 电话微信一键直达 + 数据看板</td></tr>
+        <tr><th>置顶推荐</th><td><b>¥15</b>/年 —— 含认证商户全部权益 + 目录页顶部「推荐好店」大位</td></tr>
+      </table>
+      <p class="tip" style="margin-top:10px">入驻后可在「商户中心」随时升级 / 续费（扫码付款，站长核销后自动开通）。</p>
     </div>
     ${errLine(url)}
     <form class="card" method="post" action="/api/apply" enctype="multipart/form-data">

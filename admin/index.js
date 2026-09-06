@@ -134,6 +134,10 @@ async function handleApi(request, env, path) {
   if ((m = path.match(/^\/api\/merchants\/(\d+)$/)) && method === 'DELETE') {
     return removeMerchant(env, Number(m[1]));
   }
+  // 核销：确认收款 → 开通等级 + 一年到期，清除待核销申请（M3）
+  if ((m = path.match(/^\/api\/merchants\/(\d+)\/redeem$/)) && method === 'POST') {
+    return redeemMerchant(env, Number(m[1]), request);
+  }
 
   return json({ ok: false, error: 'not_found' }, 404);
 }
@@ -261,7 +265,7 @@ async function statsOverview(env, request) {
   const url = new URL(request.url);
   const { days, sql: SINCE } = sinceExpr(url.searchParams.get('days'));
   const bots = url.searchParams.get('bots') === '1';
-  const T = bots ? 'visits' : '(SELECT * FROM ${T} WHERE is_bot = 0)';
+  const T = bots ? 'visits' : '(SELECT * FROM visits WHERE is_bot = 0)';
   const db = env.DB;
 
   const sincePrev = `datetime('now','+8 hours','start of day','-8 hours','-${days} days')`;
@@ -388,6 +392,8 @@ async function statsOverview(env, request) {
 
 async function listVisitors(env, request) {
   const url = new URL(request.url);
+  const bots = url.searchParams.get('bots') === '1';
+  const T = bots ? 'visits' : '(SELECT * FROM visits WHERE is_bot = 0)';
   const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
 
   const { results } = await env.DB
@@ -405,6 +411,7 @@ async function listVisitors(env, request) {
 }
 
 async function visitorDetail(env, gid) {
+  const T = '(SELECT * FROM visits WHERE is_bot = 0)';
   const where = `${GID} = ?1`;
   const summary = await env.DB
     .prepare(`SELECT COUNT(*) n, MIN(created_at) first, MAX(created_at) last FROM ${T} WHERE ${where}`)
@@ -539,6 +546,24 @@ async function editMerchant(env, id, request) {
     .prepare(`UPDATE merchants SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`)
     .bind(...vals, id)
     .run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  return json({ ok: true });
+}
+
+async function redeemMerchant(env, id, request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: 'invalid_json' }, 400);
+  }
+  const tier = String(body?.tier || '');
+  if (!M_TIERS.includes(tier) || tier === 'free') return json({ ok: false, error: 'invalid_tier' }, 400);
+  const { meta } = await env.DB.prepare(
+    `UPDATE merchants SET tier = ?1, paid_until = date('now', '+1 year'),
+      tier_request = NULL, paid_requested_at = NULL, updated_at = datetime('now')
+     WHERE id = ?2`
+  ).bind(tier, id).run();
   if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
   return json({ ok: true });
 }
@@ -776,6 +801,7 @@ ${BASE_CSS}
   .mst-approved { background: #e5f3e8; color: #1a7f37; }
   .mst-rejected { background: #f0f0f2; color: #6e6e73; }
   .mst-expired { background: #fbf3dd; color: #9a6b00; }
+  .mrow-pay { margin-top: 10px; padding: 8px 12px; background: #fbf3dd; color: #9a6b00; border-radius: 10px; font-size: 13px; }
   .mslug { font-size: 12px; color: #6e6e73; }
   .mslug:hover { color: #d64524; }
   @media (max-width: 900px) {
@@ -1263,7 +1289,14 @@ function renderMerchant(x) {
   if (x.address) meta.push(x.address);
   if (x.phone) meta.push('☎ ' + x.phone);
   if (x.contact_name) meta.push('联系人 ' + x.contact_name + (x.contact_phone ? ' ' + x.contact_phone : ''));
-  if (x.paid_until) meta.push('付费到期 ' + x.paid_until);
+  if (x.paid_until) {
+    var overdue = x.paid_until < new Date().toISOString().slice(0, 10);
+    meta.push((overdue ? '⚠️已到期 ' : '付费到期 ') + x.paid_until);
+  }
+  var redeemBadge = x.tier_request
+    ? '<div class="mrow-pay">💰 待核销：申请「' + esc(M_TIER[x.tier_request] || x.tier_request) + '」' +
+      (x.paid_requested_at ? '（' + esc(x.paid_requested_at) + ' 提交）' : '') + '</div>'
+    : '';
   div.innerHTML =
     '<div class="row1"><span class="name">' + esc(x.name) + '</span>' +
     '<span class="k-badge">' + esc(M_CAT[x.category] || x.category) + '</span>' +
@@ -1275,11 +1308,14 @@ function renderMerchant(x) {
     '</div>' +
     (x.intro ? '<div class="time">' + esc(x.intro) + '</div>' : '') +
     (x.reject_reason ? '<div class="meta">驳回原因：' + esc(x.reject_reason) + '</div>' : '') +
+    redeemBadge +
     (meta.length ? '<div class="meta">' + esc(meta.join(' · ')) + '</div>' : '') +
     '<div class="ops">' +
     (x.status === 'pending'
       ? '<button type="button" data-act="ok" class="primary">通过上线</button><button type="button" data-act="rej">驳回</button>' : '') +
-    (x.status === 'approved' ? '<button type="button" data-act="off">下线</button>' : '') +
+    (x.tier_request
+      ? '<button type="button" data-act="redeem" class="primary">确认收款 · 开通' + esc(M_TIER[x.tier_request] || x.tier_request) + '</button>' : '') +
+    (x.status === 'approved' && !x.tier_request ? '<button type="button" data-act="off">下线</button>' : '') +
     '<button type="button" data-act="edit">编辑</button>' +
     '<button type="button" data-act="del">删除</button></div>';
   div.querySelector('.ops').addEventListener('click', function (e) {
@@ -1300,6 +1336,12 @@ function renderMerchant(x) {
       api('/api/merchants/' + x.id, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ status: 'expired' })
+      }).then(function () { loadMerchants(true); });
+    } else if (act === 'redeem') {
+      if (!confirm('确认已收到「' + x.name + '」的' + (M_TIER[x.tier_request] || x.tier_request) + '年费？将开通一年并清除待核销。')) return;
+      api('/api/merchants/' + x.id + '/redeem', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tier: x.tier_request })
       }).then(function () { loadMerchants(true); });
     } else if (act === 'edit') {
       openForm(x);

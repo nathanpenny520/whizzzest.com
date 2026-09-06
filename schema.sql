@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS visits (
   lang TEXT,
   ua TEXT,
   ip TEXT,
+  is_bot INTEGER DEFAULT 0,
   engage_ms INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
@@ -78,3 +79,9 @@ CREATE TABLE IF NOT EXISTS merchant_users (
   pass_salt TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- M3 变现闭环：商户自助申请升级/续费 → 站长核销
+-- tier_request: 商户申请的目标等级（verified|featured，NULL = 无待核销申请）
+-- paid_requested_at: 申请时间（admin 排序/提醒用）
+ALTER TABLE merchants ADD COLUMN tier_request TEXT;
+ALTER TABLE merchants ADD COLUMN paid_requested_at TEXT;
