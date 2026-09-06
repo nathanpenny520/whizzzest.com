@@ -214,11 +214,14 @@ function buildSystem(systemPrompt, matched, live, hereLabel) {
   if (live) parts.push(live);
 
   parts.push(
-    '回答要求：有参考知识/站内数据时严格依据其作答，不编造；没有依据时如实说明。' +
+    '回答要求：有参考知识/站内数据时严格依据其作答；' +
+    '【防编造硬性要求】列举类问题（美食/景点/线路/特产等）只允许列出参考知识与站内数据中出现过的具体名称，' +
+    '两者均未覆盖时绝不编造，改为说明资料暂未覆盖，并引导用户浏览对应栏目页或发邮件到 contact@whizzzest.com 咨询。' +
     '始终以 JSON 返回：{"text": "回复正文"}，需要引导跳转时附带 "action"' +
     '（{"type":"open_page","payload":{"route":"/路径"}} 或' +
     ' {"type":"open_merchant","payload":{"name":"商户名"}} 或' +
-    ' {"type":"open_attraction","payload":{"name":"景点名"}}，名称须与站内数据完全一致）。'
+    ' {"type":"open_attraction","payload":{"name":"景点名"}}，名称须与站内数据完全一致）。' +
+    'action 不要画蛇添足：仅当问题明确指向某个页面/商户/景点详情时才附带，一般的列举回答省略。'
   );
   return parts.join('\n\n');
 }
@@ -276,7 +279,15 @@ async function loadKnowledge(env) {
 function retrieveKnowledge(question, rows) {
   const q = question.toLowerCase();
   return rows
-    .map((k) => ({ k, score: k.keywords.reduce((n, kw) => n + (kw && q.includes(kw.toLowerCase()) ? 1 : 0), 0) }))
+    .map((k) => {
+      let score = k.keywords.reduce((n, kw) => n + (kw && q.includes(kw.toLowerCase()) ? 1 : 0), 0);
+      // 中文无分词：类目名按两字滑窗切词（美食特产 → 美食/食特/特产）命中小问 +2，
+      // 让「必吃美食」这类泛问命中对应类目（种子关键词同步做了泛词补充）
+      for (let i = 0; i + 2 <= k.category.length; i++) {
+        if (q.includes(k.category.slice(i, i + 2).toLowerCase())) { score += 2; break; }
+      }
+      return { k, score };
+    })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3)
