@@ -196,11 +196,12 @@ async function handleApply(request, env) {
 
   const salt = crypto.randomUUID().replace(/-/g, '');
   const hash = await pbkdf2Hex(password, salt);
-  await env.DB.prepare(
+  const ur = await env.DB.prepare(
     'INSERT INTO merchant_users (merchant_id, phone, pass_hash, pass_salt) VALUES (?1,?2,?3,?4)'
   ).bind(merchantId, phone, hash, salt).run();
 
-  return authedResponse(env.MERCHANT_SESSION_SECRET, merchantId);
+  // 会话承载 merchant_users.id（门户统一按用户 ID 解析身份）
+  return authedResponse(env.MERCHANT_SESSION_SECRET, ur.meta.last_row_id);
 }
 
 /* ---------------- 登录 ---------------- */
@@ -227,16 +228,16 @@ async function handleLogin(request, env) {
   const hash = await pbkdf2Hex(password, row.pass_salt);
   if (!timingSafeEqual(hash, row.pass_hash)) return redirect('/login?err=bad');
 
-  return authedResponse(env.MERCHANT_SESSION_SECRET, row.merchant_id);
+  return authedResponse(env.MERCHANT_SESSION_SECRET, row.uid);
 }
 
-function authedResponse(secret, merchantId) {
+function authedResponse(secret, uid) {
   const exp = String(Date.now() + SESSION_TTL_MS);
-  return hmacHex(secret, merchantId + '.' + exp).then((sig) => {
+  return hmacHex(secret, uid + '.' + exp).then((sig) => {
     const res = json({ ok: true });
     res.headers.set(
       'Set-Cookie',
-      `${COOKIE_NAME}=${merchantId}.${exp}.${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_S}`
+      `${COOKIE_NAME}=${uid}.${exp}.${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_S}`
     );
     res.headers.set('Location', '/dashboard');
     return new Response(null, { status: 302, headers: res.headers });
