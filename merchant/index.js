@@ -66,8 +66,10 @@ export default {
       return res;
     } catch (err) {
       console.error('merchant worker error:', err);
-      const msg = url.searchParams.get('err');
-      return redirect('/apply?err=internal' + (msg ? '' : ''));
+      return new Response('服务暂时不可用，请稍后再试。', {
+        status: 500,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      });
     }
   },
 };
@@ -84,12 +86,12 @@ async function handlePage(request, env, path, url) {
   if (path === '/apply') {
     const authed = await currentUser(request, env);
     if (authed) return redirect('/dashboard');
-    return html(APPLY_HTML);
+    return html(applyHtml(url));
   }
   if (path === '/login') {
     const authed = await currentUser(request, env);
     if (authed) return redirect('/dashboard');
-    return html(LOGIN_HTML);
+    return html(loginHtml(url));
   }
   if (path === '/dashboard/edit') {
     const user = await currentUser(request, env);
@@ -198,7 +200,7 @@ async function handleApply(request, env) {
     'INSERT INTO merchant_users (merchant_id, phone, pass_hash, pass_salt) VALUES (?1,?2,?3,?4)'
   ).bind(merchantId, phone, hash, salt).run();
 
-  return authedResponse(merchantId);
+  return authedResponse(env.MERCHANT_SESSION_SECRET, merchantId);
 }
 
 /* ---------------- 登录 ---------------- */
@@ -225,26 +227,24 @@ async function handleLogin(request, env) {
   const hash = await pbkdf2Hex(password, row.pass_salt);
   if (!timingSafeEqual(hash, row.pass_hash)) return redirect('/login?err=bad');
 
-  return authedResponse(row.merchant_id);
+  return authedResponse(env.MERCHANT_SESSION_SECRET, row.merchant_id);
 }
 
-async function authedResponse(merchantId) {
-  if (!this_secret) throw new Error('config');
+function authedResponse(secret, merchantId) {
   const exp = String(Date.now() + SESSION_TTL_MS);
-  const sig = await hmacHex(this_secret, merchantId + '.' + exp);
-  const res = json({ ok: true });
-  res.headers.set(
-    'Set-Cookie',
-    `${COOKIE_NAME}=${merchantId}.${exp}.${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_S}`
-  );
-  res.headers.set('Location', '/dashboard');
-  return new Response(null, { status: 302, headers: res.headers });
+  return hmacHex(secret, merchantId + '.' + exp).then((sig) => {
+    const res = json({ ok: true });
+    res.headers.set(
+      'Set-Cookie',
+      `${COOKIE_NAME}=${merchantId}.${exp}.${sig}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_S}`
+    );
+    res.headers.set('Location', '/dashboard');
+    return new Response(null, { status: 302, headers: res.headers });
+  });
 }
 
-let this_secret = null;
 async function currentUser(request, env) {
   if (!env.MERCHANT_SESSION_SECRET) return null;
-  this_secret = env.MERCHANT_SESSION_SECRET;
   const cookie = request.headers.get('cookie') || '';
   const m = cookie.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([0-9]+)\\.([0-9]+)\\.([a-f0-9]{64})`));
   if (!m) return null;
@@ -557,14 +557,15 @@ function errLine(url) {
   return err ? `<div class="err-line">${esc(ERR_TEXT[err] || '提交失败，请重试')}</div>` : '';
 }
 
-const APPLY_HTML = shell(`
+function applyHtml(url) {
+  return shell(`
   <header><h1>焰境好店 · 商户入驻</h1><a class="btn-text" href="/login">已有账号，登录</a></header>
   <div class="wrap">
     <div class="card" style="display:block">
       <h2>把你的店，展示给每一位来万载的游客</h2>
       <p>提交后我们将在 24 小时内审核。通过即上线 whizzzest.com/merchants/，<b>免费试用</b>；认证商户与置顶推荐权益见页面底部说明。</p>
     </div>
-    ${errLine(new URL('https://x/apply'))}
+    ${errLine(url)}
     <form class="card" method="post" action="/api/apply" enctype="multipart/form-data">
       <input type="hidden" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true">
       <div class="fgrid">
@@ -594,13 +595,15 @@ const APPLY_HTML = shell(`
       </div>
     </form>
   </div>
-`);
+  `);
+}
 
-const LOGIN_HTML = shell(`
+function loginHtml(url) {
+  return shell(`
   <header><h1>焰境好店 · 商户登录</h1><a class="btn-text" href="/apply">没有账号？申请入驻</a></header>
   <div class="wrap">
-    ${errLine(new URL('https://x/login'))}
-    ${loginNotice(new URL('https://x/login'))}
+    ${errLine(url)}
+    ${loginNotice(url)}
     <form class="card" id="f" style="display:block">
       <h2 style="margin-bottom:6px">商户登录</h2>
       <p style="color:#6e6e73;font-size:13px;margin-bottom:4px">手机号 + 密码（申请入驻时设置）</p>
@@ -631,7 +634,8 @@ const LOGIN_HTML = shell(`
     }).catch(function () { btn.disabled = false; });
   });
   </script>
-`);
+  `);
+}
 
 function loginNotice(url) {
   if (!url.searchParams.get('applied')) return '';
@@ -660,7 +664,7 @@ function editPageHtml(env, merchant, url) {
           <label>电话（公开）<input name="phone" maxlength="30" value="${esc(merchant.phone || '')}"></label>
           <label>微信号（公开）<input name="wechat" maxlength="60" value="${esc(merchant.wechat || '')}"></label>
           <label>营业时间<input name="hours" maxlength="60" value="${esc(merchant.hours || '')}"></label>
-          <label class="wide">替换图片（选 ${'填'}，不选则保留现有${imgs.length ? ' ' + imgs.length + ' 张' : ''}；JPG/PNG/WebP，单张 ≤5MB）
+          <label class="wide">替换图片（选填，不选则保留现有${imgs.length ? ' ' + imgs.length + ' 张' : ''}；JPG/PNG/WebP，单张 ≤5MB）
             <input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple></label>
           ${imgs.length ? `<div class="wide thumbs" style="grid-column:1/-1">${imgs.map((k) => `<img src="${SITE}/assets-merchant/${esc(k)}" alt="" loading="lazy">`).join('')}</div>` : ''}
           <label>联系人（不公开）<input name="contact_name" maxlength="40" value="${esc(merchant.contact_name || '')}"></label>
