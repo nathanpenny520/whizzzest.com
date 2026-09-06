@@ -49,6 +49,10 @@
       "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
     }
   ],
+  // Workers AI 绑定（AI 助手「花傩」推理用，docs/AI助手方案.md）——账号内推理，无需任何 API Key
+  "ai": {
+    "binding": "AI"
+  },
   // 商户图片桶（merchant Worker 上传，本 Worker /assets-merchant/* 代理公开读取）
   // 万载TV 媒体桶（admin Worker 上传，本 Worker /media/* 代理公开读取，docs/万载TV方案.md）
   "r2_buckets": [

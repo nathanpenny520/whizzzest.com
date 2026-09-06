@@ -240,3 +240,39 @@ CREATE TABLE IF NOT EXISTS writer_users (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wu_email ON writer_users(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wu_phone ON writer_users(phone) WHERE phone IS NOT NULL;
+
+-- AI 助手「花傩」（2026-09-06，docs/AI助手方案.md）：知识库 / 设置 / 用量日志
+-- knowledge.status: published 参与检索 | hidden 剔除；keywords 逗号分隔，命中数即相关度
+CREATE TABLE IF NOT EXISTS ai_knowledge (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT NOT NULL,
+  content TEXT NOT NULL,
+  keywords TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'published',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ai_knowledge_pub ON ai_knowledge(status, sort, id);
+
+-- 运行设置（key-value）：enabled(1/0)、model、system_prompt、greeting（空=不弹气泡）、
+-- quick_questions（JSON 数组，欢迎页快捷问题）
+CREATE TABLE IF NOT EXISTS ai_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 问答日志：admin「AI 助手」Tab 用量卡数据源（问题分布 → 找知识缺口），可清空
+CREATE TABLE IF NOT EXISTS ai_chats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  question TEXT NOT NULL,
+  answer_len INTEGER DEFAULT 0,
+  action TEXT,                             -- 命中的 action 类型（调试），无则 NULL
+  sources TEXT,                            -- 命中知识条目 id 列表 JSON，无则 NULL
+  duration_ms INTEGER DEFAULT 0,
+  ip TEXT,
+  vid TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ai_chats_created ON ai_chats(created_at);

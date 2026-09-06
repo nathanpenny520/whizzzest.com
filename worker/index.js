@@ -3,6 +3,8 @@
  *  - www → 裸域 301（方案 §8.2）
  *  - POST /api/contact  联系表单：Honeypot → D1（权威记录）→ 企业邮通知（尽力而为，§7）
  *  - POST /api/pv-dwell 页面停留时长回报（页面关闭时 navigator.sendBeacon）
+ *  - POST /api/ai/chat  AI 助手「花傩」问答（Workers AI + RAG，docs/AI助手方案.md）
+ *  - GET  /api/ai/config AI 助手前端配置（招呼语/快捷问题）
  *  - /tv/*              万载TV 视频频道动态渲染（D1 权威，docs/万载TV方案.md）
  *  - /media/*           TV 视频/封面 R2 代理（admin Worker 上传）
  *  - 文档导航请求 → 访客监控：匿名 Cookie（vid 1 年 / sid 会话 30min）+ 环境解析
@@ -15,6 +17,7 @@ import { handleTv, handleMedia, handleTvLatest } from './tv.js';
 import { handleLibrary } from './library.js';
 import { handleMusic, handleMusicPlay } from './music.js';
 import { handleAttractions } from './attractions.js';
+import { handleAiChat, handleAiConfig } from './ai.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
 const VID_COOKIE = 'vid';
@@ -47,6 +50,14 @@ export default {
     // 万载音乐播放计数（前端开始播放一首时回报一次，2026-09-06）
     if (url.pathname.startsWith('/api/music/play/') && request.method === 'POST') {
       return handleMusicPlay(request, env, url);
+    }
+
+    // AI 助手「花傩」问答（docs/AI助手方案.md）
+    if (url.pathname === '/api/ai/chat' && request.method === 'POST') {
+      return handleAiChat(request, env, ctx);
+    }
+    if (url.pathname === '/api/ai/config' && request.method === 'GET') {
+      return handleAiConfig(env);
     }
 
     // 商户图片代理（R2 对象，merchant Worker 上传，M2）——不可浏览文档，直接返回不进访客采集
@@ -151,7 +162,7 @@ async function trackVisit(request, env, ctx, url, ua, assetRes) {
   const device = /Mobile|Android|iPhone/i.test(ua) ? 'mobile'
     : /iPad|Tablet/i.test(ua) ? 'tablet' : 'desktop';
   const { browser, os } = parseUA(ua);
-  const lang = (request.headers.get('accept-language') || '').split(',')[0].slice(0, 20);
+  const lang = (request.headers.get('accept-language') || '').split(',')[0].split(';')[0].trim().slice(0, 20);
   const ref = request.headers.get('referer') || '';
   let refHost = '';
   if (ref) { try { refHost = new URL(ref).hostname; } catch { /* ignore */ } }

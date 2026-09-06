@@ -403,6 +403,8 @@ ${pages
   // CSS 压缩（须在指纹计算前：?v= 哈希基于压缩产物）
   const cssPath = path.join(DIST, 'assets', 'css', 'style.css');
   fs.writeFileSync(cssPath, minifyCss(read(cssPath)));
+  const aiCssPath = path.join(DIST, 'assets', 'css', 'ai-chat.css');
+  fs.writeFileSync(aiCssPath, minifyCss(read(aiCssPath)));
 
   // 烟花模拟器（/digital-fireworks/）：13 个零依赖 JS 依依赖顺序拼接为单文件
   // （globals 协作，顺序即加载顺序；mid-file 的 "use strict" 字面量无副作用），CSS 一并压缩
@@ -427,7 +429,18 @@ ${pages
     '/assets/js/main.js': hashFile(path.join(DIST, 'assets/js/main.js')),
     '/assets/css/fireworks.css': hashFile(path.join(DIST, 'assets/css/fireworks.css')),
     '/assets/js/fireworks.js': hashFile(path.join(DIST, 'assets/js/fireworks.js')),
+    '/assets/css/ai-chat.css': hashFile(path.join(DIST, 'assets/css/ai-chat.css')),
+    '/assets/js/ai-chat.js': hashFile(path.join(DIST, 'assets/js/ai-chat.js')),
   };
+  // 供主 Worker 渲染 /tv /library /music /attractions /merchants 时复用全站页头/页脚
+  // （编译产物，导航改了随构建同步）。须在指纹回写前生成，页脚里的 ai-chat 引用才能拿到 ?v=
+  const siteCtx = { site };
+  fs.mkdirSync(path.join(DIST, 'partials'), { recursive: true });
+  for (const name of ['header', 'footer']) {
+    const compiled = render(read(path.join(PARTIALS_DIR, `${name}.html`)), siteCtx);
+    fs.writeFileSync(path.join(DIST, 'partials', `${name}.html`), compiled);
+  }
+
   const bumpAssetUrls = (file) => {
     let html = read(file);
     for (const [asset, v] of Object.entries(versions)) {
@@ -443,13 +456,6 @@ ${pages
     }
   })(DIST);
 
-  // 供主 Worker 渲染 /merchants/* 时复用全站页头/页脚（编译产物，导航改了随构建同步）
-  const siteCtx = { site };
-  fs.mkdirSync(path.join(DIST, 'partials'), { recursive: true });
-  for (const name of ['header', 'footer']) {
-    const compiled = render(read(path.join(PARTIALS_DIR, `${name}.html`)), siteCtx);
-    fs.writeFileSync(path.join(DIST, 'partials', `${name}.html`), compiled);
-  }
   // Worker 页面引用带指纹的 CSS/JS 用
   fs.writeFileSync(path.join(DIST, 'build-meta.json'), JSON.stringify(versions));
 

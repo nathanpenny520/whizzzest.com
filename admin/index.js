@@ -39,6 +39,13 @@
  *  - DELETE /api/attractions/:id   删除（级联清理 R2 封面）
  *  - PUT /api/attractions/cover    封面上传（≤5MB，attra/c-* 前缀）
  *
+ * AI 助手「花傩」管理（docs/AI助手方案.md）：
+ *  - GET/POST /api/ai/settings     运行设置（enabled/model/system_prompt/greeting/quick_questions）
+ *  - GET/POST /api/ai/knowledge    知识库列表（?status=&offset=）/ 新建
+ *  - POST/DELETE /api/ai/knowledge/:id  编辑 / 删除
+ *  - GET /api/ai/stats             用量统计（今日/7天/30天/累计 + 最近 20 条问答）
+ *  - DELETE /api/ai/log            清空问答日志
+ *
  * 会话：无状态 HMAC 签名（uid + 过期时间戳 + 签名；uid=0 主账号，>0 为 admin_users.id），
  *       改 ADMIN_SESSION_SECRET 即全体下线。
  * 凭据：wrangler secret 配 ADMIN_PASSWORD / ADMIN_SESSION_SECRET，不进代码、不进仓库。
@@ -240,6 +247,20 @@ async function handleApi(request, env, path) {
     return removeAttraction(env, Number(m[1]));
   }
   if (path === '/api/attractions/cover' && method === 'PUT') return uploadImageR2(env, request, 'attra/c-');
+
+  // AI 助手「花傩」管理（docs/AI助手方案.md）：设置 / 知识库 / 用量
+  if (path === '/api/ai/settings' && method === 'GET') return getAiSettings(env);
+  if (path === '/api/ai/settings' && method === 'POST') return saveAiSettings(env, request);
+  if (path === '/api/ai/knowledge' && method === 'GET') return listKnowledge(env, request);
+  if (path === '/api/ai/knowledge' && method === 'POST') return saveKnowledge(env, request);
+  if ((m = path.match(/^\/api\/ai\/knowledge\/(\d+)$/)) && method === 'POST') {
+    return saveKnowledge(env, request, Number(m[1]));
+  }
+  if ((m = path.match(/^\/api\/ai\/knowledge\/(\d+)$/)) && method === 'DELETE') {
+    return removeKnowledge(env, Number(m[1]));
+  }
+  if (path === '/api/ai/stats' && method === 'GET') return aiStats(env);
+  if (path === '/api/ai/log' && method === 'DELETE') return clearAiLog(env);
 
   return json({ ok: false, error: 'not_found' }, 404);
 }
@@ -476,19 +497,19 @@ async function statsOverview(env, request) {
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY src ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
-        `SELECT COALESCE(NULLIF(device,'—'),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
+        `SELECT COALESCE(NULLIF(device,''),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY device ORDER BY pv DESC`
       ).all(),
       db.prepare(
-        `SELECT COALESCE(NULLIF(browser,'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
+        `SELECT COALESCE(NULLIF(NULLIF(browser,''),'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
-        `SELECT COALESCE(NULLIF(os,'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
+        `SELECT COALESCE(NULLIF(NULLIF(os,''),'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
-        `SELECT COALESCE(NULLIF(lang,'—'),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
+        `SELECT COALESCE(NULLIF(lang,''),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY lang ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
@@ -1459,6 +1480,125 @@ async function removeAttraction(env, id) {
   return json({ ok: true });
 }
 
+/* ---------------- AI 助手「花傩」管理（docs/AI助手方案.md） ---------------- */
+
+// 与主站 worker/ai.js MODEL_ALLOW 对应的白名单（改这里需同步主站）
+const AI_MODEL_OPTIONS = [
+  { id: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3-30B-A3B（默认 · 快/省）' },
+  { id: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7-Flash（轻量）' },
+  { id: '@cf/deepseek-ai/deepseek-v4-flash-0731', label: 'DeepSeek-V4-Flash（高质量）' },
+  { id: '@cf/qwen/qwen3.8-27b', label: 'Qwen3.8-27B（旗舰）' },
+];
+
+async function getAiSettings(env) {
+  const { results } = await env.DB.prepare('SELECT key, value FROM ai_settings').all();
+  const map = {};
+  for (const r of results || []) map[r.key] = r.value;
+  return json({ ok: true, settings: map, models: AI_MODEL_OPTIONS });
+}
+
+async function saveAiSettings(env, request) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== 'object') return json({ ok: false, error: 'invalid_json' }, 400);
+  const patch = {
+    enabled: body.enabled === '0' || body.enabled === false ? '0' : '1',
+    model: AI_MODEL_OPTIONS.some((x) => x.id === body.model) ? body.model : AI_MODEL_OPTIONS[0].id,
+    system_prompt: String(body.system_prompt ?? '').slice(0, 4000),
+    greeting: String(body.greeting ?? '').trim().slice(0, 100),
+    quick_questions: JSON.stringify(
+      (Array.isArray(body.quick) ? body.quick : [])
+        .map((q) => String(q).trim().slice(0, 60)).filter(Boolean).slice(0, 6)
+    ),
+  };
+  for (const [key, value] of Object.entries(patch)) {
+    await env.DB.prepare(
+      `INSERT INTO ai_settings (key, value) VALUES (?1, ?2)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+    ).bind(key, value).run();
+  }
+  return json({ ok: true });
+}
+
+async function listKnowledge(env, request) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status') || '';
+  const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
+  const where = status ? `WHERE status='${status === 'hidden' ? 'hidden' : 'published'}'` : '';
+  const { results } = await env.DB.prepare(
+    `SELECT id, category, content, keywords, sort, status, updated_at FROM ai_knowledge ${where}
+     ORDER BY category, sort, id LIMIT ${PAGE_SIZE} OFFSET ${offset}`
+  ).all();
+  const { total } = await env.DB.prepare(`SELECT COUNT(*) AS total FROM ai_knowledge ${where}`).first();
+  const byStatus = await env.DB.prepare(
+    `SELECT status, COUNT(*) AS n FROM ai_knowledge GROUP BY status`
+  ).all();
+  const counts = {};
+  for (const r of byStatus.results || []) counts[r.status] = r.n;
+  return json({ ok: true, total, knowledge: results || [], byStatus: counts });
+}
+
+async function saveKnowledge(env, request, id = null) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+
+  // 部分更新语义：上下线切换只带 status，表单保存带全量
+  const patch = {};
+  if (body.category !== undefined) {
+    patch.category = String(body.category).trim().slice(0, 30);
+    if (!patch.category) return json({ ok: false, error: 'invalid_fields' }, 400);
+  }
+  if (body.content !== undefined) {
+    patch.content = String(body.content).trim().slice(0, 2000);
+    if (!patch.content) return json({ ok: false, error: 'invalid_fields' }, 400);
+  }
+  if (body.keywords !== undefined) patch.keywords = String(body.keywords).trim().slice(0, 200);
+  if (body.sort !== undefined) patch.sort = Math.max(0, Math.min(9999, Number(body.sort) || 0));
+  if (body.status !== undefined) patch.status = body.status === 'hidden' ? 'hidden' : 'published';
+
+  if (id === null) {
+    if (!patch.category || !patch.content) return json({ ok: false, error: 'invalid_fields' }, 400);
+    await env.DB.prepare(
+      'INSERT INTO ai_knowledge (category, content, keywords, sort, status) VALUES (?1, ?2, ?3, ?4, ?5)'
+    ).bind(patch.category, patch.content, patch.keywords || '', patch.sort || 0, patch.status || 'published').run();
+  } else {
+    const keys = Object.keys(patch);
+    if (!keys.length) return json({ ok: false, error: 'invalid_fields' }, 400);
+    const sets = keys.map((k, i) => `${k} = ?${i + 1}`).join(', ');
+    await env.DB.prepare(
+      `UPDATE ai_knowledge SET ${sets}, updated_at = datetime('now') WHERE id = ?${keys.length + 1}`
+    ).bind(...keys.map((k) => patch[k]), id).run();
+  }
+  return json({ ok: true });
+}
+
+async function removeKnowledge(env, id) {
+  const { meta } = await env.DB.prepare('DELETE FROM ai_knowledge WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  return json({ ok: true });
+}
+
+async function aiStats(env) {
+  const { today } = await env.DB.prepare(
+    `SELECT COUNT(*) AS today FROM ai_chats WHERE created_at >= datetime('now', 'start of day')`
+  ).first();
+  const { d7 } = await env.DB.prepare(
+    `SELECT COUNT(*) AS d7 FROM ai_chats WHERE created_at >= datetime('now', '-7 days')`
+  ).first();
+  const { d30 } = await env.DB.prepare(
+    `SELECT COUNT(*) AS d30 FROM ai_chats WHERE created_at >= datetime('now', '-30 days')`
+  ).first();
+  const { total } = await env.DB.prepare('SELECT COUNT(*) AS total FROM ai_chats').first();
+  const { results } = await env.DB.prepare(
+    `SELECT question, action, sources, duration_ms, created_at FROM ai_chats ORDER BY id DESC LIMIT 20`
+  ).all();
+  return json({ ok: true, today, d7, d30, total, recent: results || [] });
+}
+
+async function clearAiLog(env) {
+  await env.DB.prepare('DELETE FROM ai_chats').run();
+  return json({ ok: true });
+}
+
 /* ---------------- 工具 ---------------- */
 
 async function hmacHex(secret, msg) {
@@ -1802,6 +1942,7 @@ ${BASE_CSS}
       <a class="anav-link" id="vtab-books" href="#/books">文库</a>
       <a class="anav-link" id="vtab-music" href="#/music">音乐</a>
       <a class="anav-link" id="vtab-attra" href="#/attra">景点</a>
+      <a class="anav-link" id="vtab-ai" href="#/ai">AI 助手</a>
       <a class="anav-link" id="vtab-acct" href="#/acct">账号</a>
     </nav>
     <div class="anav-right">
@@ -2126,6 +2267,54 @@ ${BASE_CSS}
   <button class="more" id="atmore" type="button" style="display:none">加载更多</button>
 </div>
 
+<div id="view-ai" class="wrap" style="display:none">
+  <div class="range">
+    <span class="updated" id="ai-stats-line">加载中…</span>
+    <button id="ai-log-clear" type="button">清空问答日志</button>
+    <button id="k-add" type="button" class="primary">新增知识</button>
+  </div>
+  <div class="panel">
+    <h3>运行设置 <span style="font-weight:400;font-size:12px;color:#86868b">（保存后主站最迟 1 分钟生效）</span></h3>
+    <div class="mgrid" style="grid-template-columns:1fr 2fr;max-width:720px">
+      <label>助手开关
+        <select id="ai-enabled">
+          <option value="1">启用</option>
+          <option value="0">停用（前台入口隐藏）</option>
+        </select>
+      </label>
+      <label>模型<select id="ai-model"></select></label>
+      <label class="wide">招呼气泡（留空 = 不弹；每个访客每会话最多一次）<input id="ai-greeting" maxlength="100"></label>
+    </div>
+    <label style="display:block;margin-top:10px">系统提示词（花傩人设、职责、回复格式；详见 docs/AI助手方案.md）<textarea id="ai-prompt" rows="9" style="width:100%"></textarea></label>
+    <label style="display:block;margin-top:10px">欢迎页快捷问题（每行一条，最多 6 条，留空用内置默认）<textarea id="ai-quick" rows="4" style="width:100%"></textarea></label>
+    <p class="vhint" id="ai-hint" style="margin-top:8px;display:none"></p>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="ai-savesettings" type="button">保存设置</button></div>
+  </div>
+  <div class="panel" id="kform" style="display:none">
+    <h3 id="kform-title">新增知识</h3>
+    <div class="mgrid" style="grid-template-columns:1fr 1fr;max-width:760px">
+      <label>分类 *（如：烟花文化）<input id="k-category" maxlength="30"></label>
+      <label>排序（小者靠前）<input id="k-sort" type="number" value="0"></label>
+      <label>关键词 *（逗号分隔，用户问题含任一词即命中）<input id="k-keywords" maxlength="200" placeholder="烟花,花炮,历史"></label>
+      <label>状态
+        <select id="k-status">
+          <option value="published">参与检索</option>
+          <option value="hidden">停用</option>
+        </select>
+      </label>
+      <label class="wide">内容 *<textarea id="k-content" rows="5"></textarea></label>
+    </div>
+    <p class="vhint" id="k-hint" style="margin-top:8px;display:none"></p>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="ksave" type="button">保存</button><button id="kcancel" type="button">取消</button></div>
+  </div>
+  <div class="list" id="klist"><p class="empty">加载中…</p></div>
+  <button class="more" id="kmore" type="button" style="display:none">加载更多</button>
+  <div class="panel" style="margin-top:18px">
+    <h3>最近问答（20 条）<span class="updated" id="ai-usage" style="margin-left:10px"></span></h3>
+    <div class="list" id="ai-log"><p class="empty">加载中…</p></div>
+  </div>
+</div>
+
 <div id="view-acct" class="wrap" style="display:none">
   <div class="panel">
     <h3>当前登录</h3>
@@ -2155,6 +2344,13 @@ var currentView = 'msg';
 var visitDays = 30;
 var vOffset = 0;
 var KIND_LABEL = { direct: '直接访问', internal: '站内跳转', search: '搜索引擎', social: '社交媒体', referral: '外部链接', other: '其他' };
+// 设备/语言维度存的是采集端原始值（desktop、zh-CN…），展示前转中文；未收录的原样显示
+var DEVICE_LABEL = { desktop: '桌面端', mobile: '移动端', tablet: '平板', '—': '未知' };
+var LANG_LABEL = {
+  'zh-CN': '简体中文', 'zh-TW': '繁體中文', 'zh-HK': '繁體中文', zh: '中文',
+  en: '英语', 'en-US': '英语', ja: '日语', 'ja-JP': '日语', ko: '韩语', '—': '未知',
+};
+function dimName(map, name) { return map[name] || name || '—'; }
 
 function el(id) { return document.getElementById(id); }
 function esc(s) {
@@ -2186,7 +2382,7 @@ function api(path, opts) {
 }
 
 /* ---------- 视图切换（当前板块记在 location.hash：刷新/前进后退不丢） ---------- */
-var VIEWS = ['msg', 'visit', 'merch', 'tv', 'books', 'music', 'attra', 'acct'];
+var VIEWS = ['msg', 'visit', 'merch', 'tv', 'books', 'music', 'attra', 'ai', 'acct'];
 var suppressHash = false;
 function showView(v, skipHash) {
   if (VIEWS.indexOf(v) === -1) v = 'msg';
@@ -2198,6 +2394,7 @@ function showView(v, skipHash) {
   el('view-books').style.display = v === 'books' ? '' : 'none';
   el('view-music').style.display = v === 'music' ? '' : 'none';
   el('view-attra').style.display = v === 'attra' ? '' : 'none';
+  el('view-ai').style.display = v === 'ai' ? '' : 'none';
   el('view-acct').style.display = v === 'acct' ? '' : 'none';
   el('vtab-msg').classList.toggle('active', v === 'msg');
   el('vtab-visit').classList.toggle('active', v === 'visit');
@@ -2206,6 +2403,7 @@ function showView(v, skipHash) {
   el('vtab-books').classList.toggle('active', v === 'books');
   el('vtab-music').classList.toggle('active', v === 'music');
   el('vtab-attra').classList.toggle('active', v === 'attra');
+  el('vtab-ai').classList.toggle('active', v === 'ai');
   el('vtab-acct').classList.toggle('active', v === 'acct');
   if (v === 'msg') load(true);
   if (v === 'visit') { loadStats(); loadVisitors(true); }
@@ -2214,6 +2412,7 @@ function showView(v, skipHash) {
   if (v === 'books') loadBooks(true);
   if (v === 'music') loadMusic(true);
   if (v === 'attra') loadAttra(true);
+  if (v === 'ai') loadAi();
   if (v === 'acct') loadAccounts();
   if (!skipHash && '#/' + v !== location.hash) {
     suppressHash = true;
@@ -2321,10 +2520,10 @@ function loadStats() {
     });
     fillBars('kinds', (d.kinds || []).map(function (k) { return { label: k.label || k.kind, uv: k.sessions, pv: k.pv }; }));
     fillBars('sources', (d.sources || []).map(function (s) { return { label: s.src, uv: s.sessions, pv: s.pv }; }));
-    fillBars('devices', d.devices);
-    fillBars('browsers', d.browsers);
-    fillBars('os', d.os);
-    fillBars('langs', d.langs);
+    fillBars('devices', (d.devices || []).map(function (x) { return { label: dimName(DEVICE_LABEL, x.name), uv: x.uv, pv: x.pv }; }));
+    fillBars('browsers', (d.browsers || []).map(function (x) { return { label: x.name === 'Other' ? '其他' : (x.name || '—'), uv: x.uv, pv: x.pv }; }));
+    fillBars('os', (d.os || []).map(function (x) { return { label: x.name === 'Other' ? '其他' : (x.name || '—'), uv: x.uv, pv: x.pv }; }));
+    fillBars('langs', (d.langs || []).map(function (x) { return { label: dimName(LANG_LABEL, x.name), uv: x.uv, pv: x.pv }; }));
     fillBars('countries', (d.countries || []).map(function (c) {
       return { label: (flag(c.name) || '') + ' ' + c.name, uv: c.uv, pv: c.pv };
     }));
@@ -2338,7 +2537,7 @@ function loadStats() {
     el('recent').innerHTML = (d.recent || []).map(function (r) {
       return '<tr><td>' + esc(fmtTime(r.created_at)) + '</td><td>' + esc(r.path) + '</td><td>' +
         '<span class="k-badge">' + esc(KIND_LABEL[r.kind] || r.kind) + '</span></td><td>' +
-        (flag(r.country) || '') + ' ' + esc(r.device || '—') + '</td><td>' + fmtDur(Math.round((r.engage_ms || 0) / 1000)) + '</td></tr>';
+        (flag(r.country) || '') + ' ' + esc(dimName(DEVICE_LABEL, r.device)) + '</td><td>' + fmtDur(Math.round((r.engage_ms || 0) / 1000)) + '</td></tr>';
     }).join('') || '<tr><td class="empty">暂无数据</td></tr>';
   }).catch(function (e) {
     if (e.message !== 'unauthorized') el('chart-empty').textContent = '加载失败：' + esc(e.message);
@@ -2423,7 +2622,7 @@ function renderVisitor(v) {
   tr.innerHTML =
     '<td>' + esc(fmtTime(v.last)) + '</td>' +
     '<td><span class="flag">' + flag(v.country) + '</span>' + esc(v.country || '—') + '</td>' +
-    '<td>' + esc(v.device || '—') + '</td>' +
+    '<td>' + esc(dimName(DEVICE_LABEL, v.device)) + '</td>' +
     '<td>' + esc(v.browser || '—') + ' · ' + esc(v.os || '—') + '</td>' +
     '<td>' + v.views + '</td><td>' + v.sessions + '</td>' +
     '<td>' + esc(fmtTime(v.first)) + '</td>';
@@ -2444,7 +2643,7 @@ function renderVisitor(v) {
         (d.views || []).map(function (w) {
           return '<tr><td>' + esc(fmtTime(w.created_at)) + '</td><td>' + esc(w.path) + '</td><td>' +
             esc(KIND_LABEL[w.kind] || w.kind || '—') + (w.ref_host ? '（' + esc(w.ref_host) + '）' : '') + '</td><td>' +
-            (flag(w.country) || '') + ' ' + esc(w.country || '—') + '</td><td>' + esc(w.device || '—') + '</td><td>' +
+            (flag(w.country) || '') + ' ' + esc(w.country || '—') + '</td><td>' + esc(dimName(DEVICE_LABEL, w.device)) + '</td><td>' +
             fmtDur(Math.round((w.engage_ms || 0) / 1000)) + '</td></tr>';
         }).join('') + '</table></td>';
     }).catch(function (e) {
@@ -3577,6 +3776,209 @@ drop.addEventListener('click', function (e) {
     api('/api/logout', { method: 'POST' }).then(function () { location.href = '/login'; });
   }
 });
+
+/* ---------- AI 助手「花傩」（docs/AI助手方案.md） ---------- */
+// 注意：APP_HTML 是模板字符串——内嵌脚本不写反斜杠与 \n 字面量，换行统一用 AI_NL
+var AI_NL = String.fromCharCode(10);
+var editingKId = null;
+var kState = { offset: 0, status: '' };
+var K_ST = { published: '参与检索', hidden: '已停用' };
+
+function aiHint(msg) {
+  var h = el('ai-hint');
+  h.textContent = msg || '';
+  h.style.display = msg ? '' : 'none';
+}
+
+function loadAi() { loadAiSettings(); loadKnowledge(true); loadAiStats(); }
+
+function loadAiSettings() {
+  api('/api/ai/settings').then(function (d) {
+    var s = d.settings || {};
+    el('ai-enabled').value = s.enabled === '0' ? '0' : '1';
+    el('ai-greeting').value = s.greeting || '';
+    el('ai-prompt').value = s.system_prompt || '';
+    var quick = [];
+    try { quick = JSON.parse(s.quick_questions || '[]'); } catch (e) { /* 后台配坏则留空 */ }
+    el('ai-quick').value = (quick || []).join(AI_NL);
+    var sel = el('ai-model');
+    sel.innerHTML = '';
+    (d.models || []).forEach(function (mo) {
+      var o = document.createElement('option');
+      o.value = mo.id;
+      o.textContent = mo.label;
+      sel.appendChild(o);
+    });
+    sel.value = s.model || '';
+    if (!sel.value) sel.selectedIndex = 0;
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') aiHint('设置加载失败：' + e.message);
+  });
+}
+
+el('ai-savesettings').addEventListener('click', function () {
+  var quick = el('ai-quick').value.split(AI_NL).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 6);
+  aiHint('保存中…');
+  api('/api/ai/settings', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      enabled: el('ai-enabled').value, model: el('ai-model').value,
+      system_prompt: el('ai-prompt').value, greeting: el('ai-greeting').value, quick: quick
+    })
+  }).then(function () {
+    aiHint('已保存，主站最迟 1 分钟生效');
+    loadAiSettings();
+  }).catch(function (e) { aiHint('保存失败：' + e.message); });
+});
+
+/* 知识库 */
+function loadKnowledge(reset) {
+  if (reset) kState.offset = 0;
+  var q = '?offset=' + kState.offset + (kState.status ? '&status=' + kState.status : '');
+  api('/api/ai/knowledge' + q).then(function (d) {
+    var list = d.knowledge || [];
+    var counts = d.byStatus || {};
+    el('ai-stats-line').textContent = '知识 ' + d.total + ' 条 · 参与检索 ' + (counts.published || 0) + ' · 停用 ' + (counts.hidden || 0);
+    var box = el('klist');
+    if (reset) box.innerHTML = '';
+    if (reset && list.length === 0) {
+      box.innerHTML = '<p class="empty">知识库为空：先执行 scripts/ai-seed.sql 导入旧站 68 条，或点右上「新增知识」。</p>';
+    } else {
+      list.forEach(function (x) { box.appendChild(renderKnowledge(x)); });
+    }
+    el('kmore').style.display = (kState.offset + ${PAGE_SIZE} < d.total && list.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('klist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderKnowledge(x) {
+  var div = document.createElement('div');
+  div.className = 'msg' + (x.status === 'published' ? '' : ' read');
+  var badges =
+    '<span class="k-badge">#' + x.id + '</span>' +
+    '<span class="k-badge">排序 ' + (x.sort || 0) + '</span>' +
+    '<span class="mst ' + (x.status === 'published' ? 'mst-approved' : 'mst-rejected') + '">' + (K_ST[x.status] || x.status) + '</span>';
+  div.innerHTML =
+    '<div class="row1"><span class="name">' + esc(x.category) + '</span>' + badges + '</div>' +
+    '<div class="body">' + esc(x.content.length > 140 ? x.content.slice(0, 140) + '…' : x.content) + '</div>' +
+    '<div class="time">关键词：' + esc(x.keywords) + '</div>' +
+    '<div class="meta">' + esc(fmtTime(x.updated_at)) + '</div>' +
+    '<div class="ops">' +
+    '<button type="button" data-act="toggle">' + (x.status === 'published' ? '停用' : '启用') + '</button>' +
+    '<button type="button" data-act="edit">编辑</button>' +
+    '<button type="button" data-act="del">删除</button></div>';
+  div.querySelector('.ops').addEventListener('click', function (e) {
+    var act = e.target.getAttribute('data-act');
+    if (act === 'toggle') {
+      api('/api/ai/knowledge/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: x.status === 'published' ? 'hidden' : 'published' })
+      }).then(function () { loadKnowledge(false); });
+    } else if (act === 'edit') {
+      openKnowledgeForm(x);
+    } else if (act === 'del') {
+      // 二次点击确认（同景点删除）：首击变红待确认，4 秒未点自动复原
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'danger';
+        btn.textContent = '确认删除';
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.removeAttribute('data-armed');
+          btn.className = '';
+          btn.textContent = '删除';
+        }, 4000);
+        return;
+      }
+      api('/api/ai/knowledge/' + x.id, { method: 'DELETE' }).then(function () { loadKnowledge(false); });
+    }
+  });
+  return div;
+}
+
+function openKnowledgeForm(x) {
+  editingKId = x ? x.id : null;
+  el('kform-title').textContent = x ? '编辑知识 #' + x.id : '新增知识';
+  el('k-category').value = x ? x.category || '' : '';
+  el('k-content').value = x ? x.content || '' : '';
+  el('k-keywords').value = x ? x.keywords || '' : '';
+  el('k-sort').value = x ? x.sort || 0 : 0;
+  el('k-status').value = x ? x.status || 'published' : 'published';
+  kHint(null);
+  el('kform').style.display = '';
+  el('kform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function kHint(msg) {
+  var h = el('k-hint');
+  h.textContent = msg || '';
+  h.style.display = msg ? '' : 'none';
+}
+
+el('k-add').addEventListener('click', function () { openKnowledgeForm(null); });
+el('kcancel').addEventListener('click', function () { el('kform').style.display = 'none'; editingKId = null; });
+el('ksave').addEventListener('click', function () {
+  var payload = {
+    category: val('k-category'), content: val('k-content'), keywords: val('k-keywords'),
+    sort: Number(val('k-sort') || 0), status: val('k-status')
+  };
+  if (!payload.category || !payload.content) { alert('请填写分类和内容'); return; }
+  kHint('保存中…');
+  api(editingKId ? '/api/ai/knowledge/' + editingKId : '/api/ai/knowledge', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function () {
+    el('kform').style.display = 'none';
+    editingKId = null;
+    loadKnowledge(true);
+  }).catch(function (e) { kHint('保存失败：' + e.message); });
+});
+el('kmore').addEventListener('click', function () { kState.offset += ${PAGE_SIZE}; loadKnowledge(false); });
+
+/* 用量统计 */
+function loadAiStats() {
+  api('/api/ai/stats').then(function (d) {
+    el('ai-usage').textContent = '今日 ' + d.today + ' 问 · 7 天 ' + d.d7 + ' · 30 天 ' + d.d30 + ' · 累计 ' + d.total;
+    var box = el('ai-log');
+    var recent = d.recent || [];
+    if (!recent.length) { box.innerHTML = '<p class="empty">暂无问答记录。</p>'; return; }
+    box.innerHTML = '';
+    recent.forEach(function (r) {
+      var div = document.createElement('div');
+      div.className = 'msg read';
+      var src = '';
+      if (r.sources) { try { src = JSON.parse(r.sources).join('、'); } catch (e) { src = r.sources; } }
+      div.innerHTML =
+        '<div class="row1"><span class="name">' + esc(r.question) + '</span>' +
+        (r.action ? '<span class="k-badge">' + esc(r.action) + '</span>' : '') +
+        (src ? '<span class="k-badge">来源 ' + esc(src) + '</span>' : '') +
+        '<span class="k-badge">' + (r.duration_ms || 0) + 'ms</span></div>' +
+        '<div class="time">' + esc(fmtTime(r.created_at)) + '</div>';
+      box.appendChild(div);
+    });
+  }).catch(function () { el('ai-log').innerHTML = '<p class="empty">加载失败</p>'; });
+}
+
+(function () {
+  var btn = el('ai-log-clear');
+  btn.addEventListener('click', function () {
+    if (btn.getAttribute('data-armed') !== '1') {
+      btn.setAttribute('data-armed', '1');
+      btn.className = 'danger';
+      btn.textContent = '确认清空';
+      setTimeout(function () {
+        if (!btn.isConnected) return;
+        btn.removeAttribute('data-armed');
+        btn.className = '';
+        btn.textContent = '清空问答日志';
+      }, 4000);
+      return;
+    }
+    api('/api/ai/log', { method: 'DELETE' }).then(function () { loadAiStats(); });
+  });
+})();
 
 /* ---------- 移动端抽屉 ---------- */
 var burger = el('burger'), drawer = el('anav-drawer');
