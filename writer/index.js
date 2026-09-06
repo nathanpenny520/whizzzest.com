@@ -997,15 +997,15 @@ function registerHtml(url) {
         <button class="primary" id="goe" type="submit">注册并进入作品台</button>
         <p class="err-line" id="erre" style="display:none"></p>
       </div>
-      <p class="tip" style="font-size:12px;margin-top:4px">注册即表示同意站长对投稿内容进行审核；审核结果会显示在作品台。邮箱注册的账号可用「邮箱 + 验证码」登录。与商户中心账号相互独立。</p>
+      <p class="tip" style="font-size:12px;margin-top:4px">注册即表示同意站长对投稿内容进行审核；审核结果会显示在作品台。验证码由 notifications@whizzzest.com 发送；邮箱注册的账号可用「邮箱 + 验证码」登录。与商户中心账号相互独立。</p>
     </form>
   </div>
   <script>
   (function () {
     var ERR = { phone: '手机号格式不正确', email: '邮箱格式不正确', password: '密码至少 8 位',
-      dup: '该账号已注册，请直接登录', taken: '该邮箱已注册，请直接登录',
+      dup: '该手机号已注册，请直接登录', taken: '该邮箱已注册，请直接登录',
       bad: '验证码错误', expired: '验证码已过期，请重新发送', too_fast: '发送太频繁，请 1 分钟后再试',
-      send_failed: '邮件发送失败，请稍后再试', rate: '操作过于频繁，请稍后再试',
+      send_failed: '邮件发送失败，请稍后再试', rate: '尝试过于频繁，请 10 分钟后再试',
       format: '提交内容格式有误', config: '服务端未配置完成，请联系站长' };
     function showErr(id, t) { var e = document.getElementById(id); e.textContent = t; e.style.display = 'block'; }
     function post(path, data) {
@@ -1106,7 +1106,7 @@ function loginHtml(url) {
         </div>
         <button class="primary" id="goe" type="submit">登 录</button>
         <p class="err-line" id="erre" style="display:none"></p>
-        <p class="tip" style="font-size:12px">仅支持已在「作品台 → 账号安全」绑定邮箱的账号。与商户中心账号相互独立。</p>
+        <p class="tip" style="font-size:12px">支持注册时使用邮箱，或已在「作品台 → 账号安全」绑定邮箱的账号；验证码由 notifications@whizzzest.com 发送。与商户中心账号相互独立。</p>
       </form>
     </div>
   </div>
