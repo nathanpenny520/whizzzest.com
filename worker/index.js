@@ -8,6 +8,7 @@
  *  - 其余请求交给静态资产（dist/）
  */
 import { sendMail } from './smtp.js';
+import { handleMerchants } from './merchants.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
 const VID_COOKIE = 'vid';
@@ -32,8 +33,14 @@ export default {
       return handleDwell(request, env, ctx);
     }
 
-    // 静态资产请求
-    const res = await env.ASSETS.fetch(request);
+    // 商户页动态渲染（/merchants/*，docs/商户功能方案.md M1）
+    let res;
+    if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
+      res = await handleMerchants(request, env, url);
+    } else {
+      // 静态资产请求
+      res = await env.ASSETS.fetch(request);
+    }
 
     // 访客采集：仅针对「文档导航」，跳过资源请求与爬虫
     if (request.method === 'GET' && url.pathname !== '/api/contact') {

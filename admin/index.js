@@ -125,6 +125,16 @@ async function handleApi(request, env, path) {
     return visitorDetail(env, decodeURIComponent(m[1]));
   }
 
+  // 商户管理（M1，docs/商户功能方案.md）
+  if (path === '/api/merchants' && method === 'GET') return listMerchants(env, request);
+  if (path === '/api/merchants' && method === 'POST') return createMerchant(env, request);
+  if ((m = path.match(/^\/api\/merchants\/(\d+)$/)) && method === 'POST') {
+    return editMerchant(env, Number(m[1]), request);
+  }
+  if ((m = path.match(/^\/api\/merchants\/(\d+)$/)) && method === 'DELETE') {
+    return removeMerchant(env, Number(m[1]));
+  }
+
   return json({ ok: false, error: 'not_found' }, 404);
 }
 
@@ -389,6 +399,120 @@ async function visitorDetail(env, gid) {
   });
 }
 
+/* ---------------- 商户管理（D1 merchants，M1） ---------------- */
+
+const M_CATEGORIES = ['food', 'stay', 'specialty', 'fireworks', 'other'];
+const M_TIERS = ['free', 'verified', 'featured'];
+const M_STATUSES = ['pending', 'approved', 'rejected', 'expired'];
+// 可编辑字段白名单（k → 最大长度；null = 数字）
+const M_FIELDS = {
+  name: 60, category: 20, tier: 10, intro: 200, detail: 4000,
+  cover: 300, address: 120, phone: 30, wechat: 60, hours: 60,
+  contact_name: 40, contact_phone: 30, slug: 60, status: 10,
+  reject_reason: 200, paid_until: 10, sort_weight: null,
+};
+// 空串按 NULL 存的字段
+const M_NULLABLE = ['detail', 'cover', 'address', 'phone', 'wechat', 'hours',
+  'contact_name', 'contact_phone', 'slug', 'reject_reason', 'paid_until'];
+
+function pickFields(body) {
+  const out = {};
+  for (const [k, max] of Object.entries(M_FIELDS)) {
+    if (!(k in body)) continue;
+    if (k === 'sort_weight') { out[k] = Math.max(0, Math.min(999, Number(body[k]) || 0)); continue; }
+    let v = String(body[k] ?? '').trim().slice(0, max || 200);
+    if (k === 'slug') v = v.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    out[k] = M_NULLABLE.includes(k) && v === '' ? null : v;
+  }
+  return out;
+}
+
+async function listMerchants(env, request) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status');
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const counts = await env.DB.prepare('SELECT status, COUNT(*) n FROM merchants GROUP BY status').all();
+  const byStatus = {};
+  let total = 0;
+  (counts.results || []).forEach((r) => { byStatus[r.status] = r.n; total += r.n; });
+
+  const sql = M_STATUSES.includes(status)
+    ? `SELECT * FROM merchants WHERE status = ?1 ORDER BY id DESC LIMIT ?2 OFFSET ?3`
+    : `SELECT * FROM merchants ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, id DESC LIMIT ?1 OFFSET ?2`;
+  const { results } = M_STATUSES.includes(status)
+    ? await env.DB.prepare(sql).bind(status, PAGE_SIZE, offset).all()
+    : await env.DB.prepare(sql).bind(PAGE_SIZE, offset).all();
+
+  return json({ ok: true, total, byStatus, merchants: results || [] });
+}
+
+async function createMerchant(env, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+  const f = pickFields(body);
+  if (!f.name || !M_CATEGORIES.includes(f.category)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ((f.tier && !M_TIERS.includes(f.tier)) || (f.status && !M_STATUSES.includes(f.status))) {
+    return json({ ok: false, error: 'invalid_fields' }, 400);
+  }
+  const r = await env.DB.prepare(
+    `INSERT INTO merchants (name, category, tier, intro, detail, cover, address, phone, wechat, hours,
+      contact_name, contact_phone, slug, status, reject_reason, paid_until, sort_weight)
+     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)`
+  )
+    .bind(
+      f.name, f.category, f.tier || 'free', f.intro ?? '', f.detail || null, f.cover || null,
+      f.address || null, f.phone || null, f.wechat || null, f.hours || null,
+      f.contact_name || null, f.contact_phone || null, f.slug || null,
+      f.status || 'pending', f.reject_reason || null, f.paid_until || null, f.sort_weight || 0
+    )
+    .run();
+  const newId = r.meta.last_row_id;
+  // 直接以已上线状态新建且未给 slug：补 m<id>，保证有公开详情页
+  if (f.status === 'approved' && !f.slug) {
+    await env.DB.prepare("UPDATE merchants SET slug = ?1 WHERE id = ?2").bind('m' + newId, newId).run();
+  }
+  return json({ ok: true, id: newId });
+}
+
+async function editMerchant(env, id, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+  const f = pickFields(body);
+  if ('category' in f && !M_CATEGORIES.includes(f.category)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('tier' in f && !M_TIERS.includes(f.tier)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if ('status' in f && !M_STATUSES.includes(f.status)) return json({ ok: false, error: 'invalid_fields' }, 400);
+  if (f.status === 'rejected' && !f.reject_reason) return json({ ok: false, error: 'reject_reason_required' }, 400);
+
+  // 审核通过且还没有 slug：自动生成 m<id>
+  if (f.status === 'approved' && !f.slug) {
+    const row = await env.DB.prepare('SELECT slug FROM merchants WHERE id = ?1').bind(id).first();
+    if (!row) return json({ ok: false, error: 'not_found' }, 404);
+    if (!row.slug) f.slug = 'm' + id;
+  }
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(f)) {
+    sets.push(`${k} = ?${vals.length + 1}`);
+    vals.push(v);
+  }
+  if (!sets.length) return json({ ok: false, error: 'no_fields' }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  const { meta } = await env.DB
+    .prepare(`UPDATE merchants SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`)
+    .bind(...vals, id)
+    .run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  return json({ ok: true });
+}
+
+async function removeMerchant(env, id) {
+  const { meta } = await env.DB.prepare('DELETE FROM merchants WHERE id = ?1').bind(id).run();
+  if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  return json({ ok: true });
+}
+
 /* ---------------- 工具 ---------------- */
 
 async function hmacHex(secret, msg) {
@@ -592,9 +716,27 @@ ${BASE_CSS}
   .vrow:hover td { background: #fafafc; }
   .flag { margin-right: 4px; }
   .detail td { color: #6e6e73; font-size: 12px; }
+  /* 商户管理 */
+  .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 14px; }
+  .mgrid label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6e6e73; }
+  .mgrid label.wide { grid-column: 1 / -1; }
+  .mgrid input, .mgrid select, .mgrid textarea {
+    padding: 9px 12px; font-size: 14px; color: #1d1d1f; background: #f5f5f7;
+    border: 1px solid transparent; border-radius: 10px; outline: none; font-family: inherit;
+    transition: border-color .2s, background .2s;
+  }
+  .mgrid input:focus, .mgrid select:focus, .mgrid textarea:focus { border-color: #d64524; background: #fff; }
+  .mst { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .mst-pending { background: #fdeee8; color: #d64524; }
+  .mst-approved { background: #e5f3e8; color: #1a7f37; }
+  .mst-rejected { background: #f0f0f2; color: #6e6e73; }
+  .mst-expired { background: #fbf3dd; color: #9a6b00; }
+  .mslug { font-size: 12px; color: #6e6e73; }
+  .mslug:hover { color: #d64524; }
   @media (max-width: 900px) {
     .cards { grid-template-columns: repeat(3, 1fr); }
     .grid3, .grid2 { grid-template-columns: 1fr; }
+    .mgrid { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 560px) {
     .cards { grid-template-columns: repeat(2, 1fr); }
@@ -606,6 +748,7 @@ ${BASE_CSS}
   <h1>焰境·万载 · 后台<span>whizzzest.com</span></h1>
   <button id="vtab-msg" class="tab active" type="button">留言</button>
   <button id="vtab-visit" class="tab" type="button">访客</button>
+  <button id="vtab-merch" class="tab" type="button">商户</button>
   <button id="refresh" type="button">刷新</button>
   <button id="logout" type="button">退出</button>
 </header>
@@ -669,6 +812,61 @@ ${BASE_CSS}
   </div>
 </div>
 
+<div id="view-merch" class="wrap" style="display:none">
+  <div class="range">
+    <button class="tab active" data-mst="" type="button">全部</button>
+    <button class="tab" data-mst="pending" type="button">待审核</button>
+    <button class="tab" data-mst="approved" type="button">已上线</button>
+    <button class="tab" data-mst="rejected" type="button">已驳回</button>
+    <button class="tab" data-mst="expired" type="button">已过期</button>
+    <span class="updated" id="mstats"></span>
+    <button id="madd" type="button" class="primary">新增商户</button>
+  </div>
+  <div class="panel" id="mform" style="display:none">
+    <h3 id="mform-title">新增商户</h3>
+    <div class="mgrid">
+      <label>名称 *<input id="f-name"></label>
+      <label>分类
+        <select id="f-cat">
+          <option value="food">美食</option><option value="stay">住宿</option>
+          <option value="specialty">特产</option><option value="fireworks">花炮</option>
+          <option value="other">其他</option>
+        </select>
+      </label>
+      <label>等级
+        <select id="f-tier">
+          <option value="free">基础（免费）</option>
+          <option value="verified">认证商户</option>
+          <option value="featured">置顶推荐</option>
+        </select>
+      </label>
+      <label>状态
+        <select id="f-status">
+          <option value="pending">待审核</option>
+          <option value="approved">已上线</option>
+          <option value="rejected">已驳回</option>
+          <option value="expired">已过期</option>
+        </select>
+      </label>
+      <label>Slug（上线地址，留空自动 m<id）<input id="f-slug" placeholder="liuda-wan"></label>
+      <label>付费到期（YYYY-MM-DD，空 = 免费期）<input id="f-paid" placeholder="2027-09-06"></label>
+      <label>置顶权重（大者靠前）<input id="f-weight" type="number" value="0"></label>
+      <label class="wide">封面图 URL（可用站内图 /assets/img/…）<input id="f-cover" placeholder="/assets/img/wanzaizha1rou.jpeg"></label>
+      <label class="wide">一句话简介（卡片展示）<input id="f-intro"></label>
+      <label class="wide">详情（空行自动分段）<textarea id="f-detail" rows="4"></textarea></label>
+      <label>地址<input id="f-address"></label>
+      <label>电话<input id="f-phone"></label>
+      <label>微信号<input id="f-wechat"></label>
+      <label>营业时间<input id="f-hours"></label>
+      <label>联系人（不公开）<input id="f-cname"></label>
+      <label>联系电话（不公开）<input id="f-cphone"></label>
+    </div>
+    <div class="ops"><button class="primary" id="fsave" type="button">保存</button><button id="fcancel" type="button">取消</button></div>
+  </div>
+  <div class="list" id="mlist"><p class="empty">加载中…</p></div>
+  <button class="more" id="mmore" type="button" style="display:none">加载更多</button>
+</div>
+
 <script>
 var state = { filter: 'unread', offset: 0, total: 0, unread: 0 };
 var currentView = 'msg';
@@ -710,12 +908,16 @@ function showView(v) {
   currentView = v;
   el('view-msg').style.display = v === 'msg' ? '' : 'none';
   el('view-visit').style.display = v === 'visit' ? '' : 'none';
+  el('view-merch').style.display = v === 'merch' ? '' : 'none';
   el('vtab-msg').classList.toggle('active', v === 'msg');
   el('vtab-visit').classList.toggle('active', v === 'visit');
+  el('vtab-merch').classList.toggle('active', v === 'merch');
   if (v === 'visit') { loadStats(); loadVisitors(true); }
+  if (v === 'merch') loadMerchants(true);
 }
 el('vtab-msg').addEventListener('click', function () { showView('msg'); });
 el('vtab-visit').addEventListener('click', function () { showView('visit'); });
+el('vtab-merch').addEventListener('click', function () { showView('merch'); });
 document.querySelectorAll('#view-visit .range [data-days]').forEach(function (b) {
   b.addEventListener('click', function () {
     visitDays = Number(b.getAttribute('data-days'));
@@ -926,10 +1128,150 @@ function renderVisitor(v) {
 
 el('vrefresh').addEventListener('click', function () { loadStats(); loadVisitors(true); });
 el('refresh').addEventListener('click', function () {
-  if (currentView === 'visit') { loadStats(); loadVisitors(true); } else { load(true); }
+  if (currentView === 'visit') { loadStats(); loadVisitors(true); }
+  else if (currentView === 'merch') { loadMerchants(true); }
+  else { load(true); }
 });
 el('more').addEventListener('click', function () { state.offset += ${PAGE_SIZE}; load(false); });
 el('vmore').addEventListener('click', function () { vOffset += ${PAGE_SIZE}; loadVisitors(false); });
+
+/* ---------- 商户管理 ---------- */
+var mState = { status: '', offset: 0 };
+var editingId = null;
+var M_CAT = { food: '美食', stay: '住宿', specialty: '特产', fireworks: '花炮', other: '其他' };
+var M_STATUS = { pending: '待审核', approved: '已上线', rejected: '已驳回', expired: '已过期' };
+var M_TIER = { free: '基础', verified: '认证', featured: '置顶' };
+
+document.querySelectorAll('#view-merch .range [data-mst]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    mState.status = b.getAttribute('data-mst');
+    document.querySelectorAll('#view-merch .range [data-mst]').forEach(function (x) { x.classList.remove('active'); });
+    b.classList.add('active');
+    loadMerchants(true);
+  });
+});
+
+function loadMerchants(reset) {
+  if (reset) mState.offset = 0;
+  var q = '?offset=' + mState.offset + (mState.status ? '&status=' + mState.status : '');
+  api('/api/merchants' + q).then(function (d) {
+    var list = d.merchants || [];
+    var counts = d.byStatus || {};
+    el('mstats').textContent = '共 ' + d.total + ' 家 · 待审核 ' + (counts.pending || 0) + ' · 已上线 ' + (counts.approved || 0);
+    var box = el('mlist');
+    if (reset) box.innerHTML = '';
+    if (reset && list.length === 0) {
+      box.innerHTML = '<p class="empty">还没有商户，点右上「新增商户」录入第一家。</p>';
+    } else {
+      list.forEach(function (x) { box.appendChild(renderMerchant(x)); });
+    }
+    el('mmore').style.display = (mState.offset + ${PAGE_SIZE} < d.total && list.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('mlist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderMerchant(x) {
+  var div = document.createElement('div');
+  div.className = 'msg' + (x.status !== 'pending' ? ' read' : '');
+  var meta = [];
+  if (x.address) meta.push(x.address);
+  if (x.phone) meta.push('☎ ' + x.phone);
+  if (x.contact_name) meta.push('联系人 ' + x.contact_name + (x.contact_phone ? ' ' + x.contact_phone : ''));
+  if (x.paid_until) meta.push('付费到期 ' + x.paid_until);
+  div.innerHTML =
+    '<div class="row1"><span class="name">' + esc(x.name) + '</span>' +
+    '<span class="k-badge">' + esc(M_CAT[x.category] || x.category) + '</span>' +
+    '<span class="k-badge">' + esc(M_TIER[x.tier] || x.tier) + '</span>' +
+    '<span class="mst mst-' + esc(x.status) + '">' + esc(M_STATUS[x.status] || x.status) + '</span>' +
+    (x.slug && x.status === 'approved'
+      ? '<a class="mslug" href="https://whizzzest.com/merchants/' + esc(x.slug) + '/" target="_blank" rel="noopener">查看页面 ↗</a>'
+      : '') +
+    '</div>' +
+    (x.intro ? '<div class="time">' + esc(x.intro) + '</div>' : '') +
+    (x.reject_reason ? '<div class="meta">驳回原因：' + esc(x.reject_reason) + '</div>' : '') +
+    (meta.length ? '<div class="meta">' + esc(meta.join(' · ')) + '</div>' : '') +
+    '<div class="ops">' +
+    (x.status === 'pending'
+      ? '<button type="button" data-act="ok" class="primary">通过上线</button><button type="button" data-act="rej">驳回</button>' : '') +
+    (x.status === 'approved' ? '<button type="button" data-act="off">下线</button>' : '') +
+    '<button type="button" data-act="edit">编辑</button>' +
+    '<button type="button" data-act="del">删除</button></div>';
+  div.querySelector('.ops').addEventListener('click', function (e) {
+    var act = e.target.getAttribute('data-act');
+    if (act === 'ok') {
+      api('/api/merchants/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' })
+      }).then(function () { loadMerchants(true); });
+    } else if (act === 'rej') {
+      var reason = prompt('驳回原因（会展示给商户）：');
+      if (reason === null) return;
+      api('/api/merchants/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected', reject_reason: reason || '资料待完善' })
+      }).then(function () { loadMerchants(true); });
+    } else if (act === 'off') {
+      api('/api/merchants/' + x.id, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'expired' })
+      }).then(function () { loadMerchants(true); });
+    } else if (act === 'edit') {
+      openForm(x);
+    } else if (act === 'del') {
+      if (!confirm('确定删除「' + x.name + '」？不可恢复。')) return;
+      api('/api/merchants/' + x.id, { method: 'DELETE' }).then(function () { loadMerchants(true); });
+    }
+  });
+  return div;
+}
+
+function val(id) { return el(id).value.trim(); }
+
+function openForm(x) {
+  editingId = x ? x.id : null;
+  el('mform-title').textContent = x ? '编辑商户 #' + x.id : '新增商户';
+  el('f-name').value = x ? x.name || '' : '';
+  el('f-cat').value = x ? x.category || 'food' : 'food';
+  el('f-tier').value = x ? x.tier || 'free' : 'free';
+  el('f-status').value = x ? x.status || 'pending' : 'pending';
+  el('f-slug').value = x ? x.slug || '' : '';
+  el('f-paid').value = x ? x.paid_until || '' : '';
+  el('f-weight').value = x ? x.sort_weight || 0 : 0;
+  el('f-cover').value = x ? x.cover || '' : '';
+  el('f-intro').value = x ? x.intro || '' : '';
+  el('f-detail').value = x ? x.detail || '' : '';
+  el('f-address').value = x ? x.address || '' : '';
+  el('f-phone').value = x ? x.phone || '' : '';
+  el('f-wechat').value = x ? x.wechat || '' : '';
+  el('f-hours').value = x ? x.hours || '' : '';
+  el('f-cname').value = x ? x.contact_name || '' : '';
+  el('f-cphone').value = x ? x.contact_phone || '' : '';
+  el('mform').style.display = '';
+  el('mform').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeForm() { el('mform').style.display = 'none'; editingId = null; }
+
+el('madd').addEventListener('click', function () { openForm(null); });
+el('fcancel').addEventListener('click', closeForm);
+el('fsave').addEventListener('click', function () {
+  var payload = {
+    name: val('f-name'), category: val('f-cat'), tier: val('f-tier'), status: val('f-status'),
+    slug: val('f-slug'), paid_until: val('f-paid'), sort_weight: Number(val('f-weight') || 0),
+    cover: val('f-cover'), intro: val('f-intro'), detail: val('f-detail'),
+    address: val('f-address'), phone: val('f-phone'), wechat: val('f-wechat'), hours: val('f-hours'),
+    contact_name: val('f-cname'), contact_phone: val('f-cphone')
+  };
+  if (!payload.name) { alert('请填写商户名称'); return; }
+  api(editingId ? '/api/merchants/' + editingId : '/api/merchants', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function () { closeForm(); loadMerchants(true); })
+    .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); });
+});
+el('mmore').addEventListener('click', function () { mState.offset += ${PAGE_SIZE}; loadMerchants(false); });
+
 el('logout').addEventListener('click', function () {
   api('/api/logout', { method: 'POST' }).then(function () { location.href = '/login'; });
 });

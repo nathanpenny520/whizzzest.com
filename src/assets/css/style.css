@@ -1595,3 +1595,339 @@ button {
 
 .form-status.ok { color: #1a7f37; }
 .form-status.err { color: var(--c-accent); }
+
+/* ==================== 商户展示（/merchants/，Worker 动态渲染） ==================== */
+
+.mc-hero {
+  padding: 72px 22px 60px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--c-bg) 0%, #fbf1ec 100%);
+}
+
+.mc-kicker {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--c-accent);
+}
+
+.mc-hero h1 {
+  margin-top: 10px;
+  font-size: clamp(30px, 4.6vw, 48px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.mc-sub {
+  margin-top: 12px;
+  color: var(--c-text-2);
+  font-size: 16px;
+}
+
+.mc-apply { margin-top: 22px; }
+
+.mc-main { padding: 40px 0 30px; }
+
+.mc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.mc-tab {
+  padding: 7px 16px;
+  font-size: 13px;
+  color: var(--c-text-2);
+  background: var(--c-bg-alt);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  transition: all 0.2s;
+}
+
+.mc-tab:hover { color: var(--c-accent); }
+
+.mc-tab.on {
+  color: #fff;
+  background: var(--c-accent);
+  font-weight: 600;
+}
+
+.mc-feat { margin-bottom: 34px; }
+
+.mc-feat-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-accent);
+  margin-bottom: 14px;
+}
+
+.mc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 18px;
+}
+
+.mc-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--c-bg);
+  border: 1px solid var(--c-hairline);
+  border-radius: 18px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s;
+}
+
+.mc-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+}
+
+.mc-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--c-bg-alt);
+}
+
+.mc-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mc-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 44px;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: linear-gradient(135deg, #fbf1ec, #f7e3da);
+}
+
+.mc-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+}
+
+.mc-badge.feat {
+  color: #fff;
+  background: var(--c-accent);
+}
+
+.mc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+
+.mc-body h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.mc-intro {
+  color: var(--c-text-2);
+  font-size: 13px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mc-addr {
+  color: var(--c-text-3);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc-cat {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 10px;
+  font-size: 11px;
+  color: var(--c-text-2);
+  background: var(--c-bg-alt);
+  border-radius: 999px;
+}
+
+.mc-empty {
+  text-align: center;
+  padding: 70px 0;
+  color: var(--c-text-2);
+  background: var(--c-bg-alt);
+  border-radius: var(--radius);
+}
+
+.mc-empty .sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+
+.mc-cta {
+  margin: 60px 0 20px;
+  padding: 48px 30px;
+  text-align: center;
+  background: linear-gradient(135deg, #2b1208, #4a1d0e);
+  border-radius: var(--radius);
+  color: #fff;
+}
+
+.mc-cta h2 {
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 600;
+}
+
+.mc-cta p {
+  max-width: 560px;
+  margin: 12px auto 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.mc-cta .btn {
+  margin-top: 20px;
+  background: var(--c-accent);
+  color: #fff;
+}
+
+.mc-cta .btn:hover { background: var(--c-accent-dark); }
+
+/* 详情页 */
+
+.md-page { padding: 30px 0 50px; }
+
+.md-crumb {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--c-text-3);
+  margin-bottom: 22px;
+}
+
+.md-crumb a { color: var(--c-text-2); }
+.md-crumb a:hover { color: var(--c-accent); }
+.md-crumb b { color: var(--c-text); font-weight: 500; }
+
+.md-cover {
+  border-radius: var(--radius);
+  overflow: hidden;
+  aspect-ratio: 21 / 9;
+  background: var(--c-bg-alt);
+}
+
+.md-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.md-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+}
+
+.md-head .mc-badge,
+.md-head .mc-cat { position: static; }
+
+.md-head h1 {
+  font-size: clamp(26px, 3.6vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.md-intro {
+  margin-top: 14px;
+  font-size: 17px;
+  color: var(--c-text-2);
+  line-height: 1.7;
+}
+
+.md-detail {
+  margin-top: 18px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--c-text);
+}
+
+.md-detail p + p { margin-top: 12px; }
+
+.md-info {
+  margin-top: 26px;
+  border: 1px solid var(--c-hairline);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.md-info li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  font-size: 14px;
+}
+
+.md-info li + li { border-top: 1px solid var(--c-hairline); }
+
+.md-info .k {
+  flex: 0 0 4.5em;
+  color: var(--c-text-3);
+}
+
+.md-info .v {
+  flex: 1;
+  word-break: break-all;
+}
+
+.md-info .copy {
+  flex: 0 0 auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--c-accent);
+  background: none;
+  border: 1px solid var(--c-hairline);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.md-info .copy:hover { border-color: var(--c-accent); }
+
+.md-related {
+  padding: 46px 0 60px;
+  background: var(--c-bg-alt);
+}
+
+.md-related h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .mc-hero { padding: 52px 22px 44px; }
+  .mc-grid { grid-template-columns: repeat(auto-fill, minmax(46vw, 1fr)); gap: 12px; }
+  .md-cover { aspect-ratio: 16 / 10; }
+}

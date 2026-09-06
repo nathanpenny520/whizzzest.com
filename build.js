@@ -214,7 +214,7 @@ function main() {
 
   const built = pageDirs.map((d) => buildPage(d, site));
 
-  // sitemap.xml（404 不收录）
+  // sitemap.xml（404 不收录；/merchants/ 由 Worker 动态渲染，商户明细另见 /merchants/sitemap.xml）
   const pages = built.filter((b) => b.slug !== '/404/');
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -226,13 +226,17 @@ ${pages
   </url>`
   )
   .join('\n')}
+  <url>
+    <loc>${SITE_URL}/merchants/</loc>
+    <changefreq>weekly</changefreq>
+  </url>
 </urlset>
 `;
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap);
 
   fs.writeFileSync(
     path.join(DIST, 'robots.txt'),
-    `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`
+    `User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\nSitemap: ${SITE_URL}/merchants/sitemap.xml\n`
   );
 
   // 静态资源
@@ -260,6 +264,16 @@ ${pages
       else if (entry.name.endsWith('.html')) bumpAssetUrls(p);
     }
   })(DIST);
+
+  // 供主 Worker 渲染 /merchants/* 时复用全站页头/页脚（编译产物，导航改了随构建同步）
+  const siteCtx = { site };
+  fs.mkdirSync(path.join(DIST, 'partials'), { recursive: true });
+  for (const name of ['header', 'footer']) {
+    const compiled = render(read(path.join(PARTIALS_DIR, `${name}.html`)), siteCtx);
+    fs.writeFileSync(path.join(DIST, 'partials', `${name}.html`), compiled);
+  }
+  // Worker 页面引用带指纹的 CSS/JS 用
+  fs.writeFileSync(path.join(DIST, 'build-meta.json'), JSON.stringify(versions));
 
   const kb = (p) => (fs.statSync(p).size / 1024).toFixed(1);
   console.log(`✔ ${built.length} 页构建完成 → dist/（${Date.now() - t0}ms）`);

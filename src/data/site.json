@@ -28,6 +28,10 @@
       "label": "赏烟地点"
     },
     {
+      "href": "/merchants/",
+      "label": "商户"
+    },
+    {
       "href": "/about/",
       "label": "关于"
     }
