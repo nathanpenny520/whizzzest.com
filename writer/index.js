@@ -383,19 +383,12 @@ async function sendEmailCode(request, env, user) {
        expires_at = datetime('now', '+10 minutes'), attempts = 0, created_at = datetime('now')`
   ).bind(email, await sha256Hex(code), purpose).run();
 
-  if (user) {
-    try {
-      await sendCodeEmail(env, email, code, purpose);
-    } catch (err) {
-      console.error('email code send failed:', err);
-      return json({ ok: false, error: 'send_failed' }, 500);
-    }
-  } else {
-    try {
-      await sendCodeEmail(env, email, code, purpose);
-    } catch (err) {
-      console.error('email code send failed (login):', err);
-    }
+  try {
+    await sendCodeEmail(env, email, code, purpose);
+  } catch (err) {
+    console.error(`email code send failed (${purpose}):`, err);
+    // bind / register 场景如实报错（用户需要知道没发出去）；login 保持防枚举静默
+    if (user || purpose === 'register') return json({ ok: false, error: 'send_failed' }, 500);
   }
   return json({ ok: true });
 }
