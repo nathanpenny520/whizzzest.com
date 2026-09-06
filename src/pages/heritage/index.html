@@ -17,22 +17,21 @@
     </section>
 
     <section class="section">
-      <div class="container">
-        {{#each data.sections as s}}
-        <article class="split reveal" id="{{s.key}}">
-          <div class="split-media">
-            <div class="video-frame">
-              <iframe src="https://player.bilibili.com/player.html?bvid={{s.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{s.title}}视频"></iframe>
-            </div>
-            <p class="video-hint">{{data.videoHint}}</p>
-          </div>
-          <div class="split-body">
-            <span class="kicker">0{{@index}} · 非遗</span>
-            <h3>{{s.title}}</h3>
-            {{#each s.paras as p}}<p>{{p}}</p>{{/each}}
-          </div>
-        </article>
-        {{/each}}
+      <div class="container-wide">
+        <div class="section-head reveal">
+          <h2>{{data.itemsTitle}}</h2>
+          <p>{{data.itemsDesc}}</p>
+        </div>
+        <div class="grid grid-3">
+          {{#each data.items as item}}
+          <a class="feature-card reveal" href="/heritage/{{item.key}}/">
+            <span class="feature-no">{{item.badge}}</span>
+            <h3>{{item.title}}</h3>
+            <p>{{item.summary}}</p>
+            <span class="card-go">阅读详情 ›</span>
+          </a>
+          {{/each}}
+        </div>
       </div>
     </section>
 

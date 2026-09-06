@@ -8,11 +8,12 @@
       "label": "非遗",
       "menu": [
         { "href": "/heritage/", "label": "非遗文化概览" },
-        { "href": "/heritage/#fireworks", "label": "万载花炮" },
-        { "href": "/heritage/#deshenggu", "label": "得胜鼓" },
-        { "href": "/heritage/#xiaBu", "label": "夏布织造" },
-        { "href": "/heritage/#kaiKouNuo", "label": "开口傩" },
-        { "href": "/heritage/#zhiPeng", "label": "纸棚山歌" }
+        { "href": "/heritage/fireworks/", "label": "万载花炮" },
+        { "href": "/heritage/deshenggu/", "label": "得胜鼓" },
+        { "href": "/heritage/xiabu/", "label": "夏布织造" },
+        { "href": "/heritage/kaikounuo/", "label": "开口傩" },
+        { "href": "/heritage/zhipeng/", "label": "纸棚山歌" },
+        { "href": "/heritage/experience/", "label": "非遗体验" }
       ]
     },
     {

@@ -1,0 +1,50 @@
+<!-- {"title":"非遗体验 — 焰境·万载","description":"万载非遗体验项目（花炮制作、傩面具彩绘、夏布织造、得胜鼓研学）正在筹备中，敬请期待。"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <div class="container">
+        <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container-wide">
+        <div class="section-head reveal">
+          <h2>{{data.plansTitle}}</h2>
+          <p>{{data.plansDesc}}</p>
+        </div>
+        <div class="grid grid-2">
+          {{#each data.plans as plan}}
+          <div class="feature-card reveal">
+            <span class="feature-no">0{{@index}}</span>
+            <h3>{{plan.name}}</h3>
+            <p>{{plan.desc}}</p>
+          </div>
+          {{/each}}
+        </div>
+        <nav class="pager" aria-label="非遗项目切换">
+          {{#if data.prev}}<a class="pager-link" href="{{data.prev.href}}">← {{data.prev.label}}</a>{{/if}}
+          {{#if data.next}}<a class="pager-link pager-next" href="{{data.next.href}}">{{data.next.label}} →</a>{{/if}}
+        </nav>
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <div class="reveal">
+        <h2>{{data.cta.title}}</h2>
+        <p>{{data.cta.desc}}</p>
+        <a class="btn" href="{{data.cta.href}}">{{data.cta.btn}}</a>
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

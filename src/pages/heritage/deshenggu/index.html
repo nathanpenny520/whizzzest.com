@@ -1,0 +1,49 @@
+<!-- {"title":"得胜鼓 — 焰境·万载","description":"得胜鼓是万载传统民间鼓乐，起源于北宋，取材于唐朝平定安史之乱——雄浑激越的气势、整齐划一的节奏，万载重要文化品牌。"} -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+{{> head}}
+<body>
+  {{> header}}
+  <main id="main">
+
+    <section class="hero-flat">
+      <div class="container">
+        <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <article class="split reveal">
+          <div class="split-media">
+            <div class="video-frame">
+              <iframe src="https://player.bilibili.com/player.html?bvid={{data.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{data.hero.title}}视频"></iframe>
+            </div>
+            <p class="video-hint">{{data.videoHint}}</p>
+          </div>
+          <div class="split-body">
+            <span class="kicker">{{data.badge}}</span>
+            {{#each data.paras as p}}<p>{{p}}</p>{{/each}}
+          </div>
+        </article>
+        <nav class="pager" aria-label="非遗项目切换">
+          {{#if data.prev}}<a class="pager-link" href="{{data.prev.href}}">← {{data.prev.label}}</a>{{/if}}
+          {{#if data.next}}<a class="pager-link pager-next" href="{{data.next.href}}">{{data.next.label}} →</a>{{/if}}
+        </nav>
+      </div>
+    </section>
+
+    <section class="cta-band">
+      <div class="reveal">
+        <h2>{{data.cta.title}}</h2>
+        <p>{{data.cta.desc}}</p>
+        <a class="btn" href="{{data.cta.href}}">{{data.cta.btn}}</a>
+      </div>
+    </section>
+
+  </main>
+  {{> footer}}
+</body>
+</html>

@@ -4,7 +4,9 @@
  *
  * 职责：
  *  1. 拼接公共片段（partials）+ 渲染模板变量 / #each 循环
- *  2. 每个页面读取 src/pages/<name>/index.html + src/data/<name>.json
+ *  2. 每个页面读取 src/pages/<路径>/index.html + src/data/<路径>.json
+ *     （支持子目录嵌套：src/pages/heritage/fireworks/ → /heritage/fireworks/，
+ *       数据对应 src/data/heritage/fireworks.json）
  *  3. 生成 sitemap.xml / robots.txt（含 canonical 基准域名）
  *  4. 复制 public/ 与 src/assets/ → dist/
  *
@@ -326,11 +328,20 @@ async function main() {
   const site = JSON.parse(read(path.join(DATA_DIR, 'site.json')));
   const images = await scanImages();
 
-  const pageDirs = fs
-    .readdirSync(PAGES_DIR, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name)
-    .sort((a, b) => (a === 'index' ? -1 : b === 'index' ? 1 : a.localeCompare(b)));
+  /** 递归收集页面目录（相对 PAGES_DIR 路径；含 index.html 的目录才算一页，如 heritage、heritage/fireworks） */
+  const listPageDirs = (dir, prefix = '') => {
+    const out = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (exists(path.join(dir, entry.name, 'index.html'))) out.push(rel);
+      out.push(...listPageDirs(path.join(dir, entry.name), rel));
+    }
+    return out;
+  };
+  const pageDirs = listPageDirs(PAGES_DIR).sort((a, b) =>
+    a === 'index' ? -1 : b === 'index' ? 1 : a.localeCompare(b)
+  );
 
   const built = pageDirs.map((d) => buildPage(d, site, images));
 

@@ -352,6 +352,19 @@ button {
   color: var(--c-text-2);
 }
 
+/* 扁平 Hero 内的返回上级链接（非遗子页等） */
+
+.hero-flat .hero-crumb {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 15px;
+  color: var(--c-text-2);
+}
+
+.hero-flat .hero-crumb:hover {
+  color: var(--c-accent);
+}
+
 /* ---------------- 按钮 ---------------- */
 
 .btn {
@@ -523,6 +536,14 @@ a.feature-card {
 a.feature-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card .card-go {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--c-accent);
 }
 
 .merchants-more {
@@ -1104,6 +1125,28 @@ a.feature-card:hover {
   margin-top: 10px;
   font-size: 13px;
   color: var(--c-text-2);
+}
+
+/* ---------------- 非遗子页翻页（上一项 / 下一项） ---------------- */
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--c-hairline);
+}
+
+.pager-link {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--c-text-2);
+  transition: color 0.25s var(--ease);
+}
+
+.pager-link:hover {
+  color: var(--c-accent);
 }
 
 /* ---------------- 产业现状文字块 ---------------- */
