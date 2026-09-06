@@ -18,6 +18,8 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
 const COOKIE_NAME = 'wa_session';
 const PAGE_SIZE = 50;
+// 后台页内嵌 favicon（32px PNG data URI——Safari 不认 SVG 图标）
+const FAVICON_LINK = '<link rel="icon" type="image/png" href="data:image/png;base64,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">';
 
 export default {
   async fetch(request, env) {
@@ -266,6 +268,7 @@ const LOGIN_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+${FAVICON_LINK}
 <title>登录 — 焰境·万载 后台</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
@@ -335,6 +338,7 @@ const APP_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+${FAVICON_LINK}
 <title>留言管理 — 焰境·万载 后台</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
