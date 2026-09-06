@@ -1,0 +1,461 @@
+/*
+数字烟花（/digital-fireworks/）— 页面级样式，仅本页引用
+基于 NianBroken/Firework_Simulator（Apache-2.0）样式改造：
+  - .container → .fw-app、.btn → .fw-btn（避开站点同名类）
+  - 全局 `*`/body 规则收窄为 .fw-app 作用域与 body.page-sim，避免污染站点样式
+  - 华文琥珀（3.7MB TTF）不内嵌，文字烟花走系统字体；Russo One 保留
+Copyright © 2022 NianBroken. All rights reserved.
+Github：https://github.com/NianBroken/Firework_Simulator
+本项目采用 Apache-2.0 许可证
+*/
+
+/* Russo One（UI 字体，仅本页） */
+@font-face {
+	font-family: "Russo One";
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url(../fonts/fireworks/Z9XUDmZRWg6M1LvRYsHOy8mJrrg.woff2) format("woff2");
+	unicode-range: U+0301, U+0400-045F, U+0490-0491, U+2116;
+}
+@font-face {
+	font-family: "Russo One";
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url(../fonts/fireworks/Z9XUDmZRWg6M1LvRYsHOwcmJrrg.woff2) format("woff2");
+	unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+	font-family: "Russo One";
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url(../fonts/fireworks/Z9XUDmZRWg6M1LvRYsHOz8mJ.woff2) format("woff2");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* 沉浸式：本页不滚动，画布铺满导航以下视口 */
+body.page-sim {
+	overflow: hidden;
+	background: #000;
+}
+
+.fw-app {
+	position: relative;
+	box-sizing: border-box;
+	height: calc(100vh - var(--nav-h));
+	height: calc(100dvh - var(--nav-h));
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	color: rgba(255, 255, 255, 0.5);
+	font-family: "Russo One", arial, sans-serif;
+	line-height: 1.25;
+	letter-spacing: 0.06em;
+}
+.fw-app * {
+	position: relative;
+	box-sizing: border-box;
+}
+
+.fw-app .hide {
+	opacity: 0;
+	visibility: hidden;
+}
+.fw-app .remove {
+	display: none !important;
+}
+.fw-app .blur {
+	filter: blur(12px);
+}
+
+.fw-app .loading-init {
+	width: 100%;
+	align-self: center;
+	text-align: center;
+	text-transform: uppercase;
+}
+.fw-app .loading-init__header {
+	font-size: 2.2em;
+}
+.fw-app .loading-init__status {
+	margin-top: 1em;
+	font-size: 0.8em;
+	opacity: 0.75;
+}
+
+.fw-app .stage-container {
+	overflow: hidden;
+	box-sizing: initial;
+	border: 1px solid #222;
+	margin: -1px;
+}
+@media (max-width: 840px) {
+	.fw-app .stage-container {
+		border: none;
+		margin: 0;
+	}
+}
+
+.fw-app .canvas-container {
+	width: 100%;
+	height: 100%;
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: cover;
+	transition: filter 0.3s;
+}
+.fw-app .canvas-container canvas {
+	position: absolute;
+	mix-blend-mode: lighten;
+	transform: translateZ(0);
+}
+
+.fw-app .controls {
+	position: absolute;
+	top: 0;
+	width: 100%;
+	padding-bottom: 50px;
+	display: flex;
+	justify-content: space-between;
+	transition: opacity 0.3s, visibility 0.3s;
+}
+@media (min-width: 840px) {
+	.fw-app .controls {
+		visibility: visible;
+	}
+	.fw-app .controls.hide:hover {
+		opacity: 1;
+	}
+}
+
+.fw-app .menu {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background-color: rgba(0, 0, 0, 0.42);
+	transition: opacity 0.3s, visibility 0.3s;
+}
+.fw-app .menu__inner-wrap {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	transition: opacity 0.3s;
+}
+.fw-app .menu__header {
+	margin-top: 5px;
+	margin-bottom: 8px;
+	font-size: 2em;
+	text-transform: uppercase;
+}
+.fw-app .menu__subheader {
+	margin-bottom: 5px;
+	font-size: 0.86em;
+	opacity: 0.8;
+}
+.fw-app .menu form {
+	width: 100%;
+	max-width: 400px;
+	padding: 0 10px;
+	margin-right: 80px;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+}
+.fw-app .menu .form-option {
+	display: flex;
+	align-items: center;
+	margin: 16px 0;
+	transition: opacity 0.3s;
+}
+.fw-app .menu .form-option label {
+	display: block;
+	width: 50%;
+	padding-right: 12px;
+	text-align: right;
+	text-transform: uppercase;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+.fw-app .menu .form-option--select select {
+	display: block;
+	width: 50%;
+	height: 30px;
+	font-size: 1rem;
+	font-family: "Russo One", arial, sans-serif;
+	color: rgba(255, 255, 255, 0.5);
+	letter-spacing: 0.06em;
+	background-color: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.fw-app .menu .form-option--select select option {
+	background-color: black;
+}
+.fw-app .menu .form-option--checkbox input {
+	display: block;
+	width: 26px;
+	height: 26px;
+	margin: 0;
+	opacity: 0.5;
+}
+.fw-app .menu .form-option--stacked {
+	align-items: flex-start;
+}
+.fw-app .menu .form-option--stacked .form-option__content {
+	width: 50%;
+}
+.fw-app .menu .background-input {
+	width: 100%;
+	height: 30px;
+	padding: 0 8px;
+	font-size: 0.9rem;
+	font-family: "Russo One", arial, sans-serif;
+	color: rgba(255, 255, 255, 0.75);
+	letter-spacing: 0.04em;
+	background-color: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.fw-app .menu .background-input::placeholder {
+	color: rgba(255, 255, 255, 0.35);
+}
+.fw-app .menu .form-option__actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 8px;
+}
+.fw-app .menu .form-option__actions button {
+	flex: 1;
+	height: 30px;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	font-family: "Russo One", arial, sans-serif;
+	font-size: 0.76rem;
+	color: rgba(255, 255, 255, 0.75);
+	background-color: rgba(255, 255, 255, 0.08);
+	letter-spacing: 0.04em;
+	cursor: pointer;
+}
+.fw-app .menu .form-option__actions button:focus-visible,
+.fw-app .menu .background-input:focus-visible,
+.fw-app .menu .form-option--select select:focus-visible,
+.fw-app .help-modal__close-btn:focus-visible {
+	outline: 1px solid rgba(255, 255, 255, 0.7);
+	outline-offset: 1px;
+}
+.fw-app .menu .background-status {
+	min-height: 1.2em;
+	margin-top: 8px;
+	font-size: 0.72rem;
+	line-height: 1.4;
+	color: rgba(255, 255, 255, 0.45);
+}
+.fw-app .menu .background-status[data-state="loading"] {
+	color: rgba(255, 255, 255, 0.65);
+}
+.fw-app .menu .background-status[data-state="success"] {
+	color: #8fd18f;
+}
+.fw-app .menu .background-status[data-state="error"] {
+	color: #ff8b8b;
+}
+@media (max-width: 840px) {
+	.fw-app .menu .form-option select,
+	.fw-app .menu .form-option input {
+		outline: none;
+	}
+}
+@media (max-width: 560px) {
+	.fw-app .menu .form-option {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	.fw-app .menu .form-option label,
+	.fw-app .menu .form-option--stacked .form-option__content,
+	.fw-app .menu .form-option--select select {
+		width: 100%;
+	}
+	.fw-app .menu .form-option label {
+		padding-right: 0;
+		margin-bottom: 8px;
+		text-align: left;
+	}
+}
+
+.fw-app .close-menu-btn {
+	position: absolute;
+	top: 0;
+	right: 0;
+}
+.fw-app .fw-btn {
+	opacity: 0.16;
+	width: 50px;
+	height: 50px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	appearance: none;
+	display: flex;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	cursor: pointer;
+	transition: opacity 0.3s;
+}
+.fw-app .fw-btn--bright {
+	opacity: 0.5;
+}
+@media (min-width: 840px) {
+	.fw-app .fw-btn:hover {
+		opacity: 0.32;
+	}
+	.fw-app .fw-btn--bright:hover {
+		opacity: 0.75;
+	}
+}
+.fw-app .fw-btn svg {
+	display: block;
+	margin: auto;
+}
+.fw-app .fw-btn:focus-visible {
+	outline: 1px solid rgba(255, 255, 255, 0.7);
+	outline-offset: -2px;
+}
+
+.fw-app .credits {
+	margin-top: auto;
+	margin-bottom: 10px;
+	padding-top: 6px;
+	font-size: 0.8em;
+	opacity: 0.75;
+	text-align: center;
+}
+.fw-app .credits a {
+	color: rgba(255, 255, 255, 0.5);
+	text-decoration: none;
+}
+.fw-app .credits a:hover,
+.fw-app .credits a:active {
+	color: rgba(255, 255, 255, 0.75);
+	text-decoration: underline;
+}
+
+.fw-app .help-modal {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	visibility: hidden;
+	transition-property: visibility;
+	transition-duration: 0.25s;
+}
+.fw-app .help-modal__overlay {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	opacity: 0;
+	transition-property: opacity;
+	transition-timing-function: ease-in;
+	transition-duration: 0.25s;
+}
+.fw-app .help-modal__dialog {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	max-width: 400px;
+	max-height: calc(100vh - 100px);
+	margin: 10px;
+	padding: 20px;
+	border-radius: 0.3em;
+	background-color: rgba(0, 0, 0, 0.4);
+	opacity: 0;
+	transform: scale(0.9, 0.9);
+	transition-property: opacity, transform;
+	transition-timing-function: ease-in;
+	transition-duration: 0.25s;
+}
+@media (min-width: 840px) {
+	.fw-app .help-modal__dialog {
+		font-size: 1.25rem;
+		max-width: 500px;
+	}
+}
+.fw-app .help-modal__header {
+	font-size: 1.75em;
+	text-transform: uppercase;
+	text-align: center;
+}
+.fw-app .help-modal__body {
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	margin: 1em 0;
+	padding: 1em 0;
+	border-top: 1px solid rgba(255, 255, 255, 0.25);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+	line-height: 1.5;
+	color: rgba(255, 255, 255, 0.75);
+}
+.fw-app .help-modal__close-btn {
+	flex-shrink: 0;
+	outline: none;
+	border: none;
+	border-radius: 2px;
+	padding: 0.25em 0.75em;
+	margin-top: 0.36em;
+	font-family: "Russo One", arial, sans-serif;
+	font-size: 1em;
+	color: rgba(255, 255, 255, 0.5);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	background-color: rgba(255, 255, 255, 0.25);
+	cursor: pointer;
+	transition: color 0.3s, background-color 0.3s;
+}
+.fw-app .help-modal__close-btn:hover,
+.fw-app .help-modal__close-btn:active,
+.fw-app .help-modal__close-btn:focus {
+	color: #fff;
+	background-color: #09f;
+}
+.fw-app .help-modal.active {
+	visibility: visible;
+	transition-duration: 0.4s;
+}
+.fw-app .help-modal.active .help-modal__overlay {
+	opacity: 1;
+	transition-timing-function: ease-out;
+	transition-duration: 0.4s;
+}
+.fw-app .help-modal.active .help-modal__dialog {
+	opacity: 1;
+	transform: scale(1, 1);
+	transition-timing-function: ease-out;
+	transition-duration: 0.4s;
+}
+
+/* noscript 回退提示 */
+.fw-noscript {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 24px;
+	color: rgba(255, 255, 255, 0.75);
+	text-align: center;
+}

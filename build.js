@@ -261,6 +261,8 @@ function buildPage(dirName, site, images) {
       description: meta.description,
       ogType: dirName === 'index' ? 'website' : 'article',
       ogImage: meta.ogImage || '/assets/img/longhu_yanhuowanhui.jpeg',
+      themeColor: meta.themeColor || '#fbfbfd',
+      css: meta.css || '',
     },
   };
 
@@ -402,12 +404,29 @@ ${pages
   const cssPath = path.join(DIST, 'assets', 'css', 'style.css');
   fs.writeFileSync(cssPath, minifyCss(read(cssPath)));
 
+  // 烟花模拟器（/digital-fireworks/）：13 个零依赖 JS 依依赖顺序拼接为单文件
+  // （globals 协作，顺序即加载顺序；mid-file 的 "use strict" 字面量无副作用），CSS 一并压缩
+  const FIREWORKS_JS_ORDER = [
+    'fscreen', 'Stage', 'MyMath',                                       // lib
+    'config', 'store', 'background-manager', 'ui',                      // app
+    'runtime', 'shells', 'interaction', 'simulation', 'audio', 'engine', // fireworks
+  ];
+  const fwDir = path.join(SRC, 'assets', 'js', 'fireworks');
+  fs.writeFileSync(
+    path.join(DIST, 'assets', 'js', 'fireworks.js'),
+    FIREWORKS_JS_ORDER.map((n) => read(path.join(fwDir, `${n}.js`))).join('\n')
+  );
+  const fwCssPath = path.join(DIST, 'assets', 'css', 'fireworks.css');
+  fs.writeFileSync(fwCssPath, minifyCss(read(fwCssPath)));
+
   // 资源指纹：CSS/JS 内容变化 → 引用加 ?v=hash。/assets/* 缓存一年 immutable（_headers），
   // 无版本号的话访客会拿到旧样式（浏览器不会重新验证），有版本号则内容一变 URL 即变。
   const hashFile = (p) => createHash('md5').update(fs.readFileSync(p)).digest('hex').slice(0, 8);
   const versions = {
     '/assets/css/style.css': hashFile(path.join(DIST, 'assets/css/style.css')),
     '/assets/js/main.js': hashFile(path.join(DIST, 'assets/js/main.js')),
+    '/assets/css/fireworks.css': hashFile(path.join(DIST, 'assets/css/fireworks.css')),
+    '/assets/js/fireworks.js': hashFile(path.join(DIST, 'assets/js/fireworks.js')),
   };
   const bumpAssetUrls = (file) => {
     let html = read(file);

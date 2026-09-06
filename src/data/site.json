@@ -30,6 +30,7 @@
       "menu": [
         { "href": "/industry/", "label": "烟花产业" },
         { "href": "/spots/", "label": "赏烟地点" },
+        { "href": "/digital-fireworks/", "label": "数字烟花" },
         { "href": "/tv/?cat=fireworks", "label": "烟花视频 · 万载TV" }
       ]
     },
