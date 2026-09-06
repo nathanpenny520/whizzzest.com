@@ -16,14 +16,8 @@ SRC = "reference/old-site/packages/frontend/src/locales/zh-CN.json"
 TS = "reference/old-site/packages/frontend/src/data/locations.ts"
 OUT = "src/data"
 
-# 旧板块 key → 图片文件（与旧站 Page.vue 中每个板块实际引用一致）
+# 旧美食板块 key → 图片文件（仅 dish() 引用；非遗板块旧站为视频，无配图）
 IMG = {
-    "fireworks": "wanzaihuapao.jpg",
-    "deshenggu": "deshengu.jpg",
-    "xiaBu": "xiabu.jpg",
-    "kaiKouNuo": "kaikounuo.jpeg",
-    "zhiPeng": "zhipengshange.jpg",
-    # 非遗板块旧站为视频，图片仅作低配回退/海报备用
     "liuDaWan": "liudawan.jpeg",
     "fuGuiYouJuan": "fuguiyoujuan.jpeg",
     "wanzaiZhaRou": "wanzaizha1rou.jpeg",
