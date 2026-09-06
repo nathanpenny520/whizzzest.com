@@ -24,7 +24,10 @@
         <div class="grid grid-3">
           {{#each data.team.members as member}}
           <div class="team-card reveal">
-            <span class="team-avatar" aria-hidden="true">{{member.name}}</span>
+            <span class="team-avatar" aria-hidden="true">
+              {{#if member.icon}}<img class="team-avatar-icon" src="/{{member.icon}}" alt="">{{/if}}
+              {{#unless member.icon}}{{member.initial}}{{/unless}}
+            </span>
             <h3>{{member.name}}</h3>
             <p class="team-role">{{member.role}}</p>
             <p class="team-desc">{{member.description}}</p>

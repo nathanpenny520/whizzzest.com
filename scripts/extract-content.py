@@ -259,7 +259,14 @@ def main():
         "team": {
             "title": ab["team"]["title"],
             "members": [
-                {"name": ab["team"]["members"][f"member{i}"]["name"], "role": ab["team"]["members"][f"member{i}"]["role"], "description": ab["team"]["members"][f"member{i}"]["description"]}
+                {
+                    "name": (m := ab["team"]["members"][f"member{i}"])["name"],
+                    "role": m["role"],
+                    "description": m["description"],
+                    # 圆形头像：普通成员取名字首字；Claude AI 用旧站 Claude.svg 图标
+                    "initial": m["name"][0] if m["name"] else "?",
+                    "icon": "icons/claude.svg" if "claude" in m["name"].lower() else "",
+                }
                 for i in range(1, 7)
             ],
         },
