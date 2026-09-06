@@ -1,0 +1,19 @@
+{
+  // 焰境·万载 — 管理后台 Worker（admin.whizzzest.com，整域即后台）
+  // 与公开站（根目录 whizzzest）分离部署：后台挂了不影响主站。
+  // 线上凭据用 wrangler secret 配置：ADMIN_PASSWORD / ADMIN_SESSION_SECRET
+  "name": "whizzzest-admin",
+  "compatibility_date": "2026-09-01",
+  "main": "index.js",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whizzzest",
+      "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
+    }
+  ],
+  "routes": [
+    { "pattern": "admin.whizzzest.com", "custom_domain": true }
+  ]
+}

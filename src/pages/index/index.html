@@ -10,7 +10,7 @@
       <div class="hero-carousel" id="hero-carousel" aria-hidden="true">
         {{#each data.carousel as slide}}
         <div class="hero-slide">
-          <img src="/assets/img/{{slide.img}}" alt="{{slide.alt}}" {{#if_first}}loading="eager" fetchpriority="high"{{/if_first}} decoding="async">
+          <img {{#if_first}}src="/assets/img/{{slide.img}}" loading="eager" fetchpriority="high"{{/if_first}}{{#if_not_first}}data-src="/assets/img/{{slide.img}}"{{/if_not_first}} alt="{{slide.alt}}" decoding="async">
         </div>
         {{/each}}
       </div>
@@ -21,7 +21,7 @@
       <button class="hero-arrow hero-arrow-next" type="button" aria-label="下一张">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
       </button>
-      <div class="hero-dots" role="tablist" aria-label="轮播图选择">
+      <div class="hero-dots" aria-label="轮播图选择">
         {{#each data.carousel as slide}}
         <button class="hero-dot" type="button" aria-label="第 {{@index}} 张"></button>
         {{/each}}

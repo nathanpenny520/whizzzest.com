@@ -646,7 +646,7 @@ button {
   background: var(--c-bg-alt);
   padding: 52px 0 36px;
   font-size: 12px;
-  color: var(--c-text-3);
+  color: var(--c-text-2);
 }
 
 .footer h3 {
@@ -906,6 +906,16 @@ button {
 }
 
 .hero-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-dot::after {
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -913,7 +923,7 @@ button {
   transition: background 0.25s var(--ease), transform 0.25s var(--ease);
 }
 
-.hero-dot.active {
+.hero-dot.active::after {
   background: #fff;
   transform: scale(1.15);
 }
@@ -986,7 +996,7 @@ button {
 .video-hint {
   margin-top: 10px;
   font-size: 13px;
-  color: var(--c-text-3);
+  color: var(--c-text-2);
 }
 
 /* ---------------- 产业现状文字块 ---------------- */
@@ -1229,7 +1239,7 @@ button {
 .contact-label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--c-text-3);
+  color: var(--c-text-2);
   letter-spacing: 0.04em;
 }
 

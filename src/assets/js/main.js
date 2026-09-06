@@ -133,6 +133,12 @@ if (carousel && !reduceMotion) {
 
   show(0);
   play();
+
+  // 非首屏轮播图延迟加载：首帧只拉第一张，其余在 JS 初始化后再取
+  slides.forEach((s) => {
+    const img = s.querySelector('img');
+    if (img?.dataset.src) img.src = img.dataset.src;
+  });
 } else {
   // 无轮播逻辑时保证第一张可见（.hero-slide:not(:first-child) 已隐藏其余）
   carousel?.querySelector('.hero-slide')?.classList.add('active');
