@@ -86,6 +86,20 @@
       </div>
     </section>
 
+    <!-- 焰境影像：JS 从 /api/tv/latest 拉最新视频填充；无 JS / 无数据时整块隐藏不占位 -->
+    <section class="section tv-strip-wrap" id="tv-strip" hidden>
+      <div class="container-wide">
+        <div class="tv-strip-head reveal in">
+          <div>
+            <span class="tv-strip-kicker">焰境影像 · 万载TV</span>
+            <h2>看万载，从一集短剧开始</h2>
+          </div>
+          <a class="tv-strip-more" href="/tv/">进入频道 ›</a>
+        </div>
+        <div class="tv-strip-row" id="tv-strip-row"></div>
+      </div>
+    </section>
+
     <section class="cta-band">
       <div class="reveal">
         <h2>{{data.cta.title}}</h2>

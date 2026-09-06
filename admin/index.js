@@ -182,6 +182,8 @@ async function handleApi(request, env, path) {
   // 流式上传：视频 File 直作 PUT body（Worker 转发 request.body → R2，不整读内存）；封面 ≤5MB
   if (path === '/api/tv/upload' && method === 'PUT') return uploadVideoFile(env, request);
   if (path === '/api/tv/cover' && method === 'PUT') return uploadVideoCover(env, request);
+  // 从B站拉取信息：标题/简介/时长 + 封面转存 R2（B站图床有 Referer 防盗链，服务端抓回转存绕开）
+  if (path === '/api/tv/fetch-bili' && method === 'POST') return fetchBili(env, request);
 
   return json({ ok: false, error: 'not_found' }, 404);
 }
@@ -759,6 +761,9 @@ async function saveVideo(env, request, id) {
   const body = await request.json().catch(() => null);
   if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
 
+  // 剧集总封面（video_series 表，剧名非空时生效；不进 videos 字段集）
+  const seriesCover = String(body.series_cover ?? '').trim().slice(0, 300) || null;
+
   // 文本字段白名单（空串按 NULL 存）；数字字段单独整理
   const f = {};
   for (const [k, max] of Object.entries({
@@ -800,6 +805,7 @@ async function saveVideo(env, request, id) {
         f.duration || 0, f.series || null, f.episode || null, f.intro || null, f.featured || 0, f.status || 'published'
       )
       .run();
+    await upsertSeriesCover(env, f.series, seriesCover);
     return json({ ok: true, id: r.meta.last_row_id });
   }
 
@@ -838,7 +844,17 @@ async function saveVideo(env, request, id) {
   if (r2Key(old.cover) && old.cover !== newCover) {
     try { await env.MEDIA.delete(old.cover); } catch (err) { console.error('old cover cleanup failed:', err); }
   }
+  if (seriesCover) await upsertSeriesCover(env, f.series ?? old.series, seriesCover);
   return json({ ok: true });
+}
+
+/** 剧集总封面 upsert（video_series.name 与 videos.series 对应） */
+async function upsertSeriesCover(env, name, cover) {
+  if (!name || !cover) return;
+  await env.DB.prepare(
+    `INSERT INTO video_series (name, cover) VALUES (?1, ?2)
+     ON CONFLICT(name) DO UPDATE SET cover = ?2, updated_at = datetime('now')`
+  ).bind(name, cover).run();
 }
 
 async function removeVideo(env, id) {
@@ -872,6 +888,51 @@ async function uploadVideoFile(env, request) {
     return json({ ok: false, error: 'upload_failed' }, 500);
   }
   return json({ ok: true, key });
+}
+
+/** 从B站拉取视频信息：view API 取标题/简介/时长，封面转存 R2（键 tv/c-bili-<bvid>.<ext>，重抓覆盖幂等） */
+const BILI_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+
+async function fetchBili(env, request) {
+  const body = await request.json().catch(() => null);
+  const bvid = String(body?.bvid || '').trim();
+  if (!BVID_RE.test(bvid)) return json({ ok: false, error: 'bad_bvid' }, 400); // BV 号大小写敏感，不归一化
+  let data = null;
+  try {
+    const r = await fetch('https://api.bilibili.com/x/web-interface/view?bvid=' + bvid, {
+      headers: { 'user-agent': BILI_UA, referer: 'https://www.bilibili.com/' },
+    });
+    const d = await r.json().catch(() => null);
+    if (r.ok && d && d.code === 0 && d.data) data = d.data;
+  } catch { /* 网络/B站风控失败走下方统一报错 */ }
+  if (!data) return json({ ok: false, error: 'bili_api_failed' }, 502);
+  const { title, desc, duration, pic } = data;
+
+  // 封面转存 R2（best-effort：失败不阻塞，返回项 cover 为 null 时前端提示手传）
+  let cover = null;
+  if (pic && env.MEDIA) {
+    try {
+      const img = await fetch(pic.replace(/^http:/, 'https:'), { headers: { 'user-agent': BILI_UA } });
+      const buf = img.ok ? new Uint8Array(await img.arrayBuffer()) : null;
+      if (buf && buf.length && buf.length <= 10 * 1024 * 1024) {
+        const ct = (img.headers.get('content-type') || 'image/jpeg').split(';')[0];
+        const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
+        const key = `tv/c-bili-${bvid}.${ext}`;
+        await env.MEDIA.put(key, buf, { httpMetadata: { contentType: ct } });
+        cover = key;
+      }
+    } catch (err) {
+      console.error('bili cover fetch failed:', err);
+    }
+  }
+  return json({
+    ok: true,
+    title: String(title || '').slice(0, 80),
+    intro: String(desc || '').slice(0, 600),
+    duration: Math.max(0, Math.round(Number(duration) || 0)),
+    cover,
+  });
 }
 
 /** 封面上传：≤5MB，魔数校验 JPG/PNG/WebP（与商户门户 readImage 同款） */
@@ -1417,9 +1478,13 @@ ${BASE_CSS}
           <option value="upload">直接上传（MP4/WebM，≤95MB）</option>
         </select>
       </label>
-      <label id="row-bvid">B站 BV 号 *<input id="t-bvid" placeholder="BV1xx411c7mD"></label>
+      <label id="row-bvid">B站 BV 号 *<input id="t-bvid" placeholder="BV1xx411c7mD">
+        <button type="button" id="t-fetch" style="align-self:flex-start">从B站获取信息</button>
+        <span class="vhint">自动填标题 / 简介 / 时长，封面转存到站点（绕开B站防盗链）</span>
+      </label>
       <label id="row-file" style="display:none">视频文件（选文件自动读时长）<input id="t-file" type="file" accept="video/mp4,video/webm,.mp4,.m4v,.webm"><span class="vfile" id="t-fileinfo"></span></label>
       <label>剧名 / 合集（短剧用，可空）<input id="t-series" maxlength="60" placeholder="一朝相逢便是万载"></label>
+      <label id="row-scover" style="display:none">剧集总封面（货架竖版海报，≤5MB）<input id="t-scover" type="file" accept="image/jpeg,image/png,image/webp"><span class="vfile" id="t-scoverinfo"></span></label>
       <label>集数（可空）<input id="t-ep" type="number" min="1" max="9999"></label>
       <label>焦点位（频道页大位）
         <select id="t-feat">
@@ -1947,6 +2012,7 @@ el('mmore').addEventListener('click', function () { mState.offset += ${PAGE_SIZE
 /* ---------- 万载TV 视频管理（docs/万载TV方案.md） ---------- */
 var tState = { status: '', offset: 0 };
 var editingTvId = null;
+var tFetchedCover = null; // 「从B站获取信息」抓到的封面键（用户本地上传封面时优先本地）
 var V_CAT = { drama: '短剧', fireworks: '烟花', heritage: '非遗', food: '美食', tourism: '文旅', other: '其他' };
 var SITE_HOME = 'https://whizzzest.com';
 
@@ -2058,6 +2124,7 @@ function renderVideo(x) {
 
 function openTvForm(x) {
   editingTvId = x ? x.id : null;
+  tFetchedCover = null;
   el('tform-title').textContent = x ? '编辑视频 #' + x.id : '新增视频';
   el('t-title').value = x ? x.title || '' : '';
   el('t-cat').value = x ? x.category || 'drama' : 'drama';
@@ -2067,6 +2134,8 @@ function openTvForm(x) {
   el('t-file').value = '';
   el('t-fileinfo').textContent = '';
   el('t-series').value = x ? x.series || '' : '';
+  el('t-scover').value = '';
+  el('t-scoverinfo').textContent = '';
   el('t-ep').value = x && x.episode ? x.episode : '';
   el('t-feat').value = x && x.featured ? '1' : '0';
   el('t-dur').value = x && x.duration ? x.duration : '';
@@ -2074,6 +2143,7 @@ function openTvForm(x) {
   el('t-cover').value = '';
   el('t-coverinfo').textContent = x && x.cover ? '当前封面：' + x.cover : '';
   syncSrcRows();
+  syncSeriesRow();
   hint(null);
   el('tform').style.display = '';
   el('tform').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2087,6 +2157,41 @@ function syncSrcRows() {
   el('row-file').style.display = up ? '' : 'none';
 }
 el('t-src').addEventListener('change', syncSrcRows);
+
+// 剧集总封面位：填了剧名才出现
+function syncSeriesRow() {
+  el('row-scover').style.display = val('t-series') ? '' : 'none';
+}
+el('t-series').addEventListener('input', syncSeriesRow);
+
+// 从B站拉取信息：标题/简介/时长自动填 + 封面转存 R2（保存时随表单提交）
+el('t-fetch').addEventListener('click', function () {
+  var bvid = val('t-bvid');
+  // 注意 BV 号大小写敏感（base58），不可做大小写归一化
+  if (!/^BV[0-9A-Za-z]{8,12}$/.test(bvid)) { alert('请先填写正确的 BV 号'); return; }
+  var btn = el('t-fetch');
+  btn.disabled = true;
+  btn.textContent = '获取中…';
+  api('/api/tv/fetch-bili', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ bvid: bvid })
+  }).then(function (d) {
+    if (d.title) el('t-title').value = d.title;
+    if (d.intro) el('t-intro').value = d.intro;
+    if (d.duration) el('t-dur').value = d.duration;
+    if (d.cover) {
+      tFetchedCover = d.cover;
+      el('t-coverinfo').textContent = '封面已从B站获取（保存后生效）';
+    } else {
+      el('t-coverinfo').textContent = 'B站封面获取失败，可手动上传';
+    }
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') alert('获取失败：' + e.message);
+  }).then(function () {
+    btn.disabled = false;
+    btn.textContent = '从B站获取信息';
+  });
+});
 
 // 选文件即读元数据：时长自动带出 + 大小提示（95MB 上限，免费版请求体 100MB 留余量）
 el('t-file').addEventListener('change', function () {
@@ -2153,11 +2258,13 @@ el('tsave').addEventListener('click', function () {
   }
   var file = el('t-file').files && el('t-file').files[0];
   var cover = el('t-cover').files && el('t-cover').files[0];
+  var scover = el('row-scover').style.display !== 'none' ? (el('t-scover').files && el('t-scover').files[0]) : null;
   if (payload.source === 'upload' && !editingTvId && !file) { alert('请选择要上传的视频文件'); return; }
   if (file && file.size > 95 * 1048576) { alert('视频超过 95MB：请先压缩，或改用「B站嵌入」来源。'); return; }
   var ext = file ? (file.name.split('.').pop() || '').toLowerCase() : '';
   if (file && ['mp4', 'm4v', 'webm'].indexOf(ext) === -1) { alert('仅支持 MP4 / WebM 格式。'); return; }
   if (cover && cover.size > 5 * 1048576) { alert('封面图超过 5MB。'); return; }
+  if (scover && scover.size > 5 * 1048576) { alert('剧集封面超过 5MB。'); return; }
 
   var btn = el('tsave');
   btn.disabled = true;
@@ -2174,6 +2281,15 @@ el('tsave').addEventListener('click', function () {
       hint('封面上传中…');
       return putFile('/api/tv/cover', cover);
     }).then(function (d) { payload.cover = d.key; });
+  } else if (tFetchedCover) {
+    // 没传本地图但用「从B站获取信息」抓到了封面 → 随保存提交
+    payload.cover = tFetchedCover;
+  }
+  if (scover) {
+    seq = seq.then(function () {
+      hint('剧集封面上传中…');
+      return putFile('/api/tv/cover', scover);
+    }).then(function (d) { payload.series_cover = d.key; });
   }
   seq.then(function () {
     hint('保存中…');

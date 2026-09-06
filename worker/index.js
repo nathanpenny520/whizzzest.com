@@ -11,7 +11,7 @@
  */
 import { sendMail } from './smtp.js';
 import { handleMerchants } from './merchants.js';
-import { handleTv, handleMedia } from './tv.js';
+import { handleTv, handleMedia, handleTvLatest } from './tv.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
 const VID_COOKIE = 'vid';
@@ -34,6 +34,11 @@ export default {
 
     if (url.pathname === '/api/pv-dwell' && request.method === 'POST') {
       return handleDwell(request, env, ctx);
+    }
+
+    // 万载TV 最新视频（首页「焰境影像」条数据源，公开 JSON，docs/万载TV方案.md）
+    if (url.pathname === '/api/tv/latest' && request.method === 'GET') {
+      return handleTvLatest(env);
     }
 
     // 商户图片代理（R2 对象，merchant Worker 上传，M2）——不可浏览文档，直接返回不进访客采集

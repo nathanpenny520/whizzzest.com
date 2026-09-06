@@ -118,7 +118,7 @@ async function tvHome(env, url, ctx) {
   const chrome = await getChrome(env);
   const cat = CATEGORIES[url.searchParams.get('cat')] ? url.searchParams.get('cat') : '';
 
-  const [featured, list] = await Promise.all([
+  const [featured, list, scovers] = await Promise.all([
     env.DB.prepare(`SELECT * FROM videos WHERE ${PUB_WHERE} AND featured = 1 ORDER BY id DESC LIMIT 1`).first(),
     env.DB
       .prepare(
@@ -126,8 +126,11 @@ async function tvHome(env, url, ctx) {
       )
       .bind(...(cat ? [cat] : []))
       .all(),
+    env.DB.prepare('SELECT name, cover FROM video_series').all(),
   ]);
   const items = list.results || [];
+  // 剧集总封面（video_series 表，后台表单上传；缺省回退最新一集的封面）
+  const scMap = new Map((scovers.results || []).filter((r) => r.cover).map((r) => [r.name, r.cover]));
 
   // 短剧货架：series 聚合（卡片取集数最大的一集为入口，角标「更新至 N 集」）
   const seriesMap = new Map();
@@ -140,8 +143,12 @@ async function tvHome(env, url, ctx) {
     .sort((a, b) => b[1].id - a[1].id)
     .map(([name, latest]) => {
       const eps = items.filter((x) => x.series === name).length;
+      const sc = scMap.get(name);
+      const media = sc
+        ? `<img src="${esc(sc.startsWith('/') ? sc : '/media/' + sc)}" alt="${esc(name)}" loading="eager" decoding="async">`
+        : cardMedia(latest, true);
       return `<a class="tv-dcard" href="/tv/${latest.id}/">
-        <div class="tv-dmedia">${cardMedia(latest, true)}<span class="tv-dbadge">更新至 ${latest.episode || eps} 集</span></div>
+        <div class="tv-dmedia">${media}<span class="tv-dbadge">更新至 ${latest.episode || eps} 集</span></div>
         <h3>${esc(name)}</h3><p>${esc(CATEGORIES[latest.category] || '短剧')} · 共 ${eps} 集</p>
       </a>`;
     })
@@ -369,6 +376,35 @@ async function tvSitemap(env) {
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
     { headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' } }
   );
+}
+
+/* ---------------- /api/tv/latest（首页「焰境影像」条数据源，公开 JSON） ---------------- */
+
+// 60s 实例内缓存：首页每次浏览都会带一次该请求，量级小但没必要每次查 D1
+let tvLatestCache = { at: 0, items: [] };
+
+export async function handleTvLatest(env) {
+  if (Date.now() - tvLatestCache.at > 60 * 1000) {
+    const { results } = await env.DB
+      .prepare(`SELECT id, title, category, duration, cover FROM videos WHERE ${PUB_WHERE} ORDER BY id DESC LIMIT 6`)
+      .all();
+    tvLatestCache = {
+      at: Date.now(),
+      items: (results || []).map((v) => ({
+        id: v.id,
+        title: v.title,
+        cat: CATEGORIES[v.category] || '视频',
+        dur: Number(v.duration) || 0,
+        cover: v.cover ? (v.cover.startsWith('/') ? v.cover : '/media/' + v.cover) : '',
+      })),
+    };
+  }
+  return new Response(JSON.stringify({ ok: true, items: tvLatestCache.items }), {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, max-age=60',
+    },
+  });
 }
 
 /* ---------------- 工具 ---------------- */

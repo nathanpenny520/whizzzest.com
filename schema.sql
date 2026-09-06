@@ -136,3 +136,10 @@ CREATE TABLE IF NOT EXISTS videos (
 );
 CREATE INDEX IF NOT EXISTS idx_videos_pub ON videos(status, category, id DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_series ON videos(series);
+
+-- 剧集/合集级信息（2026-09-06）：货架「总封面」（竖版海报最佳）；name 与 videos.series 对应
+CREATE TABLE IF NOT EXISTS video_series (
+  name TEXT PRIMARY KEY,
+  cover TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);

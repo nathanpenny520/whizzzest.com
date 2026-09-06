@@ -161,6 +161,43 @@ if (carousel && !reduceMotion) {
   carousel?.querySelector('.hero-slide')?.classList.add('active');
 }
 
+/* 首页「焰境影像」条：拉 /api/tv/latest 渲染最新视频（失败静默，整块保持隐藏） */
+const tvStrip = document.getElementById('tv-strip');
+if (tvStrip) {
+  const escT = (s) =>
+    String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const stripDur = (sec) => {
+    sec = Number(sec) || 0;
+    if (sec <= 0) return '';
+    const m = Math.floor(sec / 60);
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  };
+  fetch('/api/tv/latest')
+    .then((r) => r.json())
+    .then((d) => {
+      const items = d && d.ok ? d.items : null;
+      if (!items || !items.length) return;
+      const row = document.getElementById('tv-strip-row');
+      row.innerHTML = items
+        .map(
+          (v) => `
+        <a class="tv-card" href="/tv/${Number(v.id)}/">
+          <div class="tv-media">${
+            v.cover
+              ? `<img src="${escT(v.cover)}" alt="${escT(v.title)}" loading="lazy" decoding="async">`
+              : '<span class="tv-ph" aria-hidden="true">焰</span>'
+          }${v.dur ? `<span class="tv-dur">${stripDur(v.dur)}</span>` : ''}</div>
+          <h3>${escT(v.title)}</h3>
+          <p class="tv-meta">${escT(v.cat)}</p>
+        </a>`
+        )
+        .join('');
+      tvStrip.hidden = false;
+    })
+    .catch(() => {});
+}
+
 /* 联系表单：fetch 提交 /api/contact，Honeypot 字段一并带上 */
 const form = document.getElementById('contact-form');
 form?.addEventListener('submit', async (e) => {
