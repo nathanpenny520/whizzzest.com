@@ -166,6 +166,7 @@ async function tvHome(env, url, ctx) {
     : `<div class="tv-empty"><p>节目筹备中，敬请期待。</p><p class="sub">视频素材持续更新中 —— 短剧、烟花、非遗、美食，一屏看尽焰火人间。</p></div>`;
 
   const body = `
+    <div class="tv-page">
     <section class="tv-hero">
       <div class="container-wide">
         <p class="tv-kicker">万载TV · WANZHAI TV</p>
@@ -180,7 +181,8 @@ async function tvHome(env, url, ctx) {
     <section class="tv-main"><div class="container-wide">
       <nav class="tv-tabs" aria-label="视频分类">${tabs}</nav>
       ${grid}
-    </div></section>`;
+    </div></section>
+    </div>`;
 
   return htmlResponse(
     pageShell(chrome, {
@@ -283,6 +285,7 @@ async function tvDetail(env, url, ctx, id) {
   };
 
   const body = `
+    <div class="tv-page">
     <section class="tv-detail"><div class="container-wide">
       <nav class="tv-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/tv/">万载TV</a><span>/</span><b>${esc(v.title)}</b></nav>
       <div class="tv-detail-grid">
@@ -294,7 +297,8 @@ async function tvDetail(env, url, ctx, id) {
         </div>
         <aside class="tv-col-side">${sideHtml}</aside>
       </div>
-    </div></section>`;
+    </div></section>
+    </div>`;
 
   // 播放计数：详情页加载即 +1（不阻塞响应）
   if (ctx) {
@@ -443,7 +447,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd, needPlayerSc
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${esc(url)}">
-  <meta name="theme-color" content="#0d0d12">
+  <meta name="theme-color" content="#2b1208">
   <meta property="og:site_name" content="焰境·万载">
   <meta property="og:type" content="video.other">
   <meta property="og:title" content="${esc(title)}">

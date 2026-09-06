@@ -305,6 +305,18 @@ button {
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.05;
+  /* 柔和暗晕：暖橙照片上保证渐变文字可读 */
+  filter: drop-shadow(0 3px 22px rgba(0, 0, 0, 0.35));
+}
+
+/* 大字落日金橙渐变（白 → 金 → 橙）；clip:text 不支持时保持纯白 */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .hero h1 {
+    background-image: linear-gradient(135deg, #ffffff 0%, #ffe3ae 38%, #f7a54b 72%, #ef6a30 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 .hero .hero-sub {
@@ -932,7 +944,8 @@ a.feature-card:hover {
 }
 
 .hero-slide:not(:first-child) {
-  visibility: hidden; /* 无 JS：仅显示第一张 */
+  visibility: hidden;
+  opacity: 0; /* 与 .js 状态同值：避免加 .js 时 opacity 1→0 触发 1.1s 过渡，闪出无 src 图的 alt 文本（Safari） */
 }
 
 .js .hero-slide {
@@ -949,6 +962,7 @@ a.feature-card:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  color: transparent; /* 纯装饰轮播（aria-hidden）：Safari 对无 src/加载失败的图会绘制 alt 文本，不绘制 */
 }
 
 .hero-overlay {
@@ -2104,7 +2118,6 @@ a.feature-card:hover {
 
 .tv-hero {
   padding: 72px 0 56px;
-  background: #0d0d12;
   color: #f5f5f7;
 }
 
@@ -2251,7 +2264,6 @@ a.feature-card:hover {
 /* 短剧货架：9:16 竖版卡横向滑动 */
 .tv-shelf {
   padding: 8px 0 48px;
-  background: #0d0d12;
   color: #f5f5f7;
 }
 
@@ -2330,9 +2342,13 @@ a.feature-card:hover {
 }
 
 /* 分类 Tab + 视频网格 */
+.tv-page {
+  background: linear-gradient(180deg, #2b1208, #1c0d06 45%, #150a05);
+  color: #f5f5f7;
+}
+
 .tv-main {
   padding: 8px 0 96px;
-  background: #0d0d12;
   color: #f5f5f7;
 }
 
@@ -2435,7 +2451,6 @@ a.feature-card:hover {
 /* 详情页：左播放器右选集/相关 */
 .tv-detail {
   padding: 40px 0 96px;
-  background: #0d0d12;
   color: #f5f5f7;
 }
 
@@ -2814,7 +2829,7 @@ a.feature-card:hover {
   color: var(--c-text-2);
 }
 
-.bk-main { padding: 28px 0 96px; background: #fbf9f6; }
+.bk-main { padding: 44px 0 112px; background: #fbf9f6; }
 
 .bk-search {
   display: flex;
@@ -2855,8 +2870,8 @@ a.feature-card:hover {
 .bk-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 28px;
+  gap: 12px;
+  margin-bottom: 44px;
 }
 
 .bk-tab {
@@ -2882,7 +2897,7 @@ a.feature-card:hover {
 .bk-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 40px 22px;
+  gap: 56px 28px;
 }
 
 .bk-card {
@@ -2969,19 +2984,21 @@ a.feature-card:hover {
 .bk-empty .sub { margin-top: 8px; font-size: 13px; color: var(--c-text-3); }
 
 .bk-cta {
-  margin-top: 72px;
-  padding: 48px 40px;
-  background: #14141a;
+  margin-top: 96px;
+  padding: 52px 40px;
+  background: linear-gradient(135deg, #2b1208, #4a1d0e);
   color: #f5f5f7;
   border-radius: 24px;
   text-align: center;
 }
 
+.bk-cta .btn { margin-top: 26px; }
+
 .bk-cta h2 { font-size: clamp(22px, 3vw, 32px); letter-spacing: -0.01em; }
 .bk-cta p { margin-top: 12px; color: rgba(245, 245, 247, 0.7); }
 
 /* 详情页 */
-.bk-detail { padding: 40px 0 96px; background: #fbf9f6; }
+.bk-detail { padding: 48px 0 112px; background: #fbf9f6; }
 
 .bk-crumb {
   margin-bottom: 24px;
@@ -2996,7 +3013,7 @@ a.feature-card:hover {
 
 .bk-head {
   display: flex;
-  gap: 32px;
+  gap: 40px;
   align-items: flex-start;
 }
 
@@ -3049,7 +3066,7 @@ div.bk-cover {
   display: inline-block;
 }
 
-.bk-toc { margin-top: 48px; }
+.bk-toc { margin-top: 64px; }
 
 .bk-toc h2 {
   font-size: 18px;
@@ -3080,7 +3097,7 @@ div.bk-cover {
 
 /* 阅读页：米色纸感 + 限宽 */
 .bk-read {
-  padding: 48px 22px 96px;
+  padding: 56px 22px 112px;
   background: #faf8f4;
   min-height: 60vh;
 }
