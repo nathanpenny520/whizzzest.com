@@ -20,7 +20,7 @@ OUT = "src/data"
 IMG = {
     "fireworks": "wanzaihuapao.jpg",
     "deshenggu": "deshengu.jpg",
-    "xiaBu": "xiabu.png",
+    "xiaBu": "xiabu.jpg",
     "kaiKouNuo": "kaikounuo.jpeg",
     "zhiPeng": "zhipengshange.jpg",
     # 非遗板块旧站为视频，图片仅作低配回退/海报备用
@@ -153,7 +153,7 @@ def main():
         "hero": home["hero"],
         "carousel": [
             {"img": f, "alt": alt, "ar": img_ar(f)}
-            for f, alt in (("yzxf_bswz.jpeg", "一朝相逢，便是万载"), ("guchen_xuejing.png", "万载古城"), ("sanshiba_pool.jpeg", "三十把水库"), ("xianyuanyanxue.jpg", "万载仙源研学"))
+            for f, alt in (("yzxf_bswz.jpeg", "一朝相逢，便是万载"), ("guchen_xuejing.jpg", "万载古城"), ("sanshiba_pool.jpeg", "三十把水库"), ("xianyuanyanxue.jpg", "万载仙源研学"))
         ],
         "featuresTitle": home["features"]["title"],
         "features": [
