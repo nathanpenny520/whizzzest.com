@@ -153,6 +153,41 @@ function buildPage(dirName, site) {
   };
 
   html = render(html, ctx);
+
+  // JSON-LD 结构化数据：每页 WebPage + 面包屑；首页附 Organization / WebSite（弊病 4 收尾项）
+  const jsonld = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: meta.title,
+    description: meta.description,
+    url: ctx.page.url,
+    inLanguage: 'zh-CN',
+    isPartOf: { '@id': `${SITE_URL}/#website` },
+  };
+  if (dirName === 'index') {
+    jsonld['@graph'] = [
+      {
+        '@type': 'Organization',
+        '@id': `${SITE_URL}/#organization`,
+        name: site.name,
+        url: `${SITE_URL}/`,
+        email: site.email,
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE_URL}/#website`,
+        name: site.name,
+        url: `${SITE_URL}/`,
+        inLanguage: 'zh-CN',
+        publisher: { '@id': `${SITE_URL}/#organization` },
+      },
+    ];
+  }
+  html = html.replace(
+    '</head>',
+    `  <script type="application/ld+json">${JSON.stringify(jsonld)}</script>\n</head>`
+  );
+
   const is404 = dirName === '404';
   // 404 页输出为 dist/404.html（Workers not_found_handling: "404-page" 约定）；其余为 <name>/index.html
   const outDir = dirName === 'index' || is404 ? DIST : path.join(DIST, dirName);
