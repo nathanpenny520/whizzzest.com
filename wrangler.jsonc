@@ -10,6 +10,13 @@
     "not_found_handling": "404-page",
     "run_worker_first": true
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whizzzest",
+      "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
+    }
+  ],
   "routes": [
     { "pattern": "whizzzest.com", "custom_domain": true },
     { "pattern": "www.whizzzest.com", "custom_domain": true }

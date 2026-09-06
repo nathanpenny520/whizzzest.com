@@ -134,6 +134,29 @@
             {{/each}}
           </ul>
         </div>
+
+        <form class="contact-form reveal" id="contact-form" novalidate>
+          <div class="form-row">
+            <label class="form-field">
+              <span class="form-label">姓名</span>
+              <input type="text" name="name" required maxlength="50" placeholder="怎么称呼您" autocomplete="name">
+            </label>
+            <label class="form-field">
+              <span class="form-label">邮箱（选填）</span>
+              <input type="email" name="email" maxlength="100" placeholder="用于回复您" autocomplete="email">
+            </label>
+          </div>
+          <label class="form-field">
+            <span class="form-label">留言</span>
+            <textarea name="message" required maxlength="2000" rows="5" placeholder="想说的内容……"></textarea>
+          </label>
+          <!-- Honeypot：对用户隐藏，机器人填了即静默丢弃 -->
+          <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="form-foot">
+            <button class="btn" type="submit">发送留言</button>
+            <p class="form-status" role="status" aria-live="polite"></p>
+          </div>
+        </form>
       </div>
     </section>
 

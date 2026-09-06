@@ -1495,3 +1495,84 @@ button {
 .contact-links {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
 }
+
+/* ---------------- 联系表单 ---------------- */
+
+.contact-form {
+  max-width: 720px;
+  margin: 56px auto 0;
+  background: var(--c-bg);
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  display: grid;
+  gap: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: 1fr; }
+}
+
+.form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.contact-form input,
+.contact-form textarea {
+  font: inherit;
+  font-size: 16px;
+  color: var(--c-text);
+  background: var(--c-bg-alt);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  background: var(--c-bg);
+  border-color: var(--c-accent);
+}
+
+.contact-form input::placeholder,
+.contact-form textarea::placeholder {
+  color: var(--c-text-3);
+}
+
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.form-foot {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.form-status {
+  font-size: 14px;
+  color: var(--c-text-2);
+}
+
+.form-status.ok { color: #1a7f37; }
+.form-status.err { color: var(--c-accent); }

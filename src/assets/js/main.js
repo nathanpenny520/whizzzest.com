@@ -137,3 +137,46 @@ if (carousel && !reduceMotion) {
   // 无轮播逻辑时保证第一张可见（.hero-slide:not(:first-child) 已隐藏其余）
   carousel?.querySelector('.hero-slide')?.classList.add('active');
 }
+
+/* 联系表单：fetch 提交 /api/contact，Honeypot 字段一并带上 */
+const form = document.getElementById('contact-form');
+form?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const status = form.querySelector('.form-status');
+  const btn = form.querySelector('button[type="submit"]');
+  const data = Object.fromEntries(new FormData(form).entries());
+
+  if (!data.name?.trim() || !data.message?.trim()) {
+    status.textContent = '请填写姓名和留言内容。';
+    status.className = 'form-status err';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = '发送中……';
+  status.className = 'form-status';
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.ok && out.ok) {
+      status.textContent = '已收到，谢谢您的留言！';
+      status.className = 'form-status ok';
+      form.reset();
+    } else if (out.error === 'rate_limited') {
+      status.textContent = '发送太频繁，请稍后再试。';
+      status.className = 'form-status err';
+    } else {
+      status.textContent = '发送失败，请稍后重试或直接邮件联系。';
+      status.className = 'form-status err';
+    }
+  } catch {
+    status.textContent = '网络异常，请稍后重试。';
+    status.className = 'form-status err';
+  } finally {
+    btn.disabled = false;
+  }
+});
