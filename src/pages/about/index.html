@@ -1,4 +1,4 @@
-<!-- {"title":"关于 — 焰境·万载","description":"焰境·万载——以「中国花炮之乡」千年烟花文化为核心的万载数字文旅站。联系我们：whizzzest@outlook.com","ogImage":"/assets/img/site_intro_1.jpg"} -->
+<!-- {"title":"关于 — 焰境·万载","description":"焰境·万载团队介绍——项目背景、使命愿景、发展历程、合作伙伴与全部联系方式。","ogImage":"/assets/img/student-team.jpg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,28 +6,28 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <h1>{{data.title}}</h1>
-      <p class="hero-sub">{{data.desc}}</p>
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+      </div>
     </section>
 
-    <section class="section" style="padding-top: 24px;">
+    <section class="section">
       <div class="container">
         <div class="section-head reveal">
-          <h2>{{data.contact}}</h2>
+          <h2>{{data.team.title}}</h2>
         </div>
-        <div style="text-align:center;">
-          <a class="btn" href="mailto:{{data.email}}">{{data.email}}</a>
-        </div>
-
-        <div class="section-head reveal" style="margin-top: 88px;">
-          <h2>关注我们</h2>
-        </div>
-        <div class="qr-grid reveal">
-          {{#each data.codes as code}}
-          <div class="qr-card">
-            <img src="/assets/img/{{code.img}}" alt="{{code.name}}二维码" loading="lazy" decoding="async">
-            <p>{{code.name}}</p>
+        <div class="grid grid-3">
+          {{#each data.team.members as member}}
+          <div class="team-card reveal">
+            <span class="team-avatar" aria-hidden="true">{{member.name}}</span>
+            <h3>{{member.name}}</h3>
+            <p class="team-role">{{member.role}}</p>
+            <p class="team-desc">{{member.description}}</p>
           </div>
           {{/each}}
         </div>
@@ -35,18 +35,93 @@
     </section>
 
     <section class="section section-alt">
-      <div class="container-wide">
+      <div class="container">
         <div class="section-head reveal">
-          <h2>链接</h2>
+          <h2>{{data.background.title}}</h2>
         </div>
-        <div class="chip-row reveal" style="justify-content:center; gap: 28px;">
-          {{#each data.links as link}}
-          <a class="btn-text" href="{{link.href}}" target="_blank" rel="noopener">{{link.label}} ↗</a>
+        <div class="grid grid-2">
+          <div class="feature-card reveal">
+            <h3>{{data.background.originTitle}}</h3>
+            <p>{{data.background.originDesc}}</p>
+          </div>
+          <div class="feature-card reveal">
+            <h3>{{data.background.goalTitle}}</h3>
+            <p>{{data.background.goalDesc}}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.mission.title}}</h2>
+        </div>
+        <div class="grid grid-2">
+          <div class="feature-card reveal">
+            <h3>{{data.mission.missionTitle}}</h3>
+            <p>{{data.mission.missionDesc}}</p>
+          </div>
+          <div class="feature-card reveal">
+            <h3>{{data.mission.visionTitle}}</h3>
+            <p>{{data.mission.visionDesc}}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.timeline.title}}</h2>
+        </div>
+        <ol class="timeline-events">
+          {{#each data.timeline.events as event}}
+          <li class="reveal">
+            <span class="event-date">{{event.date}}</span>
+            <div class="event-body">
+              <h3>{{event.title}}</h3>
+              <p>{{event.description}}</p>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.partners.title}}</h2>
+        </div>
+        <div class="grid grid-4 reveal">
+          {{#each data.partners.list as partner}}
+          <div class="partner-card">
+            {{#if partner.href}}<a href="{{partner.href}}" target="_blank" rel="noopener">{{partner.name}} ↗</a>{{/if}}
+            {{#unless partner.href}}<span>{{partner.name}}</span>{{/unless}}
+          </div>
           {{/each}}
         </div>
-        <div class="gallery reveal" style="margin-top: 64px;">
-          {{#each data.gallery as g}}
-          <img src="/assets/img/{{g.img}}" alt="{{g.alt}}" loading="lazy" decoding="async">
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.contact.title}}</h2>
+        </div>
+        <div class="grid grid-3">
+          {{#each data.contact.channels as ch}}
+          <div class="feature-card contact-card reveal">
+            <p class="contact-label">{{ch.label}}</p>
+            {{#if ch.qr}}
+            <img class="contact-qr" src="/assets/img/{{ch.qr}}" alt="{{ch.label}}二维码" loading="lazy" decoding="async">
+            {{/if}}
+            <p class="contact-value">
+              {{#if ch.href}}<a href="{{ch.href}}" target="_blank" rel="noopener">{{ch.value}} ↗</a>{{/if}}
+              {{#unless ch.href}}{{ch.value}}{{/unless}}
+            </p>
+          </div>
           {{/each}}
         </div>
       </div>

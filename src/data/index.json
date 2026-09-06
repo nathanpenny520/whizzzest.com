@@ -4,45 +4,60 @@
     "subtitle": "探索千年烟花文化，体验非遗魅力，品味特色美食，领略万载风光",
     "cta": "查看旅游线路"
   },
+  "carousel": [
+    {
+      "img": "yzxf_bswz.jpeg",
+      "alt": "一朝相逢，便是万载"
+    },
+    {
+      "img": "guchen_xuejing.png",
+      "alt": "万载古城"
+    },
+    {
+      "img": "sanshiba_pool.jpeg",
+      "alt": "三十把水库"
+    },
+    {
+      "img": "xianyuanyanxue.jpg",
+      "alt": "万载仙源研学"
+    }
+  ],
   "featuresTitle": "核心特色",
   "features": [
     {
       "title": "千年烟花文化",
-      "desc": "万载拥有1400多年的烟花生产历史，乃\"中国花炮之乡\"。",
-      "img": "wanzaihuapao.jpg",
-      "href": "/industry/"
+      "desc": "万载拥有1400多年的烟花生产历史，乃\"中国花炮之乡\"。"
     },
     {
       "title": "特色美食特产",
-      "desc": "品尝万载六大碗、万载百合、罗城扎粉等特色美食，感受赣西独特的饮食文化。",
-      "img": "liudawan.jpeg",
-      "href": "/cuisine/"
+      "desc": "品尝万载六大碗、万载百合、罗城扎粉等特色美食，感受赣西独特的饮食文化。"
     },
     {
       "title": "丰富旅游资源",
-      "desc": "万载古城、竹山洞、九龙原始森林等众多景点，满足不同游客的旅游需求。",
-      "img": "guchen_xuejing.png",
-      "href": "/tourism/"
+      "desc": "万载古城、竹山洞、九龙原始森林等众多景点，满足不同游客的旅游需求。"
     }
   ],
-  "teasers": [
+  "sections": [
     {
       "title": "非遗文化",
-      "desc": "花炮、得胜鼓、开口傩、夏布织造——探秘国家级非物质文化遗产。",
-      "img": "nuowu.jpeg",
-      "href": "/heritage/"
+      "desc": "万载拥有丰富的非物质文化遗产，包括万载花炮、得胜鼓、万载开口傩、夏布织造等。这些传统文化遗产承载着万载人民的智慧和创造力，是万载文化的重要组成部分。",
+      "learnMore": "了解更多",
+      "href": "/heritage/",
+      "img": "nuowu.jpeg"
     },
     {
       "title": "美食特产",
-      "desc": "六大碗、百合、扎粉……赣西山水的馈赠，舌尖上的万载。",
-      "img": "guchen_yanhua.jpeg",
-      "href": "/cuisine/"
+      "desc": "万载美食以其独特的风味和制作工艺闻名，万载六大碗、万载剁肉、罗城扎粉等传统菜肴，以及百合粉、南酸枣糕等特产，都是不可错过的舌尖美味。",
+      "learnMore": "了解更多",
+      "href": "/cuisine/",
+      "img": "liudawan.jpeg"
     },
     {
       "title": "烟花产业",
-      "desc": "中国四大花炮主产区之一，1400 年窑火不熄。",
-      "img": "huapao_future.jpeg",
-      "href": "/industry/"
+      "desc": "万载作为中国四大花炮主产区之一，烟花产业历史悠久，技术先进。近年来，万载花炮产业不断转型升级，产品畅销全球，成为当地的支柱富民产业之一。",
+      "learnMore": "了解更多",
+      "href": "/industry/",
+      "img": "longhu_yanhuowanhui.jpeg"
     }
   ],
   "cta": {

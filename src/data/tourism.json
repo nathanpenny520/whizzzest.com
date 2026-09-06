@@ -1,108 +1,94 @@
 {
   "hero": {
     "title": "旅游线路",
-    "subtitle": "精选万载旅游路线"
+    "subtitle": "精选万载旅游路线",
+    "img": "wanzai_travelling.jpeg"
   },
-  "cta": {
-    "title": "开始您的万载之旅",
-    "desc": "选择适合您的旅游线路，体验万载的千年文化、自然风光和红色根基。",
-    "cta": "查看赏烟地点"
-  },
+  "routesTitle": "行程安排",
   "routes": [
     {
-      "key": "ancient",
-      "title": "古城文化之旅",
+      "name": "古城文化之旅",
+      "nameEn": "Ancient City Cultural Tour",
+      "description": "上午：游览万载古城 → 中午：万载厨房品尝美食 → 下午：夏布织造、得胜鼓 → 晚上：焰火之吻烟花秀",
       "img": "guc_wenhua_tra.jpg",
-      "schedule": [
+      "stops": [
         {
-          "time": "上午",
-          "desc": "上午：抵达万载，游览万载古城，参观古祠堂群、历史文化馆、宗祠文化馆、国学文化馆"
+          "order": 1,
+          "name": "万载古城",
+          "desc": "游览古祠堂群、历史文化馆"
         },
         {
-          "time": "中午",
-          "desc": "中午：在万载厨房（古城店）品尝万载特色美食"
+          "order": 2,
+          "name": "万载厨房",
+          "desc": "品尝万载特色美食"
         },
         {
-          "time": "下午",
-          "desc": "下午：体验夏布织造技艺，观看得胜鼓表演"
+          "order": 3,
+          "name": "夏布织造体验",
+          "desc": "体验夏布织造技艺"
         },
         {
-          "time": "晚上",
-          "desc": "晚上：观看\"焰火之吻\"烟花秀，品尝万载夜市美食"
+          "order": 4,
+          "name": "焰火之吻烟花秀",
+          "desc": "观看烟花表演"
         }
       ]
     },
     {
-      "key": "mountain",
-      "title": "山水文化之旅",
-      "img": "sanshiba_pool.jpeg",
-      "schedule": [
+      "name": "山水文化之旅",
+      "nameEn": "Mountain & Water Cultural Tour",
+      "description": "上午：竹山洞、恒晖艺术农业 → 中午：农家菜 → 下午：九龙原始森林漂流 → 晚上：龙湖公园烟花",
+      "img": "shans_wenhua_tra.jpeg",
+      "stops": [
         {
-          "time": "上午",
-          "desc": "上午：游览竹山洞景区、万载恒晖艺术农业景区"
+          "order": 1,
+          "name": "竹山洞景区",
+          "desc": "游览溶洞奇观"
         },
         {
-          "time": "中午",
-          "desc": "中午：品尝农家菜，品尝万载味道"
+          "order": 2,
+          "name": "恒晖艺术农业景区",
+          "desc": "艺术农业观光"
         },
         {
-          "time": "下午",
-          "desc": "下午：游览九龙原始森林，在漂流中感受自然风光"
+          "order": 3,
+          "name": "九龙原始森林",
+          "desc": "森林漂流体验"
         },
         {
-          "time": "晚上",
-          "desc": "晚上：在龙湖公园看花炮文化节，感受夜幕下坠落的\"流星\""
+          "order": 4,
+          "name": "龙湖公园",
+          "desc": "观赏烟花文化节"
         }
       ]
     },
     {
-      "key": "red",
-      "title": "红色文化之旅",
+      "name": "红色文化之旅",
+      "nameEn": "Red Culture Tour",
+      "description": "上午：革命纪念馆 → 中午：红军餐 → 下午：仙源革命旧址群 → 晚上：非遗展演、烟花秀",
       "img": "hongs_wenhua_tra.jpg",
-      "schedule": [
+      "stops": [
         {
-          "time": "上午",
-          "desc": "上午：参观湘鄂赣革命纪念馆，万载革命烈士纪念馆"
+          "order": 1,
+          "name": "湘鄂赣革命纪念馆",
+          "desc": "参观革命纪念馆"
         },
         {
-          "time": "中午",
-          "desc": "中午：体验红军餐，感受先辈精神"
+          "order": 2,
+          "name": "革命烈士纪念馆",
+          "desc": "缅怀革命先烈"
         },
         {
-          "time": "下午",
-          "desc": "下午：参观仙源湘鄂赣革命根据地旧址群，重走红军小道"
+          "order": 3,
+          "name": "仙源革命根据地旧址",
+          "desc": "重走红军小道"
         },
         {
-          "time": "晚上",
-          "desc": "晚上：欣赏非遗展演，观看烟花秀，品尝万载特色美食"
+          "order": 4,
+          "name": "万载古城",
+          "desc": "非遗展演、烟花秀"
         }
       ]
-    }
-  ],
-  "gallery": [
-    {
-      "img": "guchen_niaokan.jpeg",
-      "alt": "万载古城鸟瞰"
-    },
-    {
-      "img": "guchen_xuejing.png",
-      "alt": "古城雪景"
-    },
-    {
-      "img": "sanshiba_pool.jpeg",
-      "alt": "三十把水库"
-    },
-    {
-      "img": "xianyuanyanxue.jpg",
-      "alt": "仙源红色研学"
-    },
-    {
-      "img": "mountains.jpeg",
-      "alt": "九龙原始森林"
-    },
-    {
-      "img": "longhu_yanhuowanhui.jpeg",
-      "alt": "龙湖烟花晚会"
     }
   ]
 }

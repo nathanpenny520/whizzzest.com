@@ -1,48 +1,151 @@
 {
-  "title": "关于焰境·万载",
-  "desc": "焰境·万载是一个展示江西省万载县烟花文化、非遗传承、美食特产和旅游风光的现代化文旅展示网站。",
-  "contact": "联系我们",
-  "email": "whizzzest@outlook.com",
-  "codes": [
-    {
-      "name": "万载人民政府",
-      "img": "wanzai_gov_QR.jpg"
-    },
-    {
-      "name": "万载文旅",
-      "img": "wanzai_wenlv_QR.jpg"
-    },
-    {
-      "name": "焰境·万载",
-      "img": "wxofficial.jpg"
-    }
-  ],
-  "links": [
-    {
-      "label": "GitHub",
-      "href": "https://github.com/nathanpenny520/WhizzZest.git"
-    },
-    {
-      "label": "Gitee",
-      "href": "https://gitee.com/nathanpenny520/WhizzZest.git"
-    },
-    {
-      "label": "抖音",
-      "href": "https://www.douyin.com/user/MS4wLjABAAAAhy0jc-hMIansK5QmD-5fikKmvNrSA2qUn9qmDNFTsqOoVZX0TJa4VoLiNU-bBP_f"
-    }
-  ],
-  "gallery": [
-    {
-      "img": "site_intro_1.jpg",
-      "alt": "焰境·万载 团队掠影 1"
-    },
-    {
-      "img": "site_intro_2.jpg",
-      "alt": "焰境·万载 团队掠影 2"
-    },
-    {
-      "img": "site_intro_3.jpg",
-      "alt": "焰境·万载 团队掠影 3"
-    }
-  ]
+  "hero": {
+    "title": "关于我们",
+    "subtitle": "焰境·万载团队介绍",
+    "img": "student-team.jpg"
+  },
+  "team": {
+    "title": "我们的团队",
+    "members": [
+      {
+        "name": "龙紫琴",
+        "role": "项目负责人",
+        "description": "统筹全局战略规划与团队协作，协调各方资源整合，确保项目高效推进与核心目标的精准达成。"
+      },
+      {
+        "name": "聂磐",
+        "role": "技术架构师",
+        "description": "主导网站全栈开发与系统架构设计，运用前沿技术栈构建高性能平台，打造流畅的用户交互体验。"
+      },
+      {
+        "name": "黄婧瑶",
+        "role": "品牌运营总监",
+        "description": "统筹新媒体矩阵运营与品牌传播策略，策划创意内容营销，持续提升平台影响力与用户触达率。"
+      },
+      {
+        "name": "龙子萱",
+        "role": "视频创意总监",
+        "description": "主导视觉内容的策划与制作，运用影像艺术语言生动展现万载烟花文化的独特魅力与深厚底蕴。"
+      },
+      {
+        "name": "闻可佳",
+        "role": "内容战略总监",
+        "description": "制定平台内容规划与项目方案撰写，深度挖掘文化价值内涵，输出专业文案与品牌叙事体系。"
+      },
+      {
+        "name": "Claude AI",
+        "role": "智能赋能助手",
+        "description": "基于前沿人工智能技术，为团队提供智能创作支持与效率赋能，协助内容生成、技术优化与创意策划，推动项目数字化转型与智能化升级。"
+      }
+    ]
+  },
+  "background": {
+    "title": "项目背景",
+    "originTitle": "创立初衷",
+    "originDesc": "焰境·万载由一群热爱家乡文化的北京高校在读生发起，我们希望通过现代技术手段，让更多人了解万载这座拥有千年烟花文化的小城。",
+    "goalTitle": "推广目标",
+    "goalDesc": "我们的目标是用AI技术赋能万载文旅，通过互联网传播万载的独特魅力，吸引更多游客前来体验花炮之乡的璀璨风情，同时助力当地文旅产业高质量发展。"
+  },
+  "mission": {
+    "title": "使命与愿景",
+    "missionTitle": "我们的使命",
+    "missionDesc": "传承与弘扬万载千年烟花文化，让每一位访客都能感受到这座城市的热情与魅力。我们致力于打造最全面的万载文旅信息平台，让游客轻松规划行程，深度体验当地文化。",
+    "visionTitle": "我们的愿景",
+    "visionDesc": "成为万载文旅数字化转型和新媒体矩阵构建的标杆，与当地企业、政府部门紧密合作，让\"焰境·万载\"成为国内外游客了解万载的重要入口。未来，我们计划将这一发展路径从万载推广开来，打造成为县域经济实现破局发展的关键方案。"
+  },
+  "timeline": {
+    "title": "发展历程",
+    "events": [
+      {
+        "date": "2025年12月",
+        "title": "项目启动",
+        "description": "团队正式组建，完成项目可行性分析与市场调研，确立平台定位与发展战略，启动技术研发准备工作。"
+      },
+      {
+        "date": "2026年1-2月",
+        "title": "产品研发",
+        "description": "完成平台原型设计与核心功能开发，采用Vue 3 + Tailwind CSS前沿技术栈，构建高性能用户体验框架，实现非遗文化、美食特产等核心模块上线。"
+      },
+      {
+        "date": "2026年2月末",
+        "title": "正式发布",
+        "description": "平台正式上线运营，面向公众开放访问，完成首轮用户测试与功能优化，确立品牌形象与市场定位。"
+      },
+      {
+        "date": "2026年4月",
+        "title": "品牌运营",
+        "description": "启动新媒体矩阵运营战略，构建微信公众号、抖音等多元化宣传渠道，持续拓展用户触达路径，提升平台品牌影响力。"
+      }
+    ]
+  },
+  "partners": {
+    "title": "合作伙伴",
+    "list": [
+      {
+        "name": "万载县文旅局",
+        "href": ""
+      },
+      {
+        "name": "万载古城景区",
+        "href": "http://zgwzgc.com/"
+      },
+      {
+        "name": "彩天艺术焰火",
+        "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb"
+      },
+      {
+        "name": "泰麟花炮",
+        "href": "http://www.wztlhp.com/"
+      }
+    ]
+  },
+  "contact": {
+    "title": "联系我们",
+    "emailLabel": "电子邮箱",
+    "email": "whizzzest@outlook.com",
+    "channels": [
+      {
+        "label": "电子邮箱",
+        "value": "whizzzest@outlook.com",
+        "href": "mailto:whizzzest@outlook.com",
+        "qr": ""
+      },
+      {
+        "label": "官方抖音",
+        "value": "焰境·万载",
+        "href": "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8",
+        "qr": ""
+      },
+      {
+        "label": "微信公众号",
+        "value": "云上万载-焰遇乡旅",
+        "href": "",
+        "qr": "wxofficial.jpg"
+      },
+      {
+        "label": "在线咨询",
+        "value": "企业客服",
+        "href": "https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8",
+        "qr": ""
+      },
+      {
+        "label": "微信视频号",
+        "value": "焰境·万载",
+        "href": "",
+        "qr": "videoaccount.jpeg"
+      },
+      {
+        "label": "小红书",
+        "value": "焰境·万载",
+        "href": "https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4",
+        "qr": ""
+      },
+      {
+        "label": "万载文旅",
+        "value": "万载县文旅局",
+        "href": "",
+        "qr": "wanzai_wenlv_QR.jpeg"
+      }
+    ]
+  }
 }

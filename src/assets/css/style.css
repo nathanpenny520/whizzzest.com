@@ -820,3 +820,442 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   v2.3.1 内容核对增补：轮播 / 内页图 Hero / 视频 / 站点列表等
+   ============================================================ */
+
+/* ---------------- 首页 Hero 轮播 ---------------- */
+
+.hero-carousel {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.hero-slide {
+  position: absolute;
+  inset: 0;
+}
+
+.hero-slide:not(:first-child) {
+  visibility: hidden; /* 无 JS：仅显示第一张 */
+}
+
+.js .hero-slide {
+  visibility: visible;
+  opacity: 0;
+  transition: opacity 1.1s var(--ease);
+}
+
+.js .hero-slide.active {
+  opacity: 1;
+}
+
+.hero-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.hero-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 0.25s var(--ease), color 0.25s var(--ease);
+}
+
+.hero-arrow:hover {
+  background: rgba(255, 255, 255, 0.32);
+  color: #fff;
+}
+
+.hero-arrow svg {
+  width: 20px;
+  height: 20px;
+}
+
+.hero-arrow-prev { left: 16px; }
+.hero-arrow-next { right: 16px; }
+
+.hero-dots {
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  transition: background 0.25s var(--ease), transform 0.25s var(--ease);
+}
+
+.hero-dot.active {
+  background: #fff;
+  transform: scale(1.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .hero-slide { transition: none; }
+}
+
+/* ---------------- 内页图 Hero ---------------- */
+
+.hero-inner {
+  min-height: min(56vh, 520px);
+}
+
+.hero-inner .hero-content {
+  padding: 72px 22px 64px;
+}
+
+.hero-inner h1 {
+  font-size: clamp(36px, 5.5vw, 60px);
+}
+
+.hero-inner .hero-sub {
+  font-size: clamp(17px, 2.2vw, 22px);
+}
+
+/* ---------------- 图文分栏补充 ---------------- */
+
+.split-rev .split-media {
+  order: 2;
+}
+
+@media (max-width: 833px) {
+  .split-rev .split-media { order: 0; }
+}
+
+.split-title {
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.split-link {
+  margin-top: 18px;
+}
+
+.split-body > p {
+  margin-top: 12px;
+}
+
+.split-body .split-title + p {
+  margin-top: 14px;
+}
+
+/* ---------------- 视频嵌入 ---------------- */
+
+.video-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.video-hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+
+/* ---------------- 产业现状文字块 ---------------- */
+
+.prose-block {
+  max-width: 720px;
+  margin: 0 auto 40px;
+}
+
+.prose-block:last-child {
+  margin-bottom: 0;
+}
+
+.prose-block h3 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.prose-block p {
+  margin-top: 10px;
+  font-size: 16px;
+  color: var(--c-text-2);
+  line-height: 1.65;
+}
+
+/* ---------------- 通用两列 ---------------- */
+
+.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 833px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ---------------- 旅游线路：逐站行程 ---------------- */
+
+.route-desc {
+  margin-top: 10px;
+  font-size: 15px;
+  color: var(--c-text-2);
+}
+
+.stops {
+  margin-top: 22px;
+}
+
+.stops li {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--c-hairline);
+  align-items: start;
+}
+
+.stops li:last-child {
+  border-bottom: 0;
+}
+
+.stop-no {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.stops h4 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.stops p {
+  margin-top: 3px;
+  font-size: 14px;
+  color: var(--c-text-2);
+  line-height: 1.55;
+}
+
+/* ---------------- 赏烟贴士 ---------------- */
+
+.spot-meta {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--c-text-2);
+}
+
+.spot-meta strong {
+  color: var(--c-text);
+}
+
+.tip-list {
+  margin-top: 14px;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.tip-list li {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--c-text-2);
+  line-height: 1.55;
+}
+
+/* ---------------- 关于页：团队 / 时间线 / 合作 / 联系 ---------------- */
+
+.team-card {
+  padding: 32px 28px;
+  background: var(--c-bg-alt);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.team-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--c-accent), #f2a03d);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.team-card h3 {
+  margin-top: 14px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.team-role {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-accent);
+}
+
+.team-desc {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--c-text-2);
+  line-height: 1.55;
+}
+
+.timeline-events {
+  max-width: 720px;
+  margin: 0 auto;
+  border-left: 2px solid var(--c-hairline);
+  padding-left: 28px;
+  list-style: none;
+}
+
+.timeline-events li {
+  position: relative;
+  padding: 0 0 40px 20px;
+}
+
+.timeline-events li::before {
+  content: "";
+  position: absolute;
+  left: -35px;
+  top: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+
+.event-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-accent);
+  letter-spacing: 0.04em;
+}
+
+.event-body h3 {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.event-body p {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--c-text-2);
+  line-height: 1.6;
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1023px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .grid-4 { grid-template-columns: 1fr; }
+}
+
+.partner-card {
+  padding: 26px 20px;
+  background: var(--c-bg-alt);
+  border-radius: 16px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.partner-card a {
+  color: var(--c-accent);
+}
+
+.partner-card a:hover {
+  text-decoration: underline;
+}
+
+.contact-card {
+  text-align: center;
+}
+
+.contact-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-3);
+  letter-spacing: 0.04em;
+}
+
+.contact-qr {
+  width: 100%;
+  max-width: 150px;
+  margin: 14px auto 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.contact-value {
+  margin-top: 12px;
+  font-size: 15px;
+}
+
+.contact-value a {
+  color: var(--c-accent);
+}
+
+.contact-value a:hover {
+  text-decoration: underline;
+}
+
+/* ---------------- CTA 带底色变体 ---------------- */
+
+.cta-band:not(.section-alt) {
+  background: var(--c-bg);
+}

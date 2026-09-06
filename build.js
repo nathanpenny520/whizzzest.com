@@ -103,7 +103,14 @@ function render(tpl, ctx) {
     tpl = tpl.slice(0, m.index) + out + tpl.slice(closeMatch.index + closeMatch[0].length);
   }
 
-  // 3. 渲染剩余 {{var}} / {{{var}}}
+  // 3. 条件块（放在 each 之后：each 体内经递归 render 时框架已带 @index）
+  //    {{#if expr}} 真值渲染 ｜ {{#unless expr}} 假值渲染 ｜ {{#if_first}} @index===1 ｜ {{#if_odd}} 奇数
+  tpl = tpl.replace(/\{\{#if\s+([\w@][\w.@]*)\}\}([\s\S]*?)\{\{\/if\}\}/g, (_, expr, b) => (resolvePath(ctx, expr) ? b : ''));
+  tpl = tpl.replace(/\{\{#unless\s+([\w@][\w.@]*)\}\}([\s\S]*?)\{\{\/unless\}\}/g, (_, expr, b) => (resolvePath(ctx, expr) ? '' : b));
+  tpl = tpl.replace(/\{\{#if_first\}\}([\s\S]*?)\{\{\/if_first\}\}/g, (_, b) => (ctx['@index'] === 1 ? b : ''));
+  tpl = tpl.replace(/\{\{#if_odd\}\}([\s\S]*?)\{\{\/if_odd\}\}/g, (_, b) => ((ctx['@index'] ?? 0) % 2 === 1 ? b : ''));
+
+  // 4. 渲染剩余 {{var}} / {{{var}}}
   return renderFragment(tpl, ctx);
 }
 

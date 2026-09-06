@@ -66,3 +66,38 @@ if (reduceMotion || !('IntersectionObserver' in window)) {
 for (const el of document.querySelectorAll('.js-year')) {
   el.textContent = String(new Date().getFullYear());
 }
+
+/* 首页 Hero 轮播（交叉淡入；无 JS / reduced-motion 时静止第一张） */
+const carousel = document.getElementById('hero-carousel');
+if (carousel && !reduceMotion) {
+  const slides = [...carousel.querySelectorAll('.hero-slide')];
+  const dots = [...document.querySelectorAll('.hero-dot')];
+  let current = 0;
+  let timer = null;
+
+  const show = (i) => {
+    current = (i + slides.length) % slides.length;
+    slides.forEach((s, k) => s.classList.toggle('active', k === current));
+    dots.forEach((d, k) => d.classList.toggle('active', k === current));
+  };
+
+  const play = () => {
+    if (slides.length < 2) return;
+    stop();
+    timer = setInterval(() => show(current + 1), 5000);
+  };
+  const stop = () => timer && (clearInterval(timer), (timer = null));
+
+  document.querySelector('.hero-arrow-prev')?.addEventListener('click', () => (show(current - 1), play()));
+  document.querySelector('.hero-arrow-next')?.addEventListener('click', () => (show(current + 1), play()));
+  dots.forEach((d, k) => d.addEventListener('click', () => (show(k), play())));
+  carousel.closest('.hero')?.addEventListener('mouseenter', stop);
+  carousel.closest('.hero')?.addEventListener('mouseleave', play);
+  document.addEventListener('visibilitychange', () => (document.hidden ? stop() : play()));
+
+  show(0);
+  play();
+} else {
+  // 无轮播逻辑时保证第一张可见（.hero-slide:not(:first-child) 已隐藏其余）
+  carousel?.querySelector('.hero-slide')?.classList.add('active');
+}

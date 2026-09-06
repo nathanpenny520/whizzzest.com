@@ -1,4 +1,4 @@
-<!-- {"title":"烟花产业 — 焰境·万载","description":"中国四大花炮主产区之一，1400 余年烟花爆竹生产史。从千年窑火到科技升级、文旅融合，读懂万载花炮产业。","ogImage":"/assets/img/wanzaihuapao.jpg"} -->
+<!-- {"title":"烟花产业 — 焰境·万载","description":"中国四大花炮主产区之一，1400 余年烟花爆竹生产史。产业规模 233 亿、出口 2.64 亿美元——读懂万载花炮产业。","ogImage":"/assets/img/longhu_yanhuowanhui.jpeg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,25 +6,77 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <h1>{{data.hero.title}}</h1>
-      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+      </div>
     </section>
 
-    <section class="section" style="padding-top: 24px;">
+    <section class="section">
       <div class="container">
-        {{#each data.sections as s}}
         <article class="split reveal">
           <div class="split-media">
-            <img src="/assets/img/{{s.img}}" alt="{{s.title}}" loading="lazy" decoding="async">
+            <div class="video-frame">
+              <iframe src="https://player.bilibili.com/player.html?bvid={{data.history.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{data.history.title}}视频"></iframe>
+            </div>
           </div>
           <div class="split-body">
-            <span class="kicker">0{{@index}} · 产业</span>
-            <h3>{{s.title}}</h3>
-            {{#each s.paras as p}}<p>{{p}}</p>{{/each}}
+            <span class="kicker">01 · 历史</span>
+            <h3>{{data.history.title}}</h3>
+            {{#each data.history.paras as p}}<p>{{p}}</p>{{/each}}
           </div>
         </article>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.status.title}}</h2>
+        </div>
+        {{#each data.status.blocks as block}}
+        <div class="prose-block reveal">
+          <h3>{{block.title}}</h3>
+          {{#each block.paras as p}}<p>{{p}}</p>{{/each}}
+        </div>
         {{/each}}
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <article class="split split-rev reveal">
+          <div class="split-media">
+            <img src="/assets/img/{{data.cultureTourism.img}}" alt="{{data.cultureTourism.title}}" loading="lazy" decoding="async">
+          </div>
+          <div class="split-body">
+            <span class="kicker">03 · 文旅</span>
+            <h3>{{data.cultureTourism.title}}</h3>
+            {{#each data.cultureTourism.paras as p}}<p>{{p}}</p>{{/each}}
+          </div>
+        </article>
+        <article class="split reveal">
+          <div class="split-media">
+            <img src="/assets/img/{{data.future.img}}" alt="{{data.future.title}}" loading="lazy" decoding="async">
+          </div>
+          <div class="split-body">
+            <span class="kicker">04 · 未来</span>
+            <h3>{{data.future.title}}</h3>
+            {{#each data.future.paras as p}}<p>{{p}}</p>{{/each}}
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="cta-band section-alt">
+      <div class="reveal">
+        <h2>{{data.cta.title}}</h2>
+        <p>{{data.cta.desc}}</p>
+        <a class="btn" href="{{data.cta.href}}">{{data.cta.btn}}</a>
       </div>
     </section>
 

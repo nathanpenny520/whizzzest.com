@@ -1,4 +1,4 @@
-<!-- {"title":"美食特产 — 焰境·万载","description":"万载六大碗、百合、罗城扎粉、南酸枣糕、番鸭……赣西山水的馈赠，品味万载特色美食与物产。","ogImage":"/assets/img/liudawan.jpeg"} -->
+<!-- {"title":"美食特产 — 焰境·万载","description":"万载六大碗、其他美食与传统特产——百合、罗城扎粉、南酸枣糕、表芯纸……赣西山水的馈赠。","ogImage":"/assets/img/liudawan.jpeg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,34 +6,24 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <h1>{{data.hero.title}}</h1>
-      <p class="hero-sub">{{data.hero.subtitle}}</p>
-    </section>
-
-    <section class="section" style="padding-top: 24px;">
-      <div class="container">
-        <article class="split reveal">
-          <div class="split-media">
-            <img src="/assets/img/{{data.featured.img}}" alt="{{data.featured.title}}" loading="eager" decoding="async">
-          </div>
-          <div class="split-body">
-            <span class="kicker">宴席之魂</span>
-            <h3>{{data.featured.title}}</h3>
-            {{#each data.featured.paras as p}}<p>{{p}}</p>{{/each}}
-          </div>
-        </article>
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
       </div>
     </section>
 
-    <section class="section section-alt">
+    {{#each data.groups as group}}
+    <section class="section{{#if_odd}} section-alt{{/if_odd}}">
       <div class="container-wide">
         <div class="section-head reveal">
-          <h2>赣西风味</h2>
-          <p>山珍河鲜、古法手作，万载的物产清单。</p>
+          <h2>{{group.title}}</h2>
         </div>
         <div class="grid grid-3">
-          {{#each data.dishes as d}}
+          {{#each group.dishes as d}}
           <div class="card reveal">
             <img class="card-media" src="/assets/img/{{d.img}}" alt="{{d.title}}" loading="lazy" decoding="async">
             <div class="card-body">
@@ -43,6 +33,15 @@
           </div>
           {{/each}}
         </div>
+      </div>
+    </section>
+    {{/each}}
+
+    <section class="cta-band">
+      <div class="reveal">
+        <h2>{{data.cta.title}}</h2>
+        <p>{{data.cta.desc}}</p>
+        <a class="btn" href="{{data.cta.href}}">{{data.cta.btn}}</a>
       </div>
     </section>
 

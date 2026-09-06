@@ -1,4 +1,4 @@
-<!-- {"title":"赏烟地点 — 焰境·万载","description":"万载古城、龙湖公园——最佳烟花观赏点位、观赏建议与交通指南。每周六晚八点，焰火之吻如约而至。","ogImage":"/assets/img/viewingspots_hero.jpeg"} -->
+<!-- {"title":"赏烟地点 — 焰境·万载","description":"万载古城、龙湖公园——最佳烟花观赏位置与交通指南。每周六晚八点，焰火之吻如约而至。","ogImage":"/assets/img/viewingspots_hero.jpeg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,28 +6,27 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <h1>{{data.hero.title}}</h1>
-      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+      </div>
     </section>
 
-    <section class="section" style="padding-top: 24px;">
+    <section class="section">
       <div class="container-wide">
-        <div class="grid" style="gap: 48px;">
+        <div class="grid grid-2">
           {{#each data.spots as spot}}
-          <article class="route-card reveal">
-            <img class="route-media" src="/assets/img/{{spot.img}}" alt="{{spot.name}}" loading="lazy" decoding="async">
-            <div class="route-body">
+          <article class="card reveal">
+            <img class="card-media" src="/assets/img/{{spot.img}}" alt="{{spot.name}}" loading="lazy" decoding="async">
+            <div class="card-body">
               <h3>{{spot.name}}</h3>
-              <p style="margin-top:12px; color: var(--c-text-2);">{{spot.desc}}</p>
-              <div class="chip-row">
-                <span class="chip-label">观赏点位</span>
-                <span class="chip">{{spot.viewing}}</span>
-              </div>
-              <div class="chip-row">
-                <span class="chip-label">交通</span>
-                <span class="chip">{{spot.transport}}</span>
-              </div>
+              <p>{{spot.desc}}</p>
+              <p class="spot-meta"><strong>{{data.viewingLabel}}：</strong>{{spot.viewing}}</p>
+              <p class="spot-meta"><strong>{{data.transportLabel}}：</strong>{{spot.transport}}</p>
             </div>
           </article>
           {{/each}}
@@ -38,11 +37,17 @@
     <section class="section section-alt">
       <div class="container">
         <div class="section-head reveal">
-          <h2>观赏贴士</h2>
+          <h2>{{data.tipsTitle}}</h2>
         </div>
-        <div class="prose reveal">
-          <p>{{data.bestViewing}}</p>
-          <p>{{data.transportation}}</p>
+        <div class="grid grid-2">
+          {{#each data.tips as tip}}
+          <div class="feature-card reveal">
+            <h3>{{tip.title}}</h3>
+            <ul class="tip-list">
+              {{#each tip.items as item}}<li>{{item}}</li>{{/each}}
+            </ul>
+          </div>
+          {{/each}}
         </div>
       </div>
     </section>

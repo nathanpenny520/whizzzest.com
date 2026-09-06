@@ -1,77 +1,99 @@
 #!/usr/bin/env python3
-"""One-off content extractor: 旧站 zh-CN.json → 新站 src/data/*.json
+"""内容提取器：旧站 zh-CN.json + locations.ts → 新站 src/data/*.json
 
-来源: reference/old-site/packages/frontend/src/locales/zh-CN.json
+来源:
+  reference/old-site/packages/frontend/src/locales/zh-CN.json   全部文案
+  reference/old-site/packages/frontend/src/data/locations.ts    travelRoutes（旅游线路站点）
 产物: src/data/site.json + 每页一个数据文件（字段结构见各文件）
-图片映射: 下方 IMG_MAP，key 按子串匹配旧资产文件名。
+图片/视频映射: 下方 IMG_RULES / VIDEO_BV，以旧站各 Page.vue 实际用到的资源为准。
 """
 import json
 import os
+import re
+import subprocess
 
 SRC = "reference/old-site/packages/frontend/src/locales/zh-CN.json"
+TS = "reference/old-site/packages/frontend/src/data/locations.ts"
 OUT = "src/data"
 
-# 旧板块 key → 新站图片文件名（子串匹配，按声明顺序取首个命中）
-IMG_RULES = [
-    (("fireworks", "huapaoqing"), "wanzaihuapao.jpg"),
-    (("desheng",), "deshengu.jpg"),
-    (("kaikou", "nuo"), "kaikounuo.jpeg"),
-    (("zhipeng",), "zhipengshange.jpg"),
-    (("xiabu",), "xiabu.png"),
-    (("nuowu", "nuo Dance"), "nuowu.jpeg"),
-    (("liudawan", "liuDaWan"), "liudawan.jpeg"),
-    (("fugui",), "fuguiyoujuan.jpeg"),
-    (("zharou2", "zha4"), "wanzaizha4rou.jpeg"),
-    (("zharonew", "zharou1", "zha1", "wanzaiZhaRou"), "wanzaizha1rou.jpeg"),
-    (("kuaiyu",), "wanzaikuaiyu.jpeg"),
-    (("kangle", "sanhuang"), "kanglesanhuangji.jpeg"),
-    (("qingdun", "heishan"), "qingdunheishanyang.jpeg"),
-    (("zhafen",), "luochenzhafen.jpeg"),
-    (("duorou",), "wanzaiduorou.jpeg"),
-    (("fanya",), "wanzaifanya.jpeg"),
-    (("baihe",), "baiheshenkai.jpeg"),
-    (("biaoxin",), "biaoxingzhi.jpeg"),
-    (("suanzao",), "nansuanzaogao.jpeg"),
-    (("history",), "wanzaihuapao.jpg"),
-    (("currentstatus",), "tailin-gongchang.jpg"),
-    (("tech",), "huapao_future.jpeg"),
-    (("culturetourism",), "longhu_yanhuowanhui.jpeg"),
-    (("future",), "moonuniverse.jpeg"),
-    (("ancientcity",), "guchen_yanhua.jpeg"),
-    (("longhupark",), "longhu_yanhuowanhui.jpeg"),
-]
+# 旧板块 key → 图片文件（与旧站 Page.vue 中每个板块实际引用一致）
+IMG = {
+    "fireworks": "wanzaihuapao.jpg",
+    "deshenggu": "deshengu.jpg",
+    "xiaBu": "xiabu.png",
+    "kaiKouNuo": "kaikounuo.jpeg",
+    "zhiPeng": "zhipengshange.jpg",
+    # 非遗板块旧站为视频，图片仅作低配回退/海报备用
+    "liuDaWan": "liudawan.jpeg",
+    "fuGuiYouJuan": "fuguiyoujuan.jpeg",
+    "wanzaiZhaRou": "wanzaizha1rou.jpeg",
+    "wanzaiZhaRou2": "wanzaizha4rou.jpeg",
+    "wanzaiKuaiYu": "wanzaikuaiyu.jpeg",
+    "kangLeSanHuangJi": "kanglesanhuangji.jpeg",
+    "qingDunHeiShanYang": "qingdunheishanyang.jpeg",
+    "luoChenZhaFen": "luochenzhafen.jpeg",
+    "wanzaiDuoRou": "wanzaiduorou.jpeg",
+    "wanzaiFanYa": "wanzaifanya.jpeg",
+    "wanzaiBaiHe": "baiheshenkai.jpeg",
+    "biaoXinZhi": "biaoxingzhi.jpeg",
+    "nanSuanZaoGao": "nansuanzaogao.jpeg",
+}
+
+# 非遗板块视频（CulturePage.vue 中 5 个 B 站 iframe，按页面顺序）
+HERITAGE_ORDER = ["fireworks", "deshenggu", "xiaBu", "kaiKouNuo", "zhiPeng"]
+VIDEO_BV = {
+    "fireworks": "BV1mLL86BEET",
+    "deshenggu": "BV1psL86aEJG",
+    "xiaBu": "BV1tLL86BEwB",
+    "kaiKouNuo": "BV127L86TE24",
+    "zhiPeng": "BV127L86TE2o",
+}
+INDUSTRY_VIDEO = "BV147L86TEvP"  # IndustryPage.vue History Section
+
+DOUYIN_OFFICIAL = "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8"
+DOUYIN_WANZAI = "https://www.douyin.com/user/MS4wLjABAAAAhy0jc-hMIansK5QmD-5fikKmvNrSA2qUn9qmDNFTsqOoVZX0TJa4VoLiNU-bBP_f"
+XIAOHONGSHU = "https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4"
+WEIXIN_SERVICE = "https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8"
 
 
-def img_for(key: str) -> str:
-    k = key.lower()
-    for needles, img in IMG_RULES:
-        if any(n.lower() in k for n in needles):
-            return img
-    return ""
+def paras(*vals):
+    """过滤空值合并为段落数组"""
+    return [v for v in vals if v]
 
 
-def dict_to_items(d, with_img=True):
-    """{key: {title, desc, ...}} → [{key, title, desc..., paras[], img}]，保持声明顺序
+def dish(zh_food, key):
+    sec = zh_food["sections"][key]
+    return {"key": key, "title": sec["title"], "paras": paras(sec.get("desc1"), sec.get("desc")), "img": IMG[key]}
 
-    paras = 旧字段 desc/desc1/desc2/desc3 统一合并为段落数组，模板只需 {{#each paras}}。
+
+def travel_routes_from_ts():
+    """locations.ts 的 travelRoutes → JSON（利用 Node 原生 TS 类型剥离导入）"""
+    script = f"""
+      const m = await import('../{TS}');
+      console.log(JSON.stringify(m.travelRoutes.map(r => ({{
+        name: r.name, nameEn: r.nameEn, description: r.description,
+        img: '',
+        stops: r.locations.map(l => ({{ order: l.order, name: l.name, desc: l.description || '' }})),
+      }}))));
     """
-    items = []
-    for key, v in d.items():
-        if isinstance(v, str):
-            continue  # 纯字符串键留给专用处理
-        item = {"key": key, **v}
-        item["paras"] = [item[f] for f in ("desc", "desc1", "desc2", "desc3") if item.get(f)]
-        if with_img and "img" not in item:
-            item["img"] = img_for(key)
-        items.append(item)
-    return items
+    res = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        capture_output=True, text=True, check=True,
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
+    routes = json.loads(res.stdout.strip().splitlines()[-1])
+    img_map = {"古城文化之旅": "guc_wenhua_tra.jpg", "山水文化之旅": "shans_wenhua_tra.jpeg", "红色文化之旅": "hongs_wenhua_tra.jpg"}
+    for r in routes:
+        r["img"] = img_map.get(r["name"], "wanzai_travelling.jpeg")
+    return routes
 
 
 def main():
     zh = json.load(open(SRC, encoding="utf-8"))
     os.makedirs(OUT, exist_ok=True)
-
+    common = zh["common"]
     f = zh["footer"]
+
     site = {
         "name": zh["siteName"] if isinstance(zh.get("siteName"), str) else "焰境·万载",
         "tagline": zh["home"]["hero"]["title"],
@@ -92,7 +114,7 @@ def main():
             "friendLinks": [
                 {"label": f.get("wanzaiGov", "万载县人民政府"), "href": "http://www.wanzai.gov.cn/"},
                 {"label": f.get("chinaFireworks", "中国烟花爆竹协会"), "href": "https://www.chinafireworks.org.cn/"},
-                {"label": "万载发布 · 抖音", "href": "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8"},
+                {"label": "万载发布 · 抖音", "href": DOUYIN_OFFICIAL},
             ],
             "copyright": f.get("copyright", ""),
             "icpLines": [f["icp"]] if f.get("icp") else [],
@@ -100,94 +122,160 @@ def main():
         },
     }
 
-    home = {
-        "hero": zh["home"]["hero"],
-        "featuresTitle": zh["home"]["features"]["title"],
+    # ---------------- 首页 ----------------
+    home = zh["home"]
+    index = {
+        "hero": home["hero"],
+        "carousel": [
+            {"img": "yzxf_bswz.jpeg", "alt": "一朝相逢，便是万载"},
+            {"img": "guchen_xuejing.png", "alt": "万载古城"},
+            {"img": "sanshiba_pool.jpeg", "alt": "三十把水库"},
+            {"img": "xianyuanyanxue.jpg", "alt": "万载仙源研学"},
+        ],
+        "featuresTitle": home["features"]["title"],
         "features": [
-            {**zh["home"]["features"]["fireworks"], "img": "wanzaihuapao.jpg", "href": "/industry/"},
-            {**zh["home"]["features"]["food"], "img": "liudawan.jpeg", "href": "/cuisine/"},
-            {**zh["home"]["features"]["tourism"], "img": "guchen_xuejing.png", "href": "/tourism/"},
+            {"title": home["features"]["fireworks"]["title"], "desc": home["features"]["fireworks"]["desc"]},
+            {"title": home["features"]["food"]["title"], "desc": home["features"]["food"]["desc"]},
+            {"title": home["features"]["tourism"]["title"], "desc": home["features"]["tourism"]["desc"]},
         ],
-        "teasers": [
-            {"title": "非遗文化", "desc": "花炮、得胜鼓、开口傩、夏布织造——探秘国家级非物质文化遗产。", "img": "nuowu.jpeg", "href": "/heritage/"},
-            {"title": "美食特产", "desc": "六大碗、百合、扎粉……赣西山水的馈赠，舌尖上的万载。", "img": "guchen_yanhua.jpeg", "href": "/cuisine/"},
-            {"title": "烟花产业", "desc": "中国四大花炮主产区之一，1400 年窑火不熄。", "img": "huapao_future.jpeg", "href": "/industry/"},
+        "sections": [
+            {"title": home["culture"]["title"], "desc": home["culture"]["desc"], "learnMore": home["culture"]["learnMore"], "href": "/heritage/", "img": "nuowu.jpeg"},
+            {"title": home["food"]["title"], "desc": home["food"]["desc"], "learnMore": home["food"]["learnMore"], "href": "/cuisine/", "img": "liudawan.jpeg"},
+            {"title": home["industry"]["title"], "desc": home["industry"]["desc"], "learnMore": home["industry"]["learnMore"], "href": "/industry/", "img": "longhu_yanhuowanhui.jpeg"},
         ],
-        "cta": zh["home"]["cta"],
+        "cta": home["cta"],
     }
 
-    def page(src_key, out_key):
-        src = zh[src_key]
-        data = {"hero": src["hero"], "cta": src.get("cta")}
-        if "sections" in src:
-            data["sections"] = dict_to_items(src["sections"])
-        return data
+    # ---------------- 非遗文化（视频板块） ----------------
+    c = zh["culture"]
+    heritage = {
+        "hero": {**c["hero"], "img": "nuowu.jpeg"},
+        "videoHint": common["videoHint"],
+        "sections": [
+            {
+                "key": key,
+                "title": c["sections"][key]["title"],
+                "paras": paras(c["sections"][key].get("desc1"), c["sections"][key].get("desc2"), c["sections"][key].get("desc3")),
+                "video": VIDEO_BV[key],
+            }
+            for key in HERITAGE_ORDER
+        ],
+        "cta": {**c["cta"], "btn": common["viewRoutes"], "href": "/tourism/"},
+    }
 
-    heritage = page("culture", "heritage")
-    cuisine_src = dict(zh["food"]["sections"])
-    # otherFood / special / traditionalSpecialties 为汇总性条目，不适合做菜品卡片，剔除
-    for k in ("otherFood", "special", "traditionalSpecialties"):
-        cuisine_src.pop(k, None)
-    cuisine_sections = dict_to_items(cuisine_src)
-    # 第一道（六大碗）作为大图特写，其余进卡片网格
-    cuisine = {"hero": zh["food"]["hero"], "cta": zh["food"].get("cta"),
-               "featured": cuisine_sections[0] if cuisine_sections else None,
-               "dishes": cuisine_sections[1:]}
-    industry = page("industry", "industry")
+    # ---------------- 美食特产（三大组） ----------------
+    fd = zh["food"]
+    cuisine = {
+        "hero": {**fd["hero"], "img": "liudawan.jpeg"},
+        "groups": [
+            {"title": fd["sections"]["liuDaWan"]["title"], "dishes": [
+                dish(fd, k) for k in ("fuGuiYouJuan", "wanzaiZhaRou", "wanzaiZhaRou2", "wanzaiKuaiYu", "kangLeSanHuangJi", "qingDunHeiShanYang")
+            ]},
+            {"title": fd["sections"]["otherFood"]["title"], "dishes": [
+                dish(fd, k) for k in ("luoChenZhaFen", "wanzaiDuoRou", "wanzaiFanYa")
+            ]},
+            {"title": fd["sections"]["traditionalSpecialties"]["title"], "dishes": [
+                dish(fd, k) for k in ("wanzaiBaiHe", "biaoXinZhi", "nanSuanZaoGao")
+            ]},
+        ],
+        "cta": {**fd["cta"], "btn": fd["cta"].get("cta", common["viewRoutes"]), "href": "/tourism/"},
+    }
 
-    r = zh["routes"]["routes"]
-    tourism = {"hero": zh["routes"]["hero"], "cta": zh["routes"].get("cta"),
-               "routes": [
-                   {"key": "ancient", "title": r["ancient"], "img": "guc_wenhua_tra.jpg",
-                    "schedule": [{"time": "上午", "desc": r["ancientMorning"]}, {"time": "中午", "desc": r["ancientNoon"]}, {"time": "下午", "desc": r["ancientAfternoon"]}, {"time": "晚上", "desc": r["ancientEvening"]}]},
-                   {"key": "mountain", "title": r["mountain"], "img": "sanshiba_pool.jpeg",
-                    "schedule": [{"time": "上午", "desc": r["mountainMorning"]}, {"time": "中午", "desc": r["mountainNoon"]}, {"time": "下午", "desc": r["mountainAfternoon"]}, {"time": "晚上", "desc": r["mountainEvening"]}]},
-                   {"key": "red", "title": r["red"], "img": "hongs_wenhua_tra.jpg",
-                    "schedule": [{"time": "上午", "desc": r["redMorning"]}, {"time": "中午", "desc": r["redNoon"]}, {"time": "下午", "desc": r["redAfternoon"]}, {"time": "晚上", "desc": r["redEvening"]}]},
-               ],
-               "gallery": [
-                   {"img": "guchen_niaokan.jpeg", "alt": "万载古城鸟瞰"},
-                   {"img": "guchen_xuejing.png", "alt": "古城雪景"},
-                   {"img": "sanshiba_pool.jpeg", "alt": "三十把水库"},
-                   {"img": "xianyuanyanxue.jpg", "alt": "仙源红色研学"},
-                   {"img": "mountains.jpeg", "alt": "九龙原始森林"},
-                   {"img": "longhu_yanhuowanhui.jpeg", "alt": "龙湖烟花晚会"},
-               ]}
+    # ---------------- 烟花产业 ----------------
+    ind = zh["industry"]["sections"]
+    industry = {
+        "hero": {**zh["industry"]["hero"], "img": "longhu_yanhuowanhui.jpeg"},
+        "history": {
+            "title": ind["history"]["title"],
+            "paras": paras(ind["history"].get("desc1"), ind["history"].get("desc2")),
+            "video": INDUSTRY_VIDEO,
+        },
+        "status": {
+            "title": ind["currentStatus"]["title"],
+            "blocks": [
+                {"title": ind["currentStatus"]["scale"], "paras": paras(ind["currentStatus"].get("scaleDesc1"), ind["currentStatus"].get("scaleDesc2"))},
+                {"title": ind["currentStatus"]["market"], "paras": paras(ind["currentStatus"].get("marketDesc1"), ind["currentStatus"].get("marketDesc2"))},
+                {"title": ind["techUpgrade"]["title"], "paras": paras(ind["techUpgrade"].get("desc1"), ind["techUpgrade"].get("desc2"), ind["techUpgrade"].get("desc3"))},
+            ],
+        },
+        "cultureTourism": {"title": ind["cultureTourism"]["title"], "paras": paras(ind["cultureTourism"].get("desc1"), ind["cultureTourism"].get("desc2"), ind["cultureTourism"].get("desc3")), "img": "guchen_yanhua.jpeg"},
+        "future": {"title": ind["future"]["title"], "paras": paras(ind["future"].get("desc1"), ind["future"].get("desc2")), "img": "huapao_future.jpeg"},
+        "cta": {**zh["industry"]["cta"], "btn": zh["industry"]["cta"].get("cta", common["viewRoutes"]), "href": "/spots/"},
+    }
 
-    s = zh["viewingSpots"]["spots"]
-    spots = {"hero": zh["viewingSpots"]["hero"], "cta": zh["viewingSpots"].get("cta"),
-             "spots": [
-                 {"key": "ancientCity", "name": s["ancientCity"], "desc": s["ancientCityDesc1"],
-                  "viewing": s["ancientCityViewing"], "transport": s["ancientCityTransport"], "img": "guchen_yanhua.jpeg"},
-                 {"key": "longhuPark", "name": s["longhuPark"], "desc": s["longhuParkDesc1"],
-                  "viewing": s["longhuParkViewing"], "transport": s["longhuParkTransport"], "img": "longhu_yanhuowanhui.jpeg"},
-             ],
-             "bestViewing": s.get("bestViewing", ""), "transportation": s.get("transportation", "")}
+    # ---------------- 旅游线路（locations.ts travelRoutes） ----------------
+    rt = zh["routes"]
+    tourism = {
+        "hero": {**rt["hero"], "img": "wanzai_travelling.jpeg"},
+        "routesTitle": "行程安排",
+        "routes": travel_routes_from_ts(),
+    }
 
+    # ---------------- 赏烟地点 ----------------
+    vs = zh["viewingSpots"]
+    s = vs["spots"]
+    spots = {
+        "hero": {**vs["hero"], "img": "viewingspots_hero.jpeg"},
+        "viewingLabel": s["bestViewing"],
+        "transportLabel": s["transportation"],
+        "spots": [
+            {"name": s["ancientCity"], "desc": s["ancientCityDesc1"], "viewing": s["ancientCityViewing"], "transport": s["ancientCityTransport"], "img": "guchen_niaokan.jpeg"},
+            {"name": s["longhuPark"], "desc": s["longhuParkDesc1"], "viewing": s["longhuParkViewing"], "transport": s["longhuParkTransport"], "img": "longhu_niaokan.jpeg"},
+        ],
+        "tipsTitle": vs["tips"]["title"],
+        "tips": [
+            {"title": vs["tips"]["bestTime"], "items": [vs["tips"][f"time{i}"] for i in range(1, 6)]},
+            {"title": vs["tips"]["notice"], "items": [vs["tips"][f"notice{i}"] for i in range(1, 6)]},
+        ],
+    }
+
+    # ---------------- 关于 ----------------
+    ab = zh["about"]["sections"]
+    contact = ab["contact"]
     about = {
-        "title": f.get("about", "关于焰境·万载"),
-        "desc": f.get("aboutDesc", ""),
-        "contact": f.get("contact", "联系我们"),
-        "email": "whizzzest@outlook.com",
-        "codes": [
-            {"name": "万载人民政府", "img": "wanzai_gov_QR.jpg"},
-            {"name": "万载文旅", "img": "wanzai_wenlv_QR.jpg"},
-            {"name": "焰境·万载", "img": "wxofficial.jpg"},
-        ],
-        "links": [
-            {"label": "GitHub", "href": "https://github.com/nathanpenny520/WhizzZest.git"},
-            {"label": "Gitee", "href": "https://gitee.com/nathanpenny520/WhizzZest.git"},
-            {"label": "抖音", "href": "https://www.douyin.com/user/MS4wLjABAAAAhy0jc-hMIansK5QmD-5fikKmvNrSA2qUn9qmDNFTsqOoVZX0TJa4VoLiNU-bBP_f"},
-        ],
-        "gallery": [
-            {"img": "site_intro_1.jpg", "alt": "焰境·万载 团队掠影 1"},
-            {"img": "site_intro_2.jpg", "alt": "焰境·万载 团队掠影 2"},
-            {"img": "site_intro_3.jpg", "alt": "焰境·万载 团队掠影 3"},
-        ],
+        "hero": {**zh["about"]["hero"], "img": "student-team.jpg"},
+        "team": {
+            "title": ab["team"]["title"],
+            "members": [
+                {"name": ab["team"]["members"][f"member{i}"]["name"], "role": ab["team"]["members"][f"member{i}"]["role"], "description": ab["team"]["members"][f"member{i}"]["description"]}
+                for i in range(1, 7)
+            ],
+        },
+        "background": ab["background"],
+        "mission": ab["mission"],
+        "timeline": {
+            "title": ab["timeline"]["title"],
+            "events": [
+                {"date": ab["timeline"]["events"][f"event{i}"]["date"], "title": ab["timeline"]["events"][f"event{i}"]["title"], "description": ab["timeline"]["events"][f"event{i}"]["description"]}
+                for i in range(1, 5)
+            ],
+        },
+        "partners": {
+            "title": ab["partners"]["title"],
+            "list": [
+                {"name": ab["partners"]["list"]["partner1"]["name"], "href": ""},
+                {"name": ab["partners"]["list"]["partner2"]["name"], "href": "http://zgwzgc.com/"},
+                {"name": ab["partners"]["list"]["partner3"]["name"], "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb"},
+                {"name": ab["partners"]["list"]["partner4"]["name"], "href": "http://www.wztlhp.com/"},
+            ],
+        },
+        "contact": {
+            "title": contact["title"],
+            "emailLabel": contact["emailLabel"], "email": site["email"],
+            "channels": [
+                {"label": contact["emailLabel"], "value": site["email"], "href": f"mailto:{site['email']}", "qr": ""},
+                {"label": contact["douyinLabel"], "value": contact["douyin"], "href": DOUYIN_OFFICIAL, "qr": ""},
+                {"label": contact["wechatLabel"], "value": contact["wechat"], "href": "", "qr": "wxofficial.jpg"},
+                {"label": contact["serviceLabel"], "value": contact["service"], "href": WEIXIN_SERVICE, "qr": ""},
+                {"label": contact["videoLabel"], "value": contact["video"], "href": "", "qr": "videoaccount.jpeg"},
+                {"label": contact["xiaohongshuLabel"], "value": contact["xiaohongshu"], "href": XIAOHONGSHU, "qr": ""},
+                {"label": "万载文旅", "value": "万载县文旅局", "href": "", "qr": "wanzai_wenlv_QR.jpeg"},
+            ],
+        },
     }
 
     out_files = {
-        "site.json": site, "index.json": home, "heritage.json": heritage,
+        "site.json": site, "index.json": index, "heritage.json": heritage,
         "cuisine.json": cuisine, "industry.json": industry,
         "tourism.json": tourism, "spots.json": spots, "about.json": about,
     }
@@ -195,12 +283,6 @@ def main():
         with open(os.path.join(OUT, name), "w", encoding="utf-8") as fh:
             json.dump(data, fh, ensure_ascii=False, indent=2)
         print(f"wrote {name}")
-
-    # 报告未匹配到图片的条目，便于人工补映射
-    for name in ("heritage", "cuisine", "industry"):
-        for item in out_files[f"{name}.json"].get("sections", []):
-            if not item.get("img"):
-                print(f"!! {name} section without img: {item['key']}")
 
 
 if __name__ == "__main__":

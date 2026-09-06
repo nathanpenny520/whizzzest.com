@@ -1,4 +1,4 @@
-<!-- {"title":"非遗文化 — 焰境·万载","description":"万载花炮制作技艺、得胜鼓、开口傩、夏布织造、纸棚山歌——探秘江西万载国家级非物质文化遗产。","ogImage":"/assets/img/kaikounuo.jpeg"} -->
+<!-- {"title":"非遗文化 — 焰境·万载","description":"万载花炮制作技艺、得胜鼓、开口傩、夏布织造、纸棚山歌——探秘江西万载非物质文化遗产，附非遗影像视频。","ogImage":"/assets/img/nuowu.jpeg"} -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 {{> head}}
@@ -6,17 +6,25 @@
   {{> header}}
   <main id="main">
 
-    <section class="hero-flat">
-      <h1>{{data.hero.title}}</h1>
-      <p class="hero-sub">{{data.hero.subtitle}}</p>
+    <section class="hero hero-inner">
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="hero-content">
+        <h1>{{data.hero.title}}</h1>
+        <p class="hero-sub">{{data.hero.subtitle}}</p>
+      </div>
     </section>
 
-    <section class="section" style="padding-top: 24px;">
+    <section class="section">
       <div class="container">
         {{#each data.sections as s}}
         <article class="split reveal">
           <div class="split-media">
-            <img src="/assets/img/{{s.img}}" alt="{{s.title}}" loading="lazy" decoding="async">
+            <div class="video-frame">
+              <iframe src="https://player.bilibili.com/player.html?bvid={{s.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{s.title}}视频"></iframe>
+            </div>
+            <p class="video-hint">{{data.videoHint}}</p>
           </div>
           <div class="split-body">
             <span class="kicker">0{{@index}} · 非遗</span>
@@ -25,6 +33,14 @@
           </div>
         </article>
         {{/each}}
+      </div>
+    </section>
+
+    <section class="cta-band section-alt">
+      <div class="reveal">
+        <h2>{{data.cta.title}}</h2>
+        <p>{{data.cta.desc}}</p>
+        <a class="btn" href="{{data.cta.href}}">{{data.cta.btn}}</a>
       </div>
     </section>
 
