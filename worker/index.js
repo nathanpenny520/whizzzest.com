@@ -2,12 +2,17 @@
  * 单入口 Worker：
  *  - www → 裸域 301（方案 §8.2）
  *  - POST /api/contact  联系表单：Honeypot → D1（权威记录）→ 企业邮通知（尽力而为，§7）
+ *  - 文档导航请求 → 访客监控：第一方匿名 Cookie vid + D1 visits 表（ctx.waitUntil 不阻塞响应）
  *  - 其余请求交给静态资产（dist/）
  */
 import { sendMail } from './smtp.js';
 
+const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
+const VID_COOKIE = 'vid';
+const VID_MAX_AGE = 365 * 24 * 60 * 60;
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.hostname === 'www.whizzzest.com') {
@@ -19,9 +24,79 @@ export default {
       return handleContact(request, env);
     }
 
-    return env.ASSETS.fetch(request);
+    // 静态资产请求
+    const res = await env.ASSETS.fetch(request);
+
+    // 访客采集：仅针对「文档导航」（浏览器地址栏/链接访问），跳过脚本/样式/图片与爬虫
+    if (request.method === 'GET' && url.pathname !== '/api/contact') {
+      const dest = request.headers.get('sec-fetch-dest') || '';
+      const accept = request.headers.get('accept') || '';
+      const ua = request.headers.get('user-agent') || '';
+      const isDoc = dest === 'document' || (!dest && accept.includes('text/html'));
+      if (isDoc && !BOT_RE.test(ua)) {
+        const setCookie = trackVisit(request, env, ctx, url, ua);
+        if (setCookie) {
+          // ASSETS 返回的 Response 头不可变，包一层再追加 Cookie
+          const mutable = new Response(res.body, res);
+          mutable.headers.append('set-cookie', setCookie);
+          return mutable;
+        }
+      }
+    }
+
+    return res;
   },
 };
+
+/* ---------------- 访客采集 ---------------- */
+
+/**
+ * 记一次页面访问：读/发第一方匿名 Cookie（vid），D1 插入走 ctx.waitUntil 不阻塞。
+ * 采集字段：匿名 ID、路径、来源站、国家（边缘地理）、设备类型、UA、IP。
+ */
+function trackVisit(request, env, ctx, url, ua) {
+  try {
+    const cookie = request.headers.get('cookie') || '';
+    const m = cookie.match(new RegExp(`(?:^|;\\s*)${VID_COOKIE}=([A-Za-z0-9-]{10,64})`));
+    let vid = m ? m[1] : '';
+    let setCookie = '';
+    if (!vid) {
+      vid = crypto.randomUUID();
+      setCookie = `${VID_COOKIE}=${vid}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${VID_MAX_AGE}`;
+    }
+
+    const device = /Mobile|Android|iPhone/i.test(ua) ? 'mobile'
+      : /iPad|Tablet/i.test(ua) ? 'tablet' : 'desktop';
+    const ref = request.headers.get('referer') || '';
+    let refHost = '';
+    if (ref) {
+      try { refHost = new URL(ref).hostname; } catch { /* 非法 referer 留空 */ }
+    }
+
+    ctx.waitUntil(
+      env.DB.prepare(
+        'INSERT INTO visits (vid, path, referrer, country, device, ua, ip) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)'
+      )
+        .bind(
+          vid,
+          url.pathname,
+          refHost,
+          request.cf?.country || '',
+          device,
+          ua.slice(0, 250),
+          request.headers.get('cf-connecting-ip') || ''
+        )
+        .run()
+        .catch((err) => console.error('visit log failed:', err))
+    );
+    return setCookie;
+  } catch (err) {
+    console.error('trackVisit error:', err);
+    return '';
+  }
+}
+
+/* ---------------- 联系表单 ---------------- */
 
 /** 同 IP 简易限流：每隔离实例内 10 分钟最多 5 条 */
 const recent = new Map();

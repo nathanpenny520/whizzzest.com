@@ -10,6 +10,11 @@
  *  - POST /api/messages/:id/read 标记已读/未读 {read: true|false}
  *  - DELETE /api/messages/:id    删除留言
  *
+ * 访客分析（数据来自主站 Worker 写入的 visits 表）：
+ *  - GET  /api/stats             概览：今日/7天/累计 PV·UV + 热门页面/来源/国家（7天）
+ *  - GET  /api/visitors          访客列表（?offset=0），按匿名 Cookie ID / IP 分组
+ *  - GET  /api/visitors/:gid     单个访客的完整访问轨迹
+ *
  * 会话：无状态 HMAC 签名（过期时间戳 + 签名），改 ADMIN_SESSION_SECRET 即全体下线。
  * 凭据：wrangler secret 配 ADMIN_PASSWORD / ADMIN_SESSION_SECRET，不进代码、不进仓库。
  */
@@ -114,6 +119,12 @@ async function handleApi(request, env, path) {
     return listMessages(env, request);
   }
 
+  if (path === '/api/stats' && method === 'GET') return statsOverview(env);
+  if (path === '/api/visitors' && method === 'GET') return listVisitors(env, request);
+  if ((m = path.match(/^\/api\/visitors\/([A-Za-z0-9:%._-]+)$/)) && method === 'GET') {
+    return visitorDetail(env, decodeURIComponent(m[1]));
+  }
+
   return json({ ok: false, error: 'not_found' }, 404);
 }
 
@@ -216,6 +227,69 @@ async function removeMessage(env, id) {
   const { meta } = await env.DB.prepare('DELETE FROM messages WHERE id = ?1').bind(id).run();
   if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
   return json({ ok: true });
+}
+
+/* ---------------- 访客分析（D1 visits） ---------------- */
+
+// 北京时区「今日零点」的 UTC 表达（D1 created_at 存 UTC）
+const BJ_TODAY = "datetime('now','+8 hours','start of day','-8 hours')";
+const BJ_WEEK = "datetime('now','+8 hours','start of day','-8 hours','-6 days')";
+// 访客分组：优先匿名 Cookie ID；无 Cookie 时按 IP 归组（gid 前缀 anon:）
+const GID = "COALESCE(NULLIF(vid,''),'anon:'||COALESCE(ip,'x'))";
+
+async function statsOverview(env) {
+  const db = env.DB;
+  const [today, week, total, pages, refs, countries] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) pv, COUNT(DISTINCT ${GID}) uv FROM visits WHERE created_at >= ${BJ_TODAY}`).first(),
+    db.prepare(`SELECT COUNT(*) pv FROM visits WHERE created_at >= ${BJ_WEEK}`).first(),
+    db.prepare(`SELECT COUNT(*) pv, COUNT(DISTINCT ${GID}) uv FROM visits`).first(),
+    db.prepare(`SELECT path, COUNT(*) n FROM visits WHERE created_at >= ${BJ_WEEK} GROUP BY path ORDER BY n DESC LIMIT 8`).all(),
+    db.prepare(`SELECT COALESCE(NULLIF(referrer,''),'直接访问') ref, COUNT(*) n FROM visits WHERE created_at >= ${BJ_WEEK} GROUP BY ref ORDER BY n DESC LIMIT 8`).all(),
+    db.prepare(`SELECT COALESCE(NULLIF(country,''),'未知') country, COUNT(*) n FROM visits WHERE created_at >= ${BJ_WEEK} GROUP BY country ORDER BY n DESC LIMIT 8`).all(),
+  ]);
+  return json({
+    ok: true,
+    today_pv: today?.pv || 0,
+    today_uv: today?.uv || 0,
+    week_pv: week?.pv || 0,
+    total_pv: total?.pv || 0,
+    total_uv: total?.uv || 0,
+    top_pages: pages.results || [],
+    top_refs: refs.results || [],
+    top_countries: countries.results || [],
+  });
+}
+
+async function listVisitors(env, request) {
+  const url = new URL(request.url);
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const { results } = await env.DB
+    .prepare(
+      `SELECT ${GID} gid, COUNT(*) n, MIN(created_at) first, MAX(created_at) last,
+              MAX(country) country, MAX(device) device
+       FROM visits GROUP BY gid ORDER BY last DESC LIMIT ?1 OFFSET ?2`
+    )
+    .bind(PAGE_SIZE, offset)
+    .all();
+  const total = (await env.DB.prepare(`SELECT COUNT(DISTINCT ${GID}) n FROM visits`).first())?.n || 0;
+
+  return json({ ok: true, total, visitors: results || [] });
+}
+
+async function visitorDetail(env, gid) {
+  const where = `${GID} = ?1`;
+  const summary = await env.DB
+    .prepare(`SELECT COUNT(*) n, MIN(created_at) first, MAX(created_at) last FROM visits WHERE ${where}`)
+    .bind(gid)
+    .first();
+  const { results } = await env.DB
+    .prepare(
+      `SELECT path, referrer, country, device, created_at FROM visits WHERE ${where} ORDER BY created_at DESC LIMIT 200`
+    )
+    .bind(gid)
+    .all();
+  return json({ ok: true, gid, n: summary?.n || 0, first: summary?.first, last: summary?.last, views: results || [] });
 }
 
 /* ---------------- 工具 ---------------- */
@@ -386,21 +460,69 @@ ${FAVICON_LINK}
   .ops button { padding: 5px 12px; font-size: 12px; }
   .empty { color: #8a8a96; text-align: center; padding: 80px 0; font-size: 14px; }
   .more { display: block; margin: 24px auto 0; }
+  /* 访客分析 */
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
+  .card2 { background: #16161b; border: 1px solid #26262e; border-radius: 12px; padding: 18px 14px; text-align: center; }
+  .card2 b { display: block; font-size: 24px; font-weight: 600; }
+  .card2 span { display: block; margin-top: 4px; color: #8a8a96; font-size: 12px; }
+  .tops { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .top { background: #16161b; border: 1px solid #26262e; border-radius: 12px; padding: 16px 18px; }
+  .top h3 { font-size: 13px; color: #8a8a96; font-weight: 600; margin-bottom: 10px; }
+  .top li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 7px 0; border-bottom: 1px solid #1e1e26; word-break: break-all; }
+  .top li:last-child { border-bottom: 0; }
+  .top li b { color: #d64524; flex-shrink: 0; }
+  .top li.dim, .dim { color: #55555f; }
+  .sec { margin: 28px 0 4px; font-size: 14px; color: #8a8a96; font-weight: 600; }
+  .vrow { margin-top: 12px; padding: 14px 18px; background: #16161b; border: 1px solid #26262e; border-radius: 12px; cursor: pointer; }
+  .vrow:hover { border-color: #d64524; }
+  .vrow .r1 { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+  .vrow .vid { font-family: ui-monospace, Menlo, monospace; color: #e8e8ec; }
+  .vrow .dim { color: #8a8a96; }
+  .vrow .n { margin-left: auto; color: #d64524; font-weight: 600; }
+  .vdetail { padding: 4px 18px 14px; }
+  .vdetail table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .vdetail th { color: #8a8a96; font-weight: 600; text-align: left; }
+  .vdetail td, .vdetail th { padding: 6px 8px; border-bottom: 1px solid #1e1e26; text-align: left; color: #c9c9d2; word-break: break-all; }
+  @media (max-width: 860px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .tops { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>焰境·万载 · 后台<span>whizzzest.com</span></h1>
+  <button id="vtab-msg" class="tab active" type="button">留言</button>
+  <button id="vtab-visit" class="tab" type="button">访客</button>
   <button id="refresh" type="button">刷新</button>
   <button id="logout" type="button">退出</button>
 </header>
-<div class="tabs">
-  <button class="tab active" id="tab-unread" type="button">未读</button>
-  <button class="tab" id="tab-all" type="button">全部</button>
+<div id="view-msg">
+  <div class="tabs">
+    <button class="tab active" id="tab-unread" type="button">未读</button>
+    <button class="tab" id="tab-all" type="button">全部</button>
+  </div>
+  <p class="stats" id="stats"></p>
+  <div class="list" id="list"><p class="empty">加载中…</p></div>
+  <button class="more" id="more" type="button" style="display:none">加载更多</button>
 </div>
-<p class="stats" id="stats"></p>
-<div class="list" id="list"><p class="empty">加载中…</p></div>
-<button class="more" id="more" type="button" style="display:none">加载更多</button>
+<div id="view-visit" style="display:none">
+  <div class="cards">
+    <div class="card2"><b id="s-today-pv">–</b><span>今日浏览</span></div>
+    <div class="card2"><b id="s-today-uv">–</b><span>今日访客</span></div>
+    <div class="card2"><b id="s-week-pv">–</b><span>近 7 天浏览</span></div>
+    <div class="card2"><b id="s-total-pv">–</b><span>总浏览</span></div>
+    <div class="card2"><b id="s-total-uv">–</b><span>总访客</span></div>
+  </div>
+  <div class="tops">
+    <div class="top"><h3>热门页面（近 7 天）</h3><ul id="top-pages"></ul></div>
+    <div class="top"><h3>来源网站（近 7 天）</h3><ul id="top-refs"></ul></div>
+    <div class="top"><h3>国家 / 地区（近 7 天）</h3><ul id="top-countries"></ul></div>
+  </div>
+  <h3 class="sec">访客列表（点击展开访问轨迹）</h3>
+  <div class="list" id="vlist"><p class="empty">加载中…</p></div>
+  <button class="more" id="vmore" type="button" style="display:none">加载更多</button>
+</div>
 
 <script>
 var state = { filter: 'unread', offset: 0, total: 0, unread: 0 };
@@ -485,11 +607,97 @@ el('tab-all').addEventListener('click', function () {
   el('tab-all').classList.add('active'); el('tab-unread').classList.remove('active');
   load(true);
 });
-el('refresh').addEventListener('click', function () { load(true); });
+el('refresh').addEventListener('click', function () {
+  if (currentView === 'visit') { loadStats(); loadVisitors(true); } else { load(true); }
+});
 el('more').addEventListener('click', function () { state.offset += ${PAGE_SIZE}; load(false); });
 el('logout').addEventListener('click', function () {
   api('/api/logout', { method: 'POST' }).then(function () { location.href = '/login'; });
 });
+
+/* ---------- 访客分析 ---------- */
+var currentView = 'msg';
+var vOffset = 0;
+
+function showView(v) {
+  currentView = v;
+  el('view-msg').style.display = v === 'msg' ? '' : 'none';
+  el('view-visit').style.display = v === 'visit' ? '' : 'none';
+  el('vtab-msg').classList.toggle('active', v === 'msg');
+  el('vtab-visit').classList.toggle('active', v === 'visit');
+  if (v === 'visit') { loadStats(); loadVisitors(true); }
+}
+el('vtab-msg').addEventListener('click', function () { showView('msg'); });
+el('vtab-visit').addEventListener('click', function () { showView('visit'); });
+
+function loadStats() {
+  api('/api/stats').then(function (d) {
+    el('s-today-pv').textContent = d.today_pv;
+    el('s-today-uv').textContent = d.today_uv;
+    el('s-week-pv').textContent = d.week_pv;
+    el('s-total-pv').textContent = d.total_pv;
+    el('s-total-uv').textContent = d.total_uv;
+    fillList('top-pages', d.top_pages, 'path');
+    fillList('top-refs', d.top_refs, 'ref');
+    fillList('top-countries', d.top_countries, 'country');
+  }).catch(function () {});
+}
+
+function fillList(id, arr, key) {
+  el(id).innerHTML = (arr && arr.length)
+    ? arr.map(function (x) { return '<li><span>' + esc(x[key]) + '</span><b>' + x.n + '</b></li>'; }).join('')
+    : '<li class="dim">暂无数据</li>';
+}
+
+function loadVisitors(reset) {
+  if (reset) { vOffset = 0; el('vlist').innerHTML = '<p class="empty">加载中…</p>'; }
+  api('/api/visitors?offset=' + vOffset).then(function (d) {
+    var box = el('vlist');
+    if (reset) box.innerHTML = '';
+    if (reset && (!d.visitors || d.visitors.length === 0)) {
+      box.innerHTML = '<p class="empty">还没有访问记录</p>';
+      el('vmore').style.display = 'none';
+      return;
+    }
+    d.visitors.forEach(function (v) { box.appendChild(renderVisitor(v)); });
+    el('vmore').style.display = (vOffset + ${PAGE_SIZE} < d.total && d.visitors.length > 0) ? 'block' : 'none';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('vlist').innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+  });
+}
+
+function renderVisitor(v) {
+  var wrap = document.createElement('div');
+  var anon = v.gid.indexOf('anon:') === 0;
+  wrap.innerHTML =
+    '<div class="vrow"><div class="r1">' +
+    '<span class="vid">' + (anon ? '匿名访客' : esc(v.gid.slice(0, 13)) + '…') + '</span>' +
+    '<span class="dim">' + esc(v.country || '未知') + ' · ' + esc(v.device || '—') +
+    (anon ? ' · IP ' + esc(v.gid.slice(5)) : '') + '</span>' +
+    '<span class="dim">' + esc(fmtTime(v.first)) + ' ~ ' + esc(fmtTime(v.last)) + '</span>' +
+    '<span class="n">' + v.n + ' 次浏览</span></div></div>' +
+    '<div class="vdetail" style="display:none"></div>';
+  wrap.querySelector('.vrow').addEventListener('click', function () {
+    var det = wrap.querySelector('.vdetail');
+    var willOpen = det.style.display === 'none';
+    det.style.display = willOpen ? '' : 'none';
+    if (!willOpen || det.dataset.loaded) return;
+    det.innerHTML = '<p class="empty">加载中…</p>';
+    api('/api/visitors/' + encodeURIComponent(v.gid)).then(function (d) {
+      det.dataset.loaded = '1';
+      det.innerHTML = '<table><tr><th>时间（北京）</th><th>页面</th><th>来源</th><th>地区</th><th>设备</th></tr>' +
+        (d.views || []).map(function (w) {
+          return '<tr><td>' + esc(fmtTime(w.created_at)) + '</td><td>' + esc(w.path) + '</td><td>' +
+            esc(w.referrer || '直接访问') + '</td><td>' + esc(w.country || '—') + '</td><td>' + esc(w.device || '—') + '</td></tr>';
+        }).join('') + '</table>';
+    }).catch(function (e) {
+      det.innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
+    });
+  });
+  return wrap;
+}
+
+el('vmore').addEventListener('click', function () { vOffset += ${PAGE_SIZE}; loadVisitors(false); });
 
 load(true);
 </script>
