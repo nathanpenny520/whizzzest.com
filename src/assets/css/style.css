@@ -1475,3 +1475,23 @@ button {
     transition: none;
   }
 }
+
+/* ---------------- 关于页卡片对比度增强：灰底白卡 + 柔和投影 ---------------- */
+
+.team-card {
+  background: var(--c-bg);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+}
+
+.section .partner-card {
+  background: var(--c-bg-alt);
+}
+
+.section-alt .partner-card {
+  background: var(--c-bg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.contact-links {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
