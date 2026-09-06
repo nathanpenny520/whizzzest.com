@@ -12,12 +12,6 @@ function setLoadingStatus(status) {
 	document.querySelector(".loading-init__status").textContent = status;
 }
 
-function applyStaticText() {
-	if (appNodes.copyrightYear) {
-		appNodes.copyrightYear.textContent = String(new Date().getFullYear());
-	}
-}
-
 function populateAppControls() {
 	populateControls(appNodes, shellNames, {
 		shellSizeOptions: ['3"', '4"', '6"', '8"', '12"', '16"'].map((label, index) => ({
@@ -100,7 +94,6 @@ function attachRuntimeBindings() {
 	handleResize();
 }
 
-applyStaticText();
 attachRuntimeBindings();
 
 if (IS_HEADER) {

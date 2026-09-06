@@ -73,7 +73,6 @@ Gitee：https://gitee.com/nianbroken/Firework_Simulator
 			backgroundApplyBtn: ".background-apply-btn",
 			backgroundClearBtn: ".background-clear-btn",
 			backgroundStatus: ".background-status",
-			copyrightYear: ".copyright-year",
 			helpModal: ".help-modal",
 			helpModalOverlay: ".help-modal__overlay",
 			helpModalHeader: ".help-modal__header",

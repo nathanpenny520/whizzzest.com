@@ -331,24 +331,6 @@ body.page-sim {
 	outline-offset: -2px;
 }
 
-.fw-app .credits {
-	margin-top: auto;
-	margin-bottom: 10px;
-	padding-top: 6px;
-	font-size: 0.8em;
-	opacity: 0.75;
-	text-align: center;
-}
-.fw-app .credits a {
-	color: rgba(255, 255, 255, 0.5);
-	text-decoration: none;
-}
-.fw-app .credits a:hover,
-.fw-app .credits a:active {
-	color: rgba(255, 255, 255, 0.75);
-	text-decoration: underline;
-}
-
 .fw-app .help-modal {
 	display: flex;
 	justify-content: center;
