@@ -19,8 +19,12 @@ const CATEGORIES = {
 };
 
 const SITE_URL = 'https://whizzzest.com';
+const APPLY_URL = 'https://merchant.whizzzest.com/apply';
 const APPLY_MAILTO =
   'mailto:whizzzest@outlook.com?subject=' + encodeURIComponent('商户入驻申请 — 焰境·万载');
+
+// 商户图片：R2 对象键 → 主站代理地址；以斜杠开头视为站内静态资源路径，原样使用
+const mimg = (v) => (v && !v.startsWith('/') ? '/assets-merchant/' + v : v);
 
 export async function handleMerchants(request, env, url) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -80,7 +84,7 @@ async function merchantsHome(env, url, cat) {
 
   const card = (x) => {
     const cover = x.cover
-      ? `<img src="${esc(x.cover)}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
+      ? `<img src="${esc(mimg(x.cover))}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
       : `<span class="mc-ph" aria-hidden="true">${esc(x.name.slice(0, 1))}</span>`;
     const badge =
       x.tier === 'featured'
@@ -178,8 +182,13 @@ async function merchantDetail(env, url, slug) {
       </div></section>`
     : '';
 
+  let gallery = [];
+  try { gallery = JSON.parse(item.images || '[]'); } catch { /* 忽略坏数据 */ }
   const coverHtml = item.cover
-    ? `<div class="md-cover"><img src="${esc(item.cover)}" alt="${esc(item.name)}" loading="eager" decoding="async"></div>`
+    ? `<div class="md-cover"><img src="${esc(mimg(item.cover))}" alt="${esc(item.name)}" loading="eager" decoding="async"></div>`
+    : '';
+  const galleryHtml = gallery.length
+    ? `<div class="md-gallery">${gallery.map((k, i) => `<img src="${esc(mimg(k))}" alt="${esc(item.name)} 图${i + 1}" loading="lazy" decoding="async">`).join('')}</div>`
     : '';
 
   const jsonLd = {
@@ -202,6 +211,7 @@ async function merchantDetail(env, url, slug) {
       <div class="container">
         <nav class="md-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/merchants/">商户</a><span>/</span><b>${esc(item.name)}</b></nav>
         ${coverHtml}
+        ${galleryHtml}
         <div class="md-head">
           <h1>${esc(item.name)}</h1>
           ${item.tier === 'featured' ? '<span class="mc-badge feat">推荐</span>' : item.tier === 'verified' ? '<span class="mc-badge">认证商户</span>' : ''}
@@ -219,7 +229,7 @@ async function merchantDetail(env, url, slug) {
 
 function relatedCard(x) {
   const cover = x.cover
-    ? `<img src="${esc(x.cover)}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
+    ? `<img src="${esc(mimg(x.cover))}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
     : `<span class="mc-ph" aria-hidden="true">${esc(x.name.slice(0, 1))}</span>`;
   return `<a class="mc-card" href="/merchants/${esc(x.slug)}/">
     <div class="mc-media">${cover}</div>

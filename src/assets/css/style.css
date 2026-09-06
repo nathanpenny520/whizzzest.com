@@ -1931,3 +1931,18 @@ button {
   .mc-grid { grid-template-columns: repeat(auto-fill, minmax(46vw, 1fr)); gap: 12px; }
   .md-cover { aspect-ratio: 16 / 10; }
 }
+
+.md-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.md-gallery img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 14px;
+  background: var(--c-bg-alt);
+}

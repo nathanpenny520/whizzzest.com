@@ -1,0 +1,26 @@
+{
+  // 焰境·万载 — 商户门户 Worker（merchant.whizzzest.com，M2 自助入驻）
+  // 职责：入驻申请（含 R2 图片上传）、商户登录、状态/编辑/数据看板
+  // 安全：整域 noindex；PBKDF2 密码哈希；登录/申请 IP 限流；独立会话密钥
+  // 凭据：wrangler secret 配 MERCHANT_SESSION_SECRET（本地明文在 .dev.vars）
+  "name": "whizzzest-merchant",
+  "compatibility_date": "2026-09-01",
+  "main": "index.js",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whizzzest",
+      "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMG",
+      "bucket_name": "whizzzest-merchant"
+    }
+  ],
+  "routes": [
+    { "pattern": "merchant.whizzzest.com", "custom_domain": true }
+  ]
+}

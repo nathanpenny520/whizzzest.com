@@ -33,6 +33,21 @@ export default {
       return handleDwell(request, env, ctx);
     }
 
+    // 商户图片代理（R2 对象，merchant Worker 上传，M2）——不可浏览文档，直接返回不进访客采集
+    if (url.pathname.startsWith('/assets-merchant/')) {
+      const key = decodeURIComponent(url.pathname.slice('/assets-merchant/'.length));
+      if (!key || key.includes('..') || !/^[\w][\w/.-]*$/.test(key)) {
+        return new Response(null, { status: 404 });
+      }
+      const obj = await env.IMG.get(key);
+      if (!obj) return new Response(null, { status: 404 });
+      const headers = new Headers();
+      obj.writeHttpMetadata(headers);
+      headers.set('etag', obj.httpEtag);
+      headers.set('cache-control', 'public, max-age=31536000, immutable');
+      return new Response(obj.body, { headers });
+    }
+
     // 商户页动态渲染（/merchants/*，docs/商户功能方案.md M1）
     let res;
     if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
@@ -110,14 +125,18 @@ async function trackVisit(request, env, ctx, url, ua, assetRes) {
   const kind = classifyRef(refHost);
   const pvId = crypto.randomUUID();
 
+  // 机器人/扫描标记：落点 404（探测不存在路径）或路径命中扫描特征
+  const SCAN_PATH_RE = /wp-admin|wp-login|phpmyadmin|\.env|\.git|\/open\/|cgi-bin|\.(php|asp|aspx|jsp|sql|bak)$/i;
+  const isBot = assetRes.status >= 400 || SCAN_PATH_RE.test(url.pathname) ? 1 : 0;
+
   ctx.waitUntil(
     env.DB.prepare(
-      `INSERT INTO visits (vid, sid, pv_id, path, referrer, ref_host, kind, country, device, browser, os, lang, ua, ip)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`
+      `INSERT INTO visits (vid, sid, pv_id, path, referrer, ref_host, kind, country, device, browser, os, lang, ua, ip, is_bot)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`
     )
       .bind(vid, sid, pvId, url.pathname, ref.slice(0, 300), refHost, kind,
         request.cf?.country || '', device, browser, os, lang.slice(0, 20), ua.slice(0, 250),
-        request.headers.get('cf-connecting-ip') || '')
+        request.headers.get('cf-connecting-ip') || '', isBot)
       .run()
       .catch((err) => console.error('visit log failed:', err))
   );

@@ -67,3 +67,14 @@ CREATE TABLE IF NOT EXISTS merchants (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status, sort_weight DESC, id DESC);
+
+-- 商户门户账号（M2，merchant.whizzzest.com）：一商户一账号，手机号+密码登录
+-- pass_hash = PBKDF2-SHA256(pass_salt, 10万次)，密码不明文存储
+CREATE TABLE IF NOT EXISTS merchant_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  merchant_id INTEGER NOT NULL UNIQUE REFERENCES merchants(id),
+  phone TEXT UNIQUE NOT NULL,
+  pass_hash TEXT NOT NULL,
+  pass_salt TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

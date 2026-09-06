@@ -260,6 +260,8 @@ function sinceExpr(daysParam) {
 async function statsOverview(env, request) {
   const url = new URL(request.url);
   const { days, sql: SINCE } = sinceExpr(url.searchParams.get('days'));
+  const bots = url.searchParams.get('bots') === '1';
+  const T = bots ? 'visits' : '(SELECT * FROM ${T} WHERE is_bot = 0)';
   const db = env.DB;
 
   const sincePrev = `datetime('now','+8 hours','start of day','-8 hours','-${days} days')`;
@@ -268,74 +270,74 @@ async function statsOverview(env, request) {
     await Promise.all([
       db.prepare(
         `SELECT COUNT(*) pv, COUNT(DISTINCT ${GID}) uv, COUNT(DISTINCT sid) sessions
-         FROM visits WHERE created_at >= ${SINCE}`
+         FROM ${T} WHERE created_at >= ${SINCE}`
       ).first(),
       db.prepare(
         `SELECT COUNT(*) n FROM (
-           SELECT sid FROM visits WHERE sid IS NOT NULL AND created_at >= ${SINCE}
+           SELECT sid FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE}
            GROUP BY sid HAVING COUNT(*) = 1
          )`
       ).first(),
       db.prepare(
-        `SELECT AVG(engage_ms) t FROM visits WHERE engage_ms > 0 AND created_at >= ${SINCE}`
+        `SELECT AVG(engage_ms) t FROM ${T} WHERE engage_ms > 0 AND created_at >= ${SINCE}`
       ).first(),
       db.prepare(
         `SELECT COUNT(*) n FROM (
-           SELECT vid FROM visits WHERE vid IS NOT NULL AND created_at >= ${SINCE}
+           SELECT vid FROM ${T} WHERE vid IS NOT NULL AND created_at >= ${SINCE}
            GROUP BY vid HAVING MIN(created_at) >= ${SINCE}
          )`
       ).first(),
       db.prepare(
         `SELECT date(created_at, '+8 hours') d, COUNT(*) pv, COUNT(DISTINCT vid) uv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY d ORDER BY d`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY d ORDER BY d`
       ).all(),
       db.prepare(
         `SELECT path, COUNT(*) pv, COUNT(DISTINCT vid) uv, AVG(engage_ms) avg_ms
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY path ORDER BY pv DESC LIMIT 10`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY path ORDER BY pv DESC LIMIT 10`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(kind,''),'other') kind, COUNT(DISTINCT sid) sessions, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY kind ORDER BY pv DESC`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY kind ORDER BY pv DESC`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(ref_host,''),'直接访问') src, COUNT(DISTINCT sid) sessions, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY src ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY src ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(device,'—'),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY device ORDER BY pv DESC`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY device ORDER BY pv DESC`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(browser,'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(os,'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(lang,'—'),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY lang ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY lang ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(country,''),'未知') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM visits WHERE created_at >= ${SINCE} GROUP BY country ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY country ORDER BY pv DESC LIMIT 8`
       ).all(),
       db.prepare(
         `SELECT created_at, path, COALESCE(NULLIF(kind,''),'other') kind, ref_host, country, device, engage_ms
-         FROM visits WHERE created_at >= ${SINCE} ORDER BY created_at DESC LIMIT 30`
+         FROM ${T} WHERE created_at >= ${SINCE} ORDER BY created_at DESC LIMIT 30`
       ).all(),
       // 上一周期 PV（环比用）
-      db.prepare(`SELECT COUNT(*) n FROM visits WHERE created_at >= ${sincePrev} AND created_at < ${SINCE}`).first(),
+      db.prepare(`SELECT COUNT(*) n FROM ${T} WHERE created_at >= ${sincePrev} AND created_at < ${SINCE}`).first(),
       // 实时：近 5 分钟浏览
-      db.prepare(`SELECT COUNT(*) n FROM visits WHERE created_at >= datetime('now','-5 minutes')`).first(),
+      db.prepare(`SELECT COUNT(*) n FROM ${T} WHERE created_at >= datetime('now','-5 minutes')`).first(),
       // 每位访客的「首访日」分布（算每日新访客）
-      db.prepare(`SELECT date(MIN(created_at), '+8 hours') fd, COUNT(*) n FROM visits WHERE vid IS NOT NULL GROUP BY vid`).all(),
+      db.prepare(`SELECT date(MIN(created_at), '+8 hours') fd, COUNT(*) n FROM ${T} WHERE vid IS NOT NULL GROUP BY vid`).all(),
       // 入口页 TOP（每会话的第一个页面）
       db.prepare(
         `SELECT path, COUNT(*) n FROM (
            SELECT sid, path, ROW_NUMBER() OVER (PARTITION BY sid ORDER BY created_at) rn
-           FROM visits WHERE sid IS NOT NULL AND created_at >= ${SINCE}
+           FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE}
          ) WHERE rn = 1 GROUP BY path ORDER BY n DESC LIMIT 8`
       ).all(),
       // 会话深度分布（1 页 / 2-3 页 / 4 页以上）
@@ -343,7 +345,7 @@ async function statsOverview(env, request) {
         `SELECT SUM(CASE WHEN d = 1 THEN 1 ELSE 0 END) d1,
                 SUM(CASE WHEN d BETWEEN 2 AND 3 THEN 1 ELSE 0 END) d23,
                 SUM(CASE WHEN d >= 4 THEN 1 ELSE 0 END) d4p
-         FROM (SELECT COUNT(*) d FROM visits WHERE sid IS NOT NULL AND created_at >= ${SINCE} GROUP BY sid)`
+         FROM (SELECT COUNT(*) d FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE} GROUP BY sid)`
       ).first(),
     ]);
 
@@ -393,11 +395,11 @@ async function listVisitors(env, request) {
       `SELECT ${GID} gid, COUNT(*) views, COUNT(DISTINCT sid) sessions,
               MIN(created_at) first, MAX(created_at) last,
               MAX(country) country, MAX(device) device, MAX(browser) browser, MAX(os) os
-       FROM visits GROUP BY gid ORDER BY last DESC LIMIT ?1 OFFSET ?2`
+       FROM ${T} GROUP BY gid ORDER BY last DESC LIMIT ?1 OFFSET ?2`
     )
     .bind(PAGE_SIZE, offset)
     .all();
-  const total = (await env.DB.prepare(`SELECT COUNT(DISTINCT ${GID}) n FROM visits`).first())?.n || 0;
+  const total = (await env.DB.prepare(`SELECT COUNT(DISTINCT ${GID}) n FROM ${T}`).first())?.n || 0;
 
   return json({ ok: true, total, visitors: results || [] });
 }
@@ -405,20 +407,20 @@ async function listVisitors(env, request) {
 async function visitorDetail(env, gid) {
   const where = `${GID} = ?1`;
   const summary = await env.DB
-    .prepare(`SELECT COUNT(*) n, MIN(created_at) first, MAX(created_at) last FROM visits WHERE ${where}`)
+    .prepare(`SELECT COUNT(*) n, MIN(created_at) first, MAX(created_at) last FROM ${T} WHERE ${where}`)
     .bind(gid)
     .first();
   const { results: sessions } = await env.DB
     .prepare(
       `SELECT sid, MIN(created_at) start, MAX(created_at) end, COUNT(*) views
-       FROM visits WHERE ${where} AND sid IS NOT NULL GROUP BY sid ORDER BY start DESC LIMIT 50`
+       FROM ${T} WHERE ${where} AND sid IS NOT NULL GROUP BY sid ORDER BY start DESC LIMIT 50`
     )
     .bind(gid)
     .all();
   const { results: views } = await env.DB
     .prepare(
       `SELECT path, kind, ref_host, country, device, engage_ms, created_at
-       FROM visits WHERE ${where} ORDER BY created_at DESC LIMIT 300`
+       FROM ${T} WHERE ${where} ORDER BY created_at DESC LIMIT 300`
     )
     .bind(gid)
     .all();
@@ -542,7 +544,11 @@ async function editMerchant(env, id, request) {
 }
 
 async function removeMerchant(env, id) {
-  const { meta } = await env.DB.prepare('DELETE FROM merchants WHERE id = ?1').bind(id).run();
+  // 级联删除门户账号，避免孤儿账号残留
+  const [, { meta }] = await env.DB.batch([
+    env.DB.prepare('DELETE FROM merchant_users WHERE merchant_id = ?1').bind(id),
+    env.DB.prepare('DELETE FROM merchants WHERE id = ?1').bind(id),
+  ]);
   if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
   return json({ ok: true });
 }
@@ -622,7 +628,12 @@ const BASE_CSS = `
   .panel h3 { font-size: 13px; font-weight: 600; color: #6e6e73; margin-bottom: 14px; }
   .empty { color: #86868b; text-align: center; padding: 60px 0; font-size: 14px; }
   .more { display: block; margin: 20px auto 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+  td, th { overflow-wrap: anywhere; }
+  .panel.collapsible > h3 { cursor: pointer; user-select: none; }
+  .panel.collapsible > h3::after { content: ' ▾'; color: #86868b; font-size: 11px; }
+  .panel.collapsed > h3::after { content: ' ▸'; }
+  .panel.collapsed > *:not(h3) { display: none; }
   th { color: #6e6e73; font-weight: 600; text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(0,0,0,.08); white-space: nowrap; }
   td { padding: 9px 10px; border-bottom: 1px solid rgba(0,0,0,.05); color: #1d1d1f; word-break: break-word; }
   tr:last-child td { border-bottom: 0; }
@@ -804,6 +815,12 @@ ${BASE_CSS}
     <button class="tab" data-days="90" type="button">90 天</button>
     <button class="tab" data-days="180" type="button">180 天</button>
     <button class="tab" data-days="365" type="button">365 天</button>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73">
+      <input id="include-bots" type="checkbox">包含扫描/机器人
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73">
+      <input id="auto-refresh" type="checkbox" checked>30s 自动刷新
+    </label>
     <span class="updated" id="updated"></span>
     <button id="vrefresh" type="button">刷新</button>
   </div>
@@ -825,7 +842,7 @@ ${BASE_CSS}
   </div>
   <div class="panel">
     <h3>热门页面</h3>
-    <table><thead><tr><th>路径</th><th>浏览</th><th>访客</th><th>平均停留</th></tr></thead><tbody id="top-pages"></tbody></table>
+    <table><colgroup><col style="width:52%"><col style="width:15%"><col style="width:15%"><col style="width:18%"></colgroup><thead><tr><th>路径</th><th>浏览</th><th>访客</th><th>平均停留</th></tr></thead><tbody id="top-pages"></tbody></table>
   </div>
   <div class="grid3" style="margin-top:14px">
     <div class="panel" style="margin:0"><h3>流量类型</h3><div id="kinds"></div></div>
@@ -1031,9 +1048,12 @@ el('tab-all').addEventListener('click', function () {
 });
 
 /* ---------- 访客分析 ---------- */
+var includeBots = false;
+var autoRefresh = true;
+
 function loadStats() {
   el('updated').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
-  api('/api/stats?days=' + visitDays).then(function (d) {
+  api('/api/stats?days=' + visitDays + (includeBots ? '&bots=1' : '')).then(function (d) {
     el('c-pv').textContent = d.cards.pv;
     el('c-uv').textContent = d.cards.uv;
     el('c-sessions').textContent = d.cards.sessions;
@@ -1130,7 +1150,7 @@ function drawChart(daily) {
 var vOffset = 0;
 function loadVisitors(reset) {
   if (reset) { vOffset = 0; el('vlist').innerHTML = '<tr><td colspan="7" class="empty">加载中…</td></tr>'; }
-  api('/api/visitors?offset=' + vOffset).then(function (d) {
+  api('/api/visitors?offset=' + vOffset + (includeBots ? '&bots=1' : '')).then(function (d) {
     var box = el('vlist');
     if (reset) box.innerHTML = '';
     if (reset && (!d.visitors || d.visitors.length === 0)) {
@@ -1165,7 +1185,7 @@ function renderVisitor(v) {
     det.className = 'detail';
     det.innerHTML = '<td colspan="7">加载中…</td>';
     tr.after(det);
-    api('/api/visitors/' + encodeURIComponent(v.gid)).then(function (d) {
+    api('/api/visitors/' + encodeURIComponent(v.gid) + (includeBots ? '&bots=1' : '')).then(function (d) {
       det.innerHTML = '<td colspan="7">' +
         '<div style="margin-bottom:8px">共 ' + d.n + ' 次浏览 · 首次 ' + esc(fmtTime(d.first)) + ' · 最近 ' + esc(fmtTime(d.last)) + '</div>' +
         '<table><tr><th>时间</th><th>页面</th><th>来源</th><th>地区</th><th>设备</th><th>停留</th></tr>' +
@@ -1183,6 +1203,15 @@ function renderVisitor(v) {
 }
 
 el('vrefresh').addEventListener('click', function () { loadStats(); loadVisitors(true); });
+el('include-bots').addEventListener('change', function (e) { includeBots = e.target.checked; loadStats(); loadVisitors(true); });
+el('auto-refresh').addEventListener('change', function (e) { autoRefresh = e.target.checked; });
+setInterval(function () {
+  if (currentView === 'visit' && autoRefresh && document.visibilityState === 'visible') { loadStats(); loadVisitors(false); }
+}, 30000);
+document.querySelectorAll('#view-visit .panel').forEach(function (p) {
+  p.classList.add('collapsible');
+  p.querySelector('h3').addEventListener('click', function () { p.classList.toggle('collapsed'); });
+});
 el('refresh').addEventListener('click', function () {
   if (currentView === 'visit') { loadStats(); loadVisitors(true); }
   else if (currentView === 'merch') { loadMerchants(true); }

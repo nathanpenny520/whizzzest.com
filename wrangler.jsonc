@@ -17,6 +17,13 @@
       "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
     }
   ],
+  // 商户图片桶（merchant Worker 上传，本 Worker /assets-merchant/* 代理公开读取）
+  "r2_buckets": [
+    {
+      "binding": "IMG",
+      "bucket_name": "whizzzest-merchant"
+    }
+  ],
   "routes": [
     { "pattern": "whizzzest.com", "custom_domain": true },
     { "pattern": "www.whizzzest.com", "custom_domain": true }
