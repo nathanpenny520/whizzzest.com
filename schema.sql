@@ -185,14 +185,58 @@ CREATE TABLE IF NOT EXISTS book_chapters (
 CREATE INDEX IF NOT EXISTS idx_chapters_book ON book_chapters(book_id, idx);
 CREATE INDEX IF NOT EXISTS idx_chapters_status ON book_chapters(status, id DESC);
 
+-- 万载音乐（2026-09-06）：admin 直传 MP3 → 主站 /music/ 播放器页
+-- file_key: R2 键（music/ 前缀，主站 /media/* 代理，Range 已支持 → 拖进度条 seek 可用）
+-- cover: R2 键（music/c-*）或站内路径（/assets/img/…），空则前台「焰」字占位
+-- status: published 上线 | hidden 隐藏；sort 小者靠前（列表顺序即专辑曲序）
+CREATE TABLE IF NOT EXISTS music_tracks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  artist TEXT,
+  cover TEXT,
+  file_key TEXT NOT NULL,
+  duration INTEGER DEFAULT 0,              -- 秒；上传时浏览器端预读元数据自动带出
+  sort INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'published',
+  plays INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_music_pub ON music_tracks(status, sort, id);
+
+-- 旅游景点（2026-09-06）：瀑布流推荐栏 + 详情页（对标 /tv/* /merchants/*，D1 权威）
+-- slug 详情 URL（后台唯一）；body 空行分段纯文本，渲染时 esc 包 <p>——白名单结构，天然免疫 XSS
+-- status: published 上线 | hidden 下线；sort 小者靠前
+CREATE TABLE IF NOT EXISTS attractions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  tags TEXT,                               -- 逗号分隔（古城,山水）
+  cover TEXT,                              -- R2 键（attra/c-*）或站内路径（/assets/img/…）
+  body TEXT,
+  address TEXT,
+  hours TEXT,
+  tickets TEXT,
+  transport TEXT,
+  sort INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'published',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_attractions_pub ON attractions(status, sort, id DESC);
+
 -- 作者账号（writer.whizzzest.com，docs/文库方案.md）：与商户门户完全独立的账号体系，
 -- 同手机号/邮箱可在两边各注册（不同表不同会话密钥）；登录方式与商户一致
+-- 2026-09-06 二次迁移：phone 允许 NULL（支持纯邮箱注册），部分唯一索引仅约束非空手机号
+-- （线上旧表迁移：DROP TABLE writer_users; 后按本结构重建——当时为空表，无数据损失）
 CREATE TABLE IF NOT EXISTS writer_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  phone TEXT UNIQUE NOT NULL,
+  phone TEXT,                              -- 手机号注册账号填；纯邮箱注册为 NULL
   email TEXT,
   pass_hash TEXT NOT NULL,                 -- PBKDF2-SHA256(pass_salt, 10万次)
   pass_salt TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wu_email ON writer_users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wu_phone ON writer_users(phone) WHERE phone IS NOT NULL;

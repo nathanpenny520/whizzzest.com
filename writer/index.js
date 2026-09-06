@@ -1,7 +1,7 @@
 /**
  * 焰境·万载 — 文库作者门户 Worker（writer.whizzzest.com，docs/文库方案.md）
  *
- *  - GET  /register          作者注册（手机号 + 密码；与商户门户完全独立的账号体系）
+ *  - GET  /register          作者注册（双方式：手机号+密码 ｜ 邮箱+验证码+密码）
  *  - GET  /login             登录（手机号+密码 或 邮箱+验证码，照抄商户门户交互）
  *  - GET  /dashboard         作品台：我的作品（状态/章节数/字数/驳回原因）+ 账号安全
  *  - GET  /book/new          新建作品（标题/分类/笔名/简介/封面）
@@ -9,9 +9,10 @@
  *  - GET  /book/<id>/chapters        章节管理（列表：序号/状态/驳回原因）
  *  - GET  /book/<id>/chapter/new     新建章节（分段纯文本 + [图] 占位 + 插图上传）
  *  - GET  /book/<id>/chapter/<cid>   编辑章节
- *  - POST /api/register      注册 → 自动登录
+ *  - POST /api/register      手机号注册 → 自动登录
+ *  - POST /api/register/email  邮箱注册（验证码验证邮箱 + 设密码）→ 自动登录
  *  - POST /api/login         手机号+密码 → HMAC 会话 Cookie（wr_session）
- *  - POST /api/email-code    发送 6 位邮箱验证码（无会话=login；带会话=bind）
+ *  - POST /api/email-code    发送 6 位邮箱验证码（无会话=login/register；带会话=bind）
  *  - POST /api/login/email   邮箱+验证码登录
  *  - POST /api/bind-email    绑定/更换登录邮箱
  *  - POST /api/logout
@@ -46,7 +47,7 @@ const MAX_IMG_BYTES = 5 * 1024 * 1024;
 const MAX_CHAPTERS = 500;          // 每部作品章节上限
 const MAX_BODY = 30000;            // 单章正文字符上限
 
-const FAVICON_LINK = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiBwLWlkPSI4NTM4IiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeG1sbnM6aHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cGF0aCBkPSJNNTExLjggNDIwLjhjLTE1Ni44IDIzNC40LTE0MS42IDU3Ni44LTQ4IDU3OC40IDk2LjggMi40LTE0LjQtMzk0LjQgNDgtNTc4LjR6TTQ4MC44IDM5NS4yYy0yMjcuMiA3NC40LTM5MiAzMTEuMi0zMjguOCAzNjEuNiA2NC44IDUyIDE5MS4yLTI3MiAzMjguOC0zNjEuNnpNNDg3LjIgMzc2QzI5MC40IDI4OCAyNCAzMzIgMzEuMiAzOTkuMmM3LjIgNjguOCAzMDcuMi00OS42IDQ1Ni0yMy4yek01MTIuOCAzNTQuNGMtODkuNi0xNjkuNi0zMDAtMzAwLjgtMzMxLjItMjU2LTMyIDQ2LjQgMjQxLjYgMTUyIDMzMS4yIDI1NnpNNTMxLjIgMzU0LjRjNjI2LjQgMjI4IDYzMiAzNC40IDU4MC44IDI5LjYtNTIuOC00LjgtNy4yIDIyMy4yLTQ5LjYgMzI0Ljh6TTU0OCAzNjYuNGMxNDQuOCAzLjIgMjk1LjItOTQuNCAyNzItMTM1LjItMjQtNDEuNi0xNzMuNiAxMTItMjcyIDEzNS4yek01NjEuNiAzOTkuMmMxNjAgMTE5LjIgNDIwIDE2MC44IDQzMS4yIDEwOS42IDExLjItNTIuOC0yOTkuMi00OC44LTQzMS4yLTEwOS42ek01MzkuMiA0MjYuNGMyOS42IDIxNiAyMTEuMiA0MTcuNiAyNjQuOCAzNzUuMiA1NS4yLTQzLjItMjA3LjItMjMzLjYtMjY0LjgtMzc1LjJ6IiBmaWxsPSIjRTgzNTE4IiBwLWlkPSI4NTM5Ij48L3BhdGg+PHBhdGggZD0iTTkxOS4yIDYyMi40bDE2IDMyLjggMzYgNC44LTI1LjYgMjUuNiA1LjYgMzYtMzItMTYuOC0zMiAxNi44IDYuNC0zNi0yNi40LTI1LjYgMzYtNC44ek01MjAgMzM5LjJsMTYgMzIuOCAzNiA1LjYtMjUuNiAyNC44IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjQuOCAzNi01LjZ6TTIzOS4yIDc5Mi44bDE0LjQgMzAuNCAzNC40IDQuOC0yNC44IDI0IDUuNiAzMy42LTI5LjYtMTYtMzAuNCAxNiA1LjYtMzMuNi0yNC44LTI0IDM0LjQtNC44eiIgZmlsbD0iI0Y0RDMxRiIgcC1pZD0iODU0MCI+PC9wYXRoPjxwYXRoIGQ9Ik01MjAgMzM5LjJsMTYgMzIuOCAzNiA1LjYtMjUuNiAyNC44IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjQuOCAzNi01LjZ6TTIzOS4yIDc5Mi44bDE0LjQgMzAuNCAzNC40IDQuOC0yNC44IDI0IDUuNiAzMy42LTI5LjYtMTYtMzAuNCAxNiA1LjYtMzMuNi0yNC44LTI0IDM0LjQtNC44eiIgZmlsbD0iI0Y1RTMyOCIgcC1pZD0iODU0MSI+PC9wYXRoPjwvc3ZnPg==">';
+const FAVICON_LINK = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB0PSIxNzcwNjM5ODE2OTM3IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTUxMi44IDQyMC44Yy0xNTYuOCAyMzQuNC0xNDEuNiA1NzYuOC00OCA1NzguNCA5Ni44IDIuNC0xNC40LTM5NC40IDQ4LTU3OC40ek00ODAuOCAzOTUuMmMtMjI3LjIgNzQuNC0zOTIgMzExLjItMzI4LjggMzYxLjYgNjQuOCA1MiAxOTEuMi0yNzIgMzI4LjgtMzYxLjZ6TTQ4Ny4yIDM3NkMyOTAuNCAyODggMjQgMzMyIDMxLjIgMzk5LjJjNy4yIDY4LjggMzA3LjItNDkuNiA0NTYtMjMuMnpNNTEyLjggMzU0LjRjLTg5LjYtMTY5LjYtMzAwLTMwMC44LTMzMS4yLTI1Ni0zMiA0Ni40IDI0MS42IDE1MiAzMzEuMiAyNTZ6TTUzMS4yIDM1NC40QzYyNi40IDIyOCA2MzIgMzQuNCA1ODAuOCAyOS42Yy01Mi44LTQuOC03LjIgMjIzLjItNDkuNiAzMjQuOHpNNTQ4IDM2Ni40YzE0NC44IDMuMiAyOTUuMi05NC40IDI3Mi0xMzUuMi0yNC00MS42LTE3My42IDExMi0yNzIgMTM1LjJ6TTU2MS42IDM5OS4yYzE2MCAxMTkuMiA0MjAgMTYwLjggNDMxLjIgMTA5LjYgMTEuMi01Mi44LTI5OS4yLTQ4LjgtNDMxLjItMTA5LjZ6TTUzOS4yIDQyNi40YzI5LjYgMjE2IDIxMS4yIDQxNy42IDI2NC44IDM3NS4yIDU1LjItNDMuMi0yMDcuMi0yMzMuNi0yNjQuOC0zNzUuMnoiIGZpbGw9IiNFODM1MTgiIHAtaWQ9Ijg1MzkiPjwvcGF0aD48cGF0aCBkPSJNOTE5LjIgNjIyLjRsMTYgMzIuOCAzNiA0LjgtMjUuNiAyNS42IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjUuNiAzNi00Ljh6IiBmaWxsPSIjRjREMzFGIiBwLWlkPSI4NTQwIj48L3BhdGg+PHBhdGggZD0iTTUyMCAzMzkuMmwxNiAzMi44IDM2IDUuNi0yNS42IDI0LjggNS42IDM2LTMyLTE2LjgtMzIgMTYuOCA2LjQtMzYtMjYuNC0yNC44IDM2LTUuNnpNMjM5LjIgNzkyLjhsMTQuNCAzMC40IDM0LjQgNC44LTI0LjggMjQgNS42IDMzLjYtMjkuNi0xNi0zMC40IDE2IDUuNi0zMy42LTI0LjgtMjQgMzQuNC00Ljh6TTE1MS4yIDE4OGgtMzJ2LTMyYzAtMi40LTEuNi00LTQtNHMtNCAxLjYtNCA0djMyaC0zMmMtMi40IDAtNCAxLjYtNCA0czEuNiA0IDQgNGgzMnYzMmMwIDIuNCAxLjYgNCA0IDRzNC0xLjYgNC00di0zMmgzMmMyLjQgMCA0LTEuNiA0LTRzLTEuNi00LTQtNHoiIGZpbGw9IiNGNUUzMjgiIHAtaWQ9Ijg1NDEiPjwvcGF0aD48L3N2Zz4=">';
 
 export default {
   async fetch(request, env) {
@@ -154,6 +155,7 @@ async function handleApi(request, env, path, url) {
 
   // 公开接口（自行限流）
   if (path === '/api/register' && method === 'POST') return handleRegister(request, env);
+  if (path === '/api/register/email' && method === 'POST') return handleRegisterEmail(request, env);
   if (path === '/api/login' && method === 'POST') return handleLogin(request, env);
   if (path === '/api/email-code' && method === 'POST') {
     const u = await currentUser(request, env);
@@ -244,6 +246,40 @@ async function handleRegister(request, env) {
   return authedResponse(env.WRITER_SESSION_SECRET, r.meta.last_row_id);
 }
 
+/** 邮箱注册：验证码验证邮箱归属 + 设密码 → 纯邮箱账号（phone 为 NULL），建号即登录 */
+async function handleRegisterEmail(request, env) {
+  if (!env.WRITER_SESSION_SECRET) return json({ ok: false, error: 'config' }, 500);
+  const ip = request.headers.get('cf-connecting-ip') || '';
+  if (ip && limited('wrege:' + ip, 60 * 60 * 1000, 3)) return json({ ok: false, error: 'rate' }, 429);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: 'format' }, 400);
+  }
+  if (String(body?.website || '') !== '') return json({ ok: true }); // Honeypot
+
+  const email = String(body?.email || '').trim().toLowerCase();
+  const code = String(body?.code || '').replace(/\s/g, '');
+  const password = String(body?.password || '');
+  if (!EMAIL_RE.test(email) || email.length > 100) return json({ ok: false, error: 'email' }, 400);
+  if (password.length < 8 || password.length > 64) return json({ ok: false, error: 'password' }, 400);
+
+  const dup = await env.DB.prepare('SELECT id FROM writer_users WHERE email = ?1').bind(email).first();
+  if (dup) return json({ ok: false, error: 'taken' }, 409);
+
+  const verr = await verifyEmailCode(env, email, 'register', code);
+  if (verr) return json({ ok: false, error: verr }, 401);
+
+  const salt = crypto.randomUUID().replace(/-/g, '');
+  const hash = await pbkdf2Hex(password, salt);
+  const r = await env.DB.prepare(
+    'INSERT INTO writer_users (phone, email, pass_hash, pass_salt) VALUES (NULL, ?1, ?2, ?3)'
+  ).bind(email, hash, salt).run();
+  return authedResponse(env.WRITER_SESSION_SECRET, r.meta.last_row_id);
+}
+
 async function handleLogin(request, env) {
   if (!env.WRITER_SESSION_SECRET) return json({ ok: false, error: 'config' }, 500);
   const ip = request.headers.get('cf-connecting-ip') || '';
@@ -300,7 +336,6 @@ async function currentUser(request, env) {
 
 async function sendEmailCode(request, env, user) {
   if (!env.SMTP_USER || !env.SMTP_PASS) return json({ ok: false, error: 'config' }, 500);
-  const purpose = user ? 'bind' : 'login';
 
   let body;
   try {
@@ -308,6 +343,9 @@ async function sendEmailCode(request, env, user) {
   } catch {
     return json({ ok: false, error: 'format' }, 400);
   }
+  // 未登录时的用途：body.purpose='register' → 注册验证（邮箱被占用如实报错）；默认 login（防枚举）
+  const purpose = user ? 'bind'
+    : String(body?.purpose || '') === 'register' ? 'register' : 'login';
   const email = String(body?.email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 100) return json({ ok: false, error: 'format' }, 400);
 
@@ -318,6 +356,10 @@ async function sendEmailCode(request, env, user) {
     const dup = await env.DB.prepare(
       'SELECT id FROM writer_users WHERE email = ?1 AND id != ?2'
     ).bind(email, user.uid).first();
+    if (dup) return json({ ok: false, error: 'taken' }, 400);
+  } else if (purpose === 'register') {
+    // 注册用途：邮箱已注册如实报错（引导去登录）
+    const dup = await env.DB.prepare('SELECT id FROM writer_users WHERE email = ?1').bind(email).first();
     if (dup) return json({ ok: false, error: 'taken' }, 400);
   } else {
     // 登录用途：邮箱未绑定任何账号时不发码、不落库，仍返回成功（防枚举）
@@ -932,24 +974,57 @@ function registerHtml(url) {
       <p>注册后在「作品台」新建作品、写章节。作品与章节均需站长审核通过后才会在 whizzzest.com/library/ 上线展示。</p>
     </div>
     ${errLine(url)}
-    <form class="card" id="f" style="display:block">
+    <form class="card" style="display:block">
       <input type="hidden" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true">
       <h2 style="margin-bottom:12px">作者注册</h2>
-      <div class="fcol">
+      <div class="ops" style="margin-bottom:16px">
+        <button type="button" class="tabbtn active" id="rt-phone">手机号 + 密码</button>
+        <button type="button" class="tabbtn" id="rt-email">邮箱 + 验证码</button>
+      </div>
+      <div class="fcol" id="fp">
         <input class="inl" id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号">
         <input class="inl" id="pw" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）">
         <button class="primary" id="go" type="submit">注册并进入作品台</button>
         <p class="err-line" id="err" style="display:none"></p>
-        <p class="tip" style="font-size:12px">注册即表示同意站长对投稿内容进行审核；审核结果会显示在作品台。与商户中心账号相互独立。</p>
       </div>
+      <div class="fcol" id="fe" style="display:none">
+        <input class="inl" id="email" type="email" placeholder="邮箱">
+        <div style="display:flex;gap:10px">
+          <input class="inl" id="code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
+          <button class="btn" id="send" type="button">发送验证码</button>
+        </div>
+        <input class="inl" id="pw2" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）">
+        <button class="primary" id="goe" type="submit">注册并进入作品台</button>
+        <p class="err-line" id="erre" style="display:none"></p>
+      </div>
+      <p class="tip" style="font-size:12px;margin-top:4px">注册即表示同意站长对投稿内容进行审核；审核结果会显示在作品台。邮箱注册的账号可用「邮箱 + 验证码」登录。与商户中心账号相互独立。</p>
     </form>
   </div>
   <script>
   (function () {
-    var ERR = { phone: '手机号格式不正确', password: '密码至少 8 位', dup: '该手机号已注册，请直接登录',
-      rate: '注册过于频繁，请稍后再试', format: '提交内容格式有误', config: '服务端未配置完成，请联系站长' };
-    document.getElementById('f').addEventListener('submit', function (e) {
+    var ERR = { phone: '手机号格式不正确', email: '邮箱格式不正确', password: '密码至少 8 位',
+      dup: '该账号已注册，请直接登录', taken: '该邮箱已注册，请直接登录',
+      bad: '验证码错误', expired: '验证码已过期，请重新发送', too_fast: '发送太频繁，请 1 分钟后再试',
+      send_failed: '邮件发送失败，请稍后再试', rate: '操作过于频繁，请稍后再试',
+      format: '提交内容格式有误', config: '服务端未配置完成，请联系站长' };
+    function showErr(id, t) { var e = document.getElementById(id); e.textContent = t; e.style.display = 'block'; }
+    function post(path, data) {
+      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { s: r.status, d: d }; }); });
+    }
+    function switchMode(email) {
+      document.getElementById('fp').style.display = email ? 'none' : 'flex';
+      document.getElementById('fe').style.display = email ? 'flex' : 'none';
+      document.getElementById('rt-phone').classList.toggle('active', !email);
+      document.getElementById('rt-email').classList.toggle('active', email);
+    }
+    document.getElementById('rt-phone').addEventListener('click', function () { switchMode(false); });
+    document.getElementById('rt-email').addEventListener('click', function () { switchMode(true); });
+
+    // 手机号注册（表单统一拦截默认提交；邮箱 Tab 由 goe 按钮自己处理）
+    document.querySelector('#fp').closest('form').addEventListener('submit', function (e) {
       e.preventDefault();
+      if (document.getElementById('fe').style.display !== 'none') return;
       var btn = document.getElementById('go');
       btn.disabled = true;
       fetch('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -959,11 +1034,47 @@ function registerHtml(url) {
           if (r.ok) { location.href = '/dashboard'; return; }
           return r.json().catch(function () { return {}; }).then(function (d) {
             btn.disabled = false;
-            showErr((r.status === 429 ? ERR.rate : ERR[d.error]) || '注册失败，请重试');
+            showErr('err', (r.status === 429 ? ERR.rate : ERR[d.error]) || '注册失败，请重试');
           });
         })
-        .catch(function () { btn.disabled = false; showErr('网络错误，请重试'); });
-      function showErr(t) { var e = document.getElementById('err'); e.textContent = t; e.style.display = 'block'; }
+        .catch(function () { btn.disabled = false; showErr('err', '网络错误，请重试'); });
+    });
+
+    // 发送注册验证码
+    document.getElementById('send').addEventListener('click', function () {
+      var btn = this;
+      if (btn.disabled) return;
+      post('/api/email-code', { email: document.getElementById('email').value.trim(), purpose: 'register' })
+        .then(function (r) {
+          if (r.s === 200 && r.d.ok) {
+            var n = 60;
+            btn.disabled = true; btn.textContent = n + 's 后重发';
+            var t = setInterval(function () {
+              n--;
+              if (n <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '发送验证码'; return; }
+              btn.textContent = n + 's 后重发';
+            }, 1000);
+            showErr('erre', '✅ 验证码已发送，请查收邮箱（10 分钟内有效）');
+            return;
+          }
+          showErr('erre', (r.s === 429 ? (r.d.error === 'too_fast' ? ERR.too_fast : ERR.rate) : ERR[r.d.error]) || '发送失败，请重试');
+        })
+        .catch(function () { showErr('erre', '网络错误，请重试'); });
+    });
+
+    // 邮箱注册
+    document.getElementById('goe').addEventListener('click', function () {
+      var btn = this;
+      btn.disabled = true;
+      post('/api/register/email', { email: document.getElementById('email').value.trim(),
+        code: document.getElementById('code').value.trim(),
+        password: document.getElementById('pw2').value, website: '' })
+        .then(function (r) {
+          if (r.s === 200 && r.d.ok) { location.href = '/dashboard'; return; }
+          btn.disabled = false;
+          showErr('erre', (r.s === 429 ? ERR.rate : ERR[r.d.error]) || '注册失败，请重试');
+        })
+        .catch(function () { btn.disabled = false; showErr('erre', '网络错误，请重试'); });
     });
   })();
   </script>
