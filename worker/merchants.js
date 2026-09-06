@@ -23,6 +23,8 @@ const APPLY_URL = 'https://merchant.whizzzest.com/apply';
 
 // 商户图片：R2 对象键 → 主站代理地址；以斜杠开头视为站内静态资源路径，原样使用
 const mimg = (v) => (v && !v.startsWith('/') ? '/assets-merchant/' + v : v);
+// 站内静态图换 800px WebP 变体（build.js 对 src/assets/img 全量生成；R2 图不受影响，上传时已压）
+const simg = (v) => (v && v.startsWith('/assets/img/') ? v.replace(/\.[a-z]+$/i, '-800.webp') : mimg(v));
 
 export async function handleMerchants(request, env, url) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -107,7 +109,7 @@ async function merchantsHome(env, url, cat) {
 
   const card = (x) => {
     const cover = x.cover
-      ? `<img src="${esc(mimg(x.cover))}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
+      ? `<img src="${esc(simg(x.cover))}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
       : `<span class="mc-ph" aria-hidden="true">${esc(x.name.slice(0, 1))}</span>`;
     const badge =
       x.tier === 'featured'
@@ -210,12 +212,12 @@ async function merchantDetail(env, url, slug) {
   let gallery = [];
   try { gallery = JSON.parse(item.images || '[]'); } catch { /* 忽略坏数据 */ }
   const coverHtml = item.cover
-    ? `<div class="md-cover"><img src="${esc(mimg(item.cover))}" alt="${esc(item.name)}" loading="eager" decoding="async"></div>`
+    ? `<div class="md-cover"><img src="${esc(simg(item.cover))}" alt="${esc(item.name)}" loading="eager" decoding="async"></div>`
     : '';
   // 图集去重：第一张已在封面展示
   const galleryExtra = gallery.filter((k) => k !== item.cover);
   const galleryHtml = galleryExtra.length
-    ? `<div class="md-gallery">${galleryExtra.map((k, i) => `<img src="${esc(mimg(k))}" alt="${esc(item.name)} 图${i + 2}" loading="lazy" decoding="async">`).join('')}</div>`
+    ? `<div class="md-gallery">${galleryExtra.map((k, i) => `<img src="${esc(simg(k))}" alt="${esc(item.name)} 图${i + 2}" loading="lazy" decoding="async">`).join('')}</div>`
     : '';
 
   const jsonLd = {
@@ -262,7 +264,7 @@ async function merchantDetail(env, url, slug) {
 
 function relatedCard(x) {
   const cover = x.cover
-    ? `<img src="${esc(mimg(x.cover))}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
+    ? `<img src="${esc(simg(x.cover))}" alt="${esc(x.name)}" loading="lazy" decoding="async">`
     : `<span class="mc-ph" aria-hidden="true">${esc(x.name.slice(0, 1))}</span>`;
   return `<a class="mc-card" href="/merchants/${esc(x.slug)}/">
     <div class="mc-media">${cover}</div>

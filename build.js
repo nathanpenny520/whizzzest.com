@@ -124,6 +124,114 @@ function renderFragment(tpl, ctx) {
 
 /* ---------------- 页面处理 ---------------- */
 
+/* ---------------- 图片优化（WebP 多宽度；未安装 sharp 时优雅降级为原图直出） ---------------- */
+
+const IMG_WIDTHS = [480, 800, 1200, 1600];
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch {
+  /* devDependency 未安装（如临时环境）→ 跳过 WebP，站点仍可用原 JPEG 打开 */
+}
+
+/** 扫描 src/assets/img，产出 { '/assets/img/x.jpeg': { file, width, png } }；无 sharp 返回 {} */
+async function scanImages() {
+  if (!sharp) return {};
+  const dir = path.join(SRC, 'assets', 'img');
+  const out = {};
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() || !/\.(jpe?g|png)$/i.test(entry.name)) continue;
+    const meta = await sharp(path.join(dir, entry.name)).metadata();
+    out[`/assets/img/${entry.name}`] = {
+      file: entry.name,
+      width: meta.width || 0,
+      png: /\.png$/i.test(entry.name),
+    };
+  }
+  return out;
+}
+
+/** 源图可用的变体宽度（不超过源宽；源图偏小则单给原生宽度一档） */
+function variantWidths(info) {
+  const ws = IMG_WIDTHS.filter((w) => w <= info.width);
+  return ws.length ? ws : info.width ? [info.width] : [];
+}
+
+/** 生成 <name>-<w>.webp 到 dist/assets/img/（照片 q80，PNG/二维码类 q90 保清晰） */
+async function generateWebp(images) {
+  const dir = path.join(SRC, 'assets', 'img');
+  const destDir = path.join(DIST, 'assets', 'img');
+  let count = 0;
+  for (const info of Object.values(images)) {
+    for (const w of variantWidths(info)) {
+      await sharp(path.join(dir, info.file))
+        .resize({ width: w })
+        .webp({ quality: info.png ? 90 : 80, effort: 6 })
+        .toFile(path.join(destDir, info.file.replace(/\.[a-z]+$/i, `-${w}.webp`)));
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * <img> 增强：/assets/img 源图包 <picture> 加 WebP srcset（原 JPEG 作回退）；
+ * data-src 懒加载图（轮播）改补 data-srcset / data-sizes，由 main.js 激活时赋值。
+ * sizes 取值：fetchpriority="high"（首屏 hero）→ 100vw；模板可写 data-sizes 覆盖；其余走卡片默认。
+ */
+function enhanceImages(html, images) {
+  const preloads = [];
+  html = html.replace(/<img\b[^>]*>/g, (tag) => {
+    const m = tag.match(/\s(?:data-)?src="(\/assets\/img\/([^"]+))"/);
+    const info = m && images[m[1]];
+    if (!m || !info) return tag;
+    const widths = variantWidths(info);
+    if (!widths.length) return tag;
+    const base = m[1].replace(/\.[a-z]+$/i, '');
+    const srcset = widths.map((w) => `${base}-${w}.webp ${w}w`).join(', ');
+    const isHero = /fetchpriority="high"/.test(tag);
+    const sizes = isHero ? '100vw' : (tag.match(/data-sizes="([^"]+)"/) || [])[1] || '(max-width: 833px) 100vw, 340px';
+    const clean = tag.replace(/\sdata-sizes="[^"]*"/g, '');
+    if (/data-src="/.test(tag)) {
+      return clean.replace(/data-src="/, `data-srcset="${srcset}" data-sizes="${sizes}" data-src="`);
+    }
+    if (isHero) preloads.push({ srcset, sizes });
+    return `<picture><source type="image/webp" srcset="${srcset}" sizes="${sizes}">${clean}</picture>`;
+  });
+  return { html, preloads };
+}
+
+/* ---------------- 产物压缩（只压 dist，源文件保持可读） ---------------- */
+
+function minifyCss(css) {
+  return css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([{}:;,>~])\s*/g, '$1')
+    .replace(/;}/g, '}')
+    .trim();
+}
+
+/** 折叠空白与注释；script/style/pre/textarea 内容原样保留（压空白可能破坏行注释等） */
+function minifyHtml(html) {
+  const parts = html.split(
+    /(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<pre\b[\s\S]*?<\/pre>|<textarea\b[\s\S]*?<\/textarea>)/g
+  );
+  return parts
+    .map((seg, i) =>
+      i % 2
+        ? seg
+        : seg
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/\s+/g, ' ')
+            .replace(/> </g, '><')
+            .trim()
+    )
+    .join('');
+}
+
+/* ---------------- 页面处理 ---------------- */
+
 /** 页面首部 JSON 元信息注释：<!-- {"title":"…","description":"…"} --> */
 function parseMeta(html) {
   const m = html.match(/^\s*<!--\s*(\{[\s\S]*?\})\s*-->/);
@@ -131,7 +239,7 @@ function parseMeta(html) {
   return JSON.parse(m[1]);
 }
 
-function buildPage(dirName, site) {
+function buildPage(dirName, site, images) {
   const pagePath = path.join(PAGES_DIR, dirName, 'index.html');
   let html = read(pagePath);
   const meta = parseMeta(html);
@@ -190,6 +298,17 @@ function buildPage(dirName, site) {
     `  <script type="application/ld+json">${JSON.stringify(jsonld)}</script>\n</head>`
   );
 
+  // 图片增强（WebP srcset / picture 回退）+ 首屏 hero preload；无 sharp 时 images 为空原样输出
+  const enhanced = enhanceImages(html, images);
+  html = enhanced.html;
+  if (enhanced.preloads.length) {
+    const links = enhanced.preloads
+      .map((p) => `<link rel="preload" as="image" imagesrcset="${p.srcset}" imagesizes="${p.sizes}" fetchpriority="high">`)
+      .join('');
+    html = html.replace('<link rel="stylesheet"', `${links}<link rel="stylesheet"`);
+  }
+  html = minifyHtml(html);
+
   const is404 = dirName === '404';
   // 404 页输出为 dist/404.html（Workers not_found_handling: "404-page" 约定）；其余为 <name>/index.html
   const outDir = dirName === 'index' || is404 ? DIST : path.join(DIST, dirName);
@@ -200,11 +319,12 @@ function buildPage(dirName, site) {
 
 /* ---------------- 主流程 ---------------- */
 
-function main() {
+async function main() {
   const t0 = Date.now();
   fs.rmSync(DIST, { recursive: true, force: true });
 
   const site = JSON.parse(read(path.join(DATA_DIR, 'site.json')));
+  const images = await scanImages();
 
   const pageDirs = fs
     .readdirSync(PAGES_DIR, { withFileTypes: true })
@@ -212,7 +332,7 @@ function main() {
     .map((e) => e.name)
     .sort((a, b) => (a === 'index' ? -1 : b === 'index' ? 1 : a.localeCompare(b)));
 
-  const built = pageDirs.map((d) => buildPage(d, site));
+  const built = pageDirs.map((d) => buildPage(d, site, images));
 
   // sitemap.xml（404 不收录；/merchants/ 由 Worker 动态渲染，商户明细另见 /merchants/sitemap.xml）
   const pages = built.filter((b) => b.slug !== '/404/');
@@ -242,6 +362,18 @@ ${pages
   // 静态资源
   copyDir(path.join(ROOT, 'public'), DIST);
   copyDir(path.join(SRC, 'assets'), path.join(DIST, 'assets'));
+
+  // WebP 变体生成（有 sharp 才有 images 清单）
+  if (Object.keys(images).length) {
+    const n = await generateWebp(images);
+    console.log(`  WebP 变体 ${n} 个已生成`);
+  } else if (!sharp) {
+    console.warn('  ⚠ 未安装 sharp（npm install），跳过 WebP 图片优化');
+  }
+
+  // CSS 压缩（须在指纹计算前：?v= 哈希基于压缩产物）
+  const cssPath = path.join(DIST, 'assets', 'css', 'style.css');
+  fs.writeFileSync(cssPath, minifyCss(read(cssPath)));
 
   // 资源指纹：CSS/JS 内容变化 → 引用加 ?v=hash。/assets/* 缓存一年 immutable（_headers），
   // 无版本号的话访客会拿到旧样式（浏览器不会重新验证），有版本号则内容一变 URL 即变。
@@ -281,4 +413,7 @@ ${pages
   console.log(`  sitemap.xml + robots.txt 已生成；首页 HTML ${kb(path.join(DIST, 'index.html'))}KB`);
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

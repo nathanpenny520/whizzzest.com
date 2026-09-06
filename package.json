@@ -1,0 +1,13 @@
+{
+  "name": "whizzzest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "焰境·万载 — 零依赖静态构建 + Cloudflare Workers；sharp 仅用于构建期 WebP 图片优化",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4"
+  }
+}

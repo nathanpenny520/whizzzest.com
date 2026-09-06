@@ -75,7 +75,17 @@ if (lightbox) {
   let lastFocus = null;
 
   const openLb = (src, caption) => {
-    lbImg.src = src;
+    // 优先取 WebP 变体（build.js 生成 <name>-800.webp）；没有该档（源图 <800px）时回退原图
+    const m = src.match(/^(\/assets\/img\/.+?)\.(jpe?g|png)$/i);
+    if (m) {
+      lbImg.onerror = () => {
+        lbImg.onerror = null;
+        lbImg.src = src;
+      };
+      lbImg.src = `${m[1]}-800.webp`;
+    } else {
+      lbImg.src = src;
+    }
     lbImg.alt = caption || '二维码';
     lbCap.textContent = caption || '';
     lastFocus = document.activeElement;
@@ -111,8 +121,21 @@ if (carousel && !reduceMotion) {
   let current = 0;
   let timer = null;
 
+  // 非首屏轮播图按需加载：切到某张才赋 src（含 WebP srcset/sizes），首帧只拉第一张
+  const activate = (i) => {
+    const img = slides[((i % slides.length) + slides.length) % slides.length]?.querySelector('img');
+    if (!img || !img.dataset.src) return;
+    img.src = img.dataset.src;
+    if (img.dataset.srcset) img.srcset = img.dataset.srcset;
+    if (img.dataset.sizes) img.sizes = img.dataset.sizes;
+    delete img.dataset.src;
+  };
+
   const show = (i) => {
     current = (i + slides.length) % slides.length;
+    activate(current);
+    // 稍候预取下一张，不与当前张抢带宽
+    setTimeout(() => activate(current + 1), 1500);
     slides.forEach((s, k) => s.classList.toggle('active', k === current));
     dots.forEach((d, k) => d.classList.toggle('active', k === current));
   };
@@ -133,12 +156,6 @@ if (carousel && !reduceMotion) {
 
   show(0);
   play();
-
-  // 非首屏轮播图延迟加载：首帧只拉第一张，其余在 JS 初始化后再取
-  slides.forEach((s) => {
-    const img = s.querySelector('img');
-    if (img?.dataset.src) img.src = img.dataset.src;
-  });
 } else {
   // 无轮播逻辑时保证第一张可见（.hero-slide:not(:first-child) 已隐藏其余）
   carousel?.querySelector('.hero-slide')?.classList.add('active');

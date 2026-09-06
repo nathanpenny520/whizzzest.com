@@ -10,7 +10,7 @@
       <div class="hero-carousel" id="hero-carousel" aria-hidden="true">
         {{#each data.carousel as slide}}
         <div class="hero-slide">
-          <img {{#if_first}}src="/assets/img/{{slide.img}}" loading="eager" fetchpriority="high"{{/if_first}}{{#if_not_first}}data-src="/assets/img/{{slide.img}}"{{/if_not_first}} alt="{{slide.alt}}" decoding="async">
+          <img {{#if_first}}src="/assets/img/{{slide.img}}" loading="eager" fetchpriority="high"{{/if_first}}{{#if_not_first}}data-src="/assets/img/{{slide.img}}"{{/if_not_first}} data-sizes="100vw" alt="{{slide.alt}}" decoding="async">
         </div>
         {{/each}}
       </div>
@@ -55,7 +55,7 @@
       <div class="container">
         <article class="split reveal{{#if_odd}} split-rev{{/if_odd}}">
           <div class="split-media">
-            <img src="/assets/img/{{sec.img}}" alt="{{sec.title}}" loading="lazy" decoding="async" {{#if sec.ar}}style="aspect-ratio:{{sec.ar}}"{{/if}}>
+            <img src="/assets/img/{{sec.img}}" alt="{{sec.title}}" loading="lazy" decoding="async" data-sizes="(max-width: 833px) 100vw, 512px" {{#if sec.ar}}style="aspect-ratio:{{sec.ar}}"{{/if}}>
           </div>
           <div class="split-body">
             <h2 class="split-title">{{sec.title}}</h2>

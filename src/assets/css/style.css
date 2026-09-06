@@ -51,6 +51,11 @@ img {
   height: auto;
 }
 
+/* build.js 会把 <img> 包进 <picture>（WebP 回退），布局上让 picture 透明化 */
+picture {
+  display: contents;
+}
+
 a {
   color: inherit;
   text-decoration: none;

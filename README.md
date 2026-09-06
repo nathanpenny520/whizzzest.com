@@ -9,7 +9,8 @@
 ## 开发
 
 ```bash
-node build.js                          # 构建
+npm install                            # 安装 sharp（构建期 WebP 图片优化；不装也能构建，仅跳过图片优化）
+npm run build                          # 构建
 python3 -m http.server 8788 -d dist    # 本地预览
 ```
 
@@ -17,4 +18,4 @@ push 到 `main` 分支自动部署。
 
 ## 联系
 
-whizzzest@outlook.com
+contact@whizzzest.com
