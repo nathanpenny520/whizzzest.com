@@ -145,15 +145,14 @@ async function merchantsHome(env, url, cat) {
     url: `${SITE_URL}/merchants/`,
     body: `
     <section class="mc-hero">
-      <div class="container">
+      <div class="container-wide">
         <p class="mc-kicker">焰境好店</p>
         <h1>万载本地商户推荐</h1>
         <p class="mc-sub">吃得地道、住得舒心、带得走的万载 —— 游客与本地人都在用。</p>
-        <a class="btn btn-light mc-apply" href="${APPLY_URL}" target="_blank" rel="noopener">商户入驻</a>
       </div>
     </section>
     <section class="mc-main">
-      <div class="container">
+      <div class="container-wide">
         ${searchBox}
         <nav class="mc-tabs" aria-label="商户分类">${catTabs}</nav>
         ${foundLine}

@@ -1697,8 +1697,7 @@ a.feature-card:hover {
 /* ==================== 商户展示（/merchants/，Worker 动态渲染） ==================== */
 
 .mc-hero {
-  padding: 72px 22px 60px;
-  text-align: center;
+  padding: 72px 0 48px;
   background: linear-gradient(180deg, var(--c-bg) 0%, #fbf1ec 100%);
 }
 
@@ -1710,21 +1709,23 @@ a.feature-card:hover {
 }
 
 .mc-hero h1 {
-  margin-top: 10px;
-  font-size: clamp(30px, 4.6vw, 48px);
+  margin-top: 12px;
+  font-size: clamp(30px, 4.4vw, 52px);
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 .mc-sub {
   margin-top: 12px;
   color: var(--c-text-2);
-  font-size: 16px;
+  font-size: clamp(16px, 2vw, 19px);
 }
 
-.mc-apply { margin-top: 22px; }
-
-.mc-main { padding: 40px 0 30px; }
+/* 主区：承接 hero 浅焰尾色，140px 内过渡到浅米（与文库主区同底色） */
+.mc-main {
+  padding: 8px 0 112px;
+  background: linear-gradient(180deg, #fbf1ec, #fbf9f6 140px);
+}
 
 .mc-tabs {
   display: flex;
@@ -1880,8 +1881,8 @@ a.feature-card:hover {
 }
 
 .mc-cta {
-  margin: 60px 0 20px;
-  padding: 48px 30px;
+  margin: 96px 0 0;
+  padding: 52px 40px;
   text-align: center;
   background: linear-gradient(135deg, #2b1208, #4a1d0e);
   border-radius: var(--radius);
@@ -1889,12 +1890,12 @@ a.feature-card:hover {
 }
 
 .mc-cta h2 {
-  font-size: clamp(22px, 3vw, 30px);
+  font-size: clamp(22px, 3vw, 32px);
   font-weight: 600;
 }
 
 .mc-cta p {
-  max-width: 560px;
+  max-width: 640px;
   margin: 12px auto 0;
   color: rgba(255, 255, 255, 0.75);
   font-size: 14px;
@@ -2039,7 +2040,7 @@ a.feature-card:hover {
 }
 
 @media (max-width: 640px) {
-  .mc-hero { padding: 52px 22px 44px; }
+  .mc-hero { padding: 48px 0 36px; }
   .mc-grid { grid-template-columns: repeat(auto-fill, minmax(46vw, 1fr)); gap: 12px; }
   .md-cover { aspect-ratio: 16 / 10; }
   .md-hero { padding-bottom: 48px; }
@@ -2806,8 +2807,7 @@ a.feature-card:hover {
 
 .bk-hero {
   padding: 72px 0 48px;
-  background: #fbf9f6;
-  border-bottom: 1px solid var(--c-hairline);
+  background: linear-gradient(180deg, var(--c-bg) 0%, #fbf1ec 100%);
 }
 
 .bk-kicker {
@@ -2829,7 +2829,10 @@ a.feature-card:hover {
   color: var(--c-text-2);
 }
 
-.bk-main { padding: 44px 0 112px; background: #fbf9f6; }
+.bk-main {
+  padding: 28px 0 112px;
+  background: linear-gradient(180deg, #fbf1ec, #fbf9f6 140px);
+}
 
 .bk-search {
   display: flex;
@@ -2995,7 +2998,11 @@ a.feature-card:hover {
 .bk-cta .btn { margin-top: 26px; }
 
 .bk-cta h2 { font-size: clamp(22px, 3vw, 32px); letter-spacing: -0.01em; }
-.bk-cta p { margin-top: 12px; color: rgba(245, 245, 247, 0.7); }
+.bk-cta p {
+  max-width: 640px;
+  margin: 12px auto 0;
+  color: rgba(245, 245, 247, 0.7);
+}
 
 /* 详情页 */
 .bk-detail { padding: 48px 0 112px; background: #fbf9f6; }
