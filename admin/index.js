@@ -252,7 +252,7 @@ const KIND_LABEL = {
 
 /** 天数参数 → SQL since 表达式（含边界校验） */
 function sinceExpr(daysParam) {
-  const days = [7, 30, 90].includes(daysParam) ? daysParam : 7;
+  const days = [7, 30, 90, 180, 365].includes(daysParam) ? daysParam : 7;
   const back = days === 1 ? '' : `,'-${days - 1} days'`;
   return { days, sql: `datetime('now','+8 hours','start of day','-8 hours'${back})` };
 }
@@ -262,7 +262,9 @@ async function statsOverview(env, request) {
   const { days, sql: SINCE } = sinceExpr(url.searchParams.get('days'));
   const db = env.DB;
 
-  const [cards, bounce, avgTime, newUv, daily, pages, kinds, sources, devices, browsers, oses, langs, countries, recent] =
+  const sincePrev = `datetime('now','+8 hours','start of day','-8 hours','-${days} days')`;
+
+  const [cards, bounce, avgTime, newUv, daily, pages, kinds, sources, devices, browsers, oses, langs, countries, recent, prevPv, live, firstSeen, entries, depth] =
     await Promise.all([
       db.prepare(
         `SELECT COUNT(*) pv, COUNT(DISTINCT ${GID}) uv, COUNT(DISTINCT sid) sessions
@@ -323,21 +325,53 @@ async function statsOverview(env, request) {
         `SELECT created_at, path, COALESCE(NULLIF(kind,''),'other') kind, ref_host, country, device, engage_ms
          FROM visits WHERE created_at >= ${SINCE} ORDER BY created_at DESC LIMIT 30`
       ).all(),
+      // 上一周期 PV（环比用）
+      db.prepare(`SELECT COUNT(*) n FROM visits WHERE created_at >= ${sincePrev} AND created_at < ${SINCE}`).first(),
+      // 实时：近 5 分钟浏览
+      db.prepare(`SELECT COUNT(*) n FROM visits WHERE created_at >= datetime('now','-5 minutes')`).first(),
+      // 每位访客的「首访日」分布（算每日新访客）
+      db.prepare(`SELECT date(MIN(created_at), '+8 hours') fd, COUNT(*) n FROM visits WHERE vid IS NOT NULL GROUP BY vid`).all(),
+      // 入口页 TOP（每会话的第一个页面）
+      db.prepare(
+        `SELECT path, COUNT(*) n FROM (
+           SELECT sid, path, ROW_NUMBER() OVER (PARTITION BY sid ORDER BY created_at) rn
+           FROM visits WHERE sid IS NOT NULL AND created_at >= ${SINCE}
+         ) WHERE rn = 1 GROUP BY path ORDER BY n DESC LIMIT 8`
+      ).all(),
+      // 会话深度分布（1 页 / 2-3 页 / 4 页以上）
+      db.prepare(
+        `SELECT SUM(CASE WHEN d = 1 THEN 1 ELSE 0 END) d1,
+                SUM(CASE WHEN d BETWEEN 2 AND 3 THEN 1 ELSE 0 END) d23,
+                SUM(CASE WHEN d >= 4 THEN 1 ELSE 0 END) d4p
+         FROM (SELECT COUNT(*) d FROM visits WHERE sid IS NOT NULL AND created_at >= ${SINCE} GROUP BY sid)`
+      ).first(),
     ]);
 
+    // 每日新访客：按首访日聚合
+    const newMap = {};
+    (firstSeen.results || []).forEach((r) => { newMap[r.fd] = (newMap[r.fd] || 0) + r.n; });
+    const dailyRows = (daily.results || []).map((r) => ({ ...r, new_uv: newMap[r.d] || 0 }));
+
   const sessions = cards?.sessions || 0;
+  const pv = cards?.pv || 0;
+  const prev = prevPv?.n || 0;
   return json({
     ok: true,
     days,
     cards: {
-      pv: cards?.pv || 0,
+      pv,
       uv: cards?.uv || 0,
       sessions,
       bounce: sessions ? Math.round(((bounce?.n || 0) / sessions) * 100) : 0,
       avg_time_s: Math.round((avgTime?.t || 0) / 1000),
       new_uv: newUv?.n || 0,
+      pages_per_session: sessions ? Math.round((pv / sessions) * 10) / 10 : 0,
+      delta_pv: prev ? Math.round(((pv - prev) / prev) * 100) : null,
+      live5: live?.n || 0,
     },
-    daily: (daily.results || []),
+    daily: dailyRows,
+    entries: entries.results || [],
+    depth: { d1: depth?.d1 || 0, d23: depth?.d23 || 0, d4p: depth?.d4p || 0 },
     top_pages: (pages.results || []).map((p) => ({ ...p, avg_s: Math.round((p.avg_ms || 0) / 1000) })),
     kinds: (kinds.results || []).map((k) => ({ ...k, label: KIND_LABEL[k.kind] || k.kind })),
     sources: sources.results || [],
@@ -679,7 +713,7 @@ ${BASE_CSS}
   /* 访客分析 */
   .range { display: flex; align-items: center; gap: 10px; margin: 18px auto 0; max-width: 1060px; }
   .range .updated { margin-left: auto; color: #86868b; font-size: 12px; }
-  .cards { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin: 14px 0 0; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 0; }
   .card2 { background: #fff; border-radius: 16px; padding: 16px 14px; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
   .card2 b { display: block; font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
   .card2 span { display: block; margin-top: 4px; color: #6e6e73; font-size: 12px; }
@@ -745,7 +779,7 @@ ${BASE_CSS}
 </head>
 <body>
 <header>
-  <h1>焰境·万载 · 后台<span>whizzzest.com</span></h1>
+  <h1>焰境·万载</h1>
   <button id="vtab-msg" class="tab active" type="button">留言</button>
   <button id="vtab-visit" class="tab" type="button">访客</button>
   <button id="vtab-merch" class="tab" type="button">商户</button>
@@ -768,6 +802,8 @@ ${BASE_CSS}
     <button class="tab" data-days="7" type="button">7 天</button>
     <button class="tab active" data-days="30" type="button">30 天</button>
     <button class="tab" data-days="90" type="button">90 天</button>
+    <button class="tab" data-days="180" type="button">180 天</button>
+    <button class="tab" data-days="365" type="button">365 天</button>
     <span class="updated" id="updated"></span>
     <button id="vrefresh" type="button">刷新</button>
   </div>
@@ -778,10 +814,13 @@ ${BASE_CSS}
     <div class="card2"><b id="c-bounce">–</b><span>跳出率</span></div>
     <div class="card2"><b id="c-avg">–</b><span>平均停留</span></div>
     <div class="card2"><b id="c-new">–</b><span>新访客</span></div>
+    <div class="card2"><b id="c-pps">–</b><span>页 / 会话</span></div>
+    <div class="card2"><b id="c-delta">–</b><span>浏览量环比</span></div>
+    <div class="card2"><b id="c-live">–</b><span>5 分钟内活跃</span></div>
   </div>
   <div class="panel">
     <h3>每日浏览与访客</h3>
-    <div class="legend"><span><i style="background:#d64524"></i>浏览量</span><span><i style="background:#8ab4ff"></i>访客数</span><span id="chart-empty" style="margin-left:auto"></span></div>
+    <div class="legend"><span><i style="background:#d64524"></i>浏览量</span><span><i style="background:#8ab4ff"></i>访客数</span><span><i style="background:#f2a03d"></i>新访客</span><span id="chart-empty" style="margin-left:auto"></span></div>
     <svg class="chart" id="chart" viewBox="0 0 1000 240" preserveAspectRatio="none"></svg>
   </div>
   <div class="panel">
@@ -801,6 +840,10 @@ ${BASE_CSS}
   <div class="grid2" style="margin-top:14px">
     <div class="panel" style="margin:0"><h3>国家 / 地区</h3><div id="countries"></div></div>
     <div class="panel" style="margin:0"><h3>最近页面浏览</h3><table><tbody id="recent"></tbody></table></div>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="panel" style="margin:0"><h3>入口页 TOP（每会话首站）</h3><div id="entries"></div></div>
+    <div class="panel" style="margin:0"><h3>会话浏览深度</h3><div id="depth"></div></div>
   </div>
   <div class="panel">
     <h3>访客列表（最近活跃在前，点击展开会话与轨迹）</h3>
@@ -997,6 +1040,11 @@ function loadStats() {
     el('c-bounce').textContent = d.cards.bounce + '%';
     el('c-avg').textContent = fmtDur(d.cards.avg_time_s);
     el('c-new').textContent = d.cards.uv ? Math.round((d.cards.new_uv / d.cards.uv) * 100) + '%' : '0%';
+    el('c-pps').textContent = d.cards.pages_per_session;
+    var dl = d.cards.delta_pv;
+    el('c-delta').textContent = dl === null ? '—' : (dl >= 0 ? '▲ ' : '▼ ') + Math.abs(dl) + '%';
+    el('c-delta').style.color = dl === null ? '#6e6e73' : (dl >= 0 ? '#1a7f37' : '#d64524');
+    el('c-live').textContent = d.live5;
     drawChart(d.daily || []);
     fillTable('top-pages', d.top_pages, function (p) {
       return '<td>' + esc(p.path) + '</td><td>' + p.pv + '</td><td>' + p.uv + '</td><td>' + fmtDur(p.avg_s) + '</td>';
@@ -1010,6 +1058,13 @@ function loadStats() {
     fillBars('countries', (d.countries || []).map(function (c) {
       return { label: (flag(c.name) || '') + ' ' + c.name, uv: c.uv, pv: c.pv };
     }));
+    fillBars('entries', (d.entries || []).map(function (x) { return { label: x.path, uv: x.n, pv: x.n }; }), true);
+    var dp = d.depth || {};
+    fillBars('depth', [
+      { label: '只看 1 页', uv: dp.d1, pv: dp.d1 },
+      { label: '2-3 页', uv: dp.d23, pv: dp.d23 },
+      { label: '4 页以上', uv: dp.d4p, pv: dp.d4p },
+    ], true);
     el('recent').innerHTML = (d.recent || []).map(function (r) {
       return '<tr><td>' + esc(fmtTime(r.created_at)) + '</td><td>' + esc(r.path) + '</td><td>' +
         '<span class="k-badge">' + esc(KIND_LABEL[r.kind] || r.kind) + '</span></td><td>' +
@@ -1026,7 +1081,7 @@ function fillTable(id, rows, fn) {
     : '<tr><td class="empty">暂无数据</td></tr>';
 }
 
-function fillBars(id, rows) {
+function fillBars(id, rows, single) {
   var max = 0;
   (rows || []).forEach(function (r) { if (r.pv > max) max = r.pv; });
   el(id).innerHTML = (rows && rows.length)
@@ -1034,7 +1089,7 @@ function fillBars(id, rows) {
         var w = max ? Math.round((r.pv / max) * 100) : 0;
         return '<div class="bar-row"><span class="label" title="' + esc(r.label) + '">' + esc(r.label) + '</span>' +
           '<div class="bar-track"><div class="bar-fill" style="width:' + w + '%"></div></div>' +
-          '<b>' + r.uv + ' 访客 · ' + r.pv + ' 浏览</b></div>';
+          '<b>' + (single ? r.pv : r.uv + ' 访客 · ' + r.pv + ' 浏览') + '</b></div>';
       }).join('')
     : '<div class="bar-row"><span class="label dim">暂无数据</span></div>';
 }
@@ -1065,6 +1120,7 @@ function drawChart(daily) {
   svg.innerHTML = grid +
     '<polyline points="' + pts('pv') + '" fill="none" stroke="#d64524" stroke-width="2.5" stroke-linejoin="round"/>' +
     '<polyline points="' + pts('uv') + '" fill="none" stroke="#8ab4ff" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<polyline points="' + pts('new_uv') + '" fill="none" stroke="#f2a03d" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/>' +
     daily.map(function (d, i) {
       return '<circle cx="' + (PAD + i * step).toFixed(1) + '" cy="' + y(d.pv).toFixed(1) + '" r="3" fill="#d64524"/>' +
         '<circle cx="' + (PAD + i * step).toFixed(1) + '" cy="' + y(d.uv).toFixed(1) + '" r="3" fill="#8ab4ff"/>';
