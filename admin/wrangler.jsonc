@@ -13,6 +13,13 @@
       "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
     }
   ],
+  // 商户图片桶（删除商户时级联清理 m<id>/ 前缀对象；与 merchant/ 根 worker 同桶）
+  "r2_buckets": [
+    {
+      "binding": "IMG",
+      "bucket_name": "whizzzest-merchant"
+    }
+  ],
   "routes": [
     { "pattern": "admin.whizzzest.com", "custom_domain": true }
   ]

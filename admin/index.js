@@ -149,7 +149,7 @@ async function handleApi(request, env, path) {
     return visitorDetail(env, decodeURIComponent(m[1]));
   }
 
-  // 商户管理（M1，docs/商户功能方案.md）
+  // 商户管理（M1，docs/商户功能方案.md）；DELETE 级联删除门户账号 + R2 图片
   if (path === '/api/merchants' && method === 'GET') return listMerchants(env, request);
   if (path === '/api/merchants' && method === 'POST') return createMerchant(env, request);
   if ((m = path.match(/^\/api\/merchants\/(\d+)$/)) && method === 'POST') {
@@ -665,6 +665,21 @@ async function removeMerchant(env, id) {
     env.DB.prepare('DELETE FROM merchants WHERE id = ?1').bind(id),
   ]);
   if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+
+  // 级联清理 R2 图片：按 m<id>/ 前缀全删（覆盖换图留下的历史对象与文档页封面键；
+  // admin 表单里的站内路径封面如 /assets/img/… 不在该前缀下，不受影响）。尽力而为，失败不回滚 D1
+  if (env.IMG) {
+    try {
+      let cursor;
+      do {
+        const list = await env.IMG.list({ prefix: `m${id}/`, cursor });
+        await Promise.all(list.objects.map((o) => env.IMG.delete(o.key)));
+        cursor = list.truncated ? list.cursor : undefined;
+      } while (cursor);
+    } catch (err) {
+      console.error(`R2 image cleanup failed for merchant ${id}:`, err);
+    }
+  }
   return json({ ok: true });
 }
 
@@ -948,6 +963,8 @@ ${BASE_CSS}
   .meta { color: #86868b; font-size: 12px; word-break: break-all; }
   .ops { display: flex; gap: 8px; margin-top: 14px; }
   .ops button { padding: 5px 12px; font-size: 12px; }
+  .ops button.danger { background: #d64524; border-color: #d64524; color: #fff; }
+  .ops button.danger:hover { background: #b5371a; color: #fff; }
   .stat-line { color: #6e6e73; font-size: 13px; margin: 12px 0 0; }
   .vwrap { margin-top: 12px; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
   .vrow td { cursor: pointer; }
@@ -1583,7 +1600,20 @@ function renderMerchant(x) {
     } else if (act === 'edit') {
       openForm(x);
     } else if (act === 'del') {
-      if (!confirm('确定删除「' + x.name + '」？不可恢复。')) return;
+      // 二次点击确认：首击变红待确认，4 秒未点自动复原；第二击才真正删除（含图片，不可恢复）
+      var btn = e.target;
+      if (btn.getAttribute('data-armed') !== '1') {
+        btn.setAttribute('data-armed', '1');
+        btn.className = 'danger';
+        btn.textContent = '确认删除（含图片）';
+        setTimeout(function () {
+          if (!btn.isConnected) return;
+          btn.removeAttribute('data-armed');
+          btn.className = '';
+          btn.textContent = '删除';
+        }, 4000);
+        return;
+      }
       api('/api/merchants/' + x.id, { method: 'DELETE' }).then(function () { loadMerchants(true); });
     }
   });
