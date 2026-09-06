@@ -4,28 +4,37 @@
   "email": "contact@whizzzest.com",
   "nav": [
     {
-      "href": "/",
-      "label": "首页"
-    },
-    {
       "href": "/heritage/",
-      "label": "非遗文化"
+      "label": "非遗",
+      "menu": [
+        { "href": "/heritage/", "label": "非遗文化概览" },
+        { "href": "/heritage/#fireworks", "label": "万载花炮" },
+        { "href": "/heritage/#deshenggu", "label": "得胜鼓" },
+        { "href": "/heritage/#xiaBu", "label": "夏布织造" },
+        { "href": "/heritage/#kaiKouNuo", "label": "开口傩" },
+        { "href": "/heritage/#zhiPeng", "label": "纸棚山歌" }
+      ]
     },
     {
       "href": "/cuisine/",
-      "label": "美食特产"
+      "label": "美食",
+      "menu": [
+        { "href": "/cuisine/", "label": "美食特产概览" },
+        { "href": "/merchants/?cat=food", "label": "焰境好店 · 美食" }
+      ]
     },
     {
       "href": "/industry/",
-      "label": "烟花产业"
+      "label": "烟花",
+      "menu": [
+        { "href": "/industry/", "label": "烟花产业" },
+        { "href": "/spots/", "label": "赏烟地点" },
+        { "href": "/tv/?cat=fireworks", "label": "烟花视频 · 万载TV" }
+      ]
     },
     {
       "href": "/tourism/",
       "label": "旅游线路"
-    },
-    {
-      "href": "/spots/",
-      "label": "赏烟地点"
     },
     {
       "href": "/tv/",
@@ -34,10 +43,6 @@
     {
       "href": "/merchants/",
       "label": "商户"
-    },
-    {
-      "href": "/about/",
-      "label": "关于"
     }
   ],
   "footer": {

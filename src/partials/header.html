@@ -9,12 +9,38 @@
       <span class="nav-burger-line" aria-hidden="true"></span>
     </button>
     <ul class="nav-menu" aria-label="站内页面">
-      {{#each site.nav}}<li class="nav-item"><a class="nav-link" href="{{item.href}}">{{item.label}}</a></li>{{/each}}
+      {{#each site.nav as item}}
+      <li class="nav-item{{#if item.menu}} has-menu{{/if}}">
+        <a class="nav-link" href="{{item.href}}"{{#if item.menu}} aria-haspopup="true" aria-expanded="false"{{/if}}>{{item.label}}</a>
+        {{#if item.menu}}
+        <div class="nav-panel">
+          <div class="nav-panel-inner">
+            <p class="nav-panel-title">{{item.label}}</p>
+            <ul class="nav-panel-list">
+              {{#each item.menu as sub}}<li><a class="nav-panel-link" href="{{sub.href}}">{{sub.label}}</a></li>{{/each}}
+            </ul>
+          </div>
+        </div>
+        {{/if}}
+      </li>
+      {{/each}}
     </ul>
   </nav>
 </header>
 <div class="nav-drawer" id="nav-drawer">
   <ul class="nav-drawer-list" aria-label="站内页面">
-    {{#each site.nav}}<li class="nav-drawer-item"><a class="nav-link" href="{{item.href}}">{{item.label}}</a></li>{{/each}}
+    {{#each site.nav as item}}
+    {{#if item.menu}}
+    <li class="nav-drawer-item has-menu">
+      <button class="nav-drawer-toggle" type="button" aria-expanded="false">{{item.label}}<span class="nav-drawer-caret" aria-hidden="true"></span></button>
+      <ul class="nav-drawer-sub">
+        {{#each item.menu as sub}}<li class="nav-drawer-subitem"><a class="nav-link" href="{{sub.href}}">{{sub.label}}</a></li>{{/each}}
+      </ul>
+    </li>
+    {{/if}}
+    {{#unless item.menu}}
+    <li class="nav-drawer-item"><a class="nav-link" href="{{item.href}}">{{item.label}}</a></li>
+    {{/unless}}
+    {{/each}}
   </ul>
 </div>

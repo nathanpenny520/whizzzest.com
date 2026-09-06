@@ -19,7 +19,7 @@
     <section class="section">
       <div class="container">
         {{#each data.sections as s}}
-        <article class="split reveal">
+        <article class="split reveal" id="{{s.key}}">
           <div class="split-media">
             <div class="video-frame">
               <iframe src="https://player.bilibili.com/player.html?bvid={{s.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{s.title}}视频"></iframe>

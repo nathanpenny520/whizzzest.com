@@ -2604,3 +2604,145 @@ a.feature-card:hover {
   .tv-strip-head { flex-direction: column; align-items: flex-start; gap: 8px; }
   .tv-strip-row { grid-auto-columns: calc((100% - 40px) / 2.5); gap: 14px; }
 }
+
+/* ============================================================
+   导航下拉（Apple 式全宽毛玻璃面板）+ 移动端手风琴（导航改版 v2.6）
+   桌面：hover/键盘展开；面板锚定 header（sticky 即包含块）全宽滑出
+   ============================================================ */
+
+/* 锚点跳转给吸顶导航留空间（非遗下拉等 /#key 链接） */
+[id] { scroll-margin-top: calc(var(--nav-h) + 16px); }
+
+.nav-item.has-menu > .nav-link { position: relative; }
+
+/* 展开时主链接与面板的衔接：主题链接提色 */
+.nav-item.open > .nav-link,
+.nav-item:focus-within > .nav-link { color: var(--c-text); }
+
+.nav-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 99;
+  display: none;
+  background: rgba(251, 251, 253, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--c-hairline);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease),
+    visibility 0.28s;
+  visibility: hidden;
+}
+
+.nav-item.open .nav-panel,
+.nav-item:focus-within .nav-panel {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+}
+
+.nav-panel-inner {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 26px 22px 34px;
+}
+
+.nav-panel-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--c-text-3);
+}
+
+.nav-panel-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-panel-link {
+  display: block;
+  padding: 8px 0;
+  font-size: 15px;
+  color: var(--c-text);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: color 0.2s var(--ease);
+}
+
+.nav-panel-link:hover {
+  color: var(--c-accent);
+}
+
+@media (min-width: 834px) {
+  .nav-item.open .nav-panel,
+  .nav-item:focus-within .nav-panel { display: block; }
+}
+
+/* 移动端抽屉手风琴（子项列表默认收起） */
+.nav-drawer-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 13px 0;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--c-text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.nav-drawer-caret {
+  width: 10px;
+  height: 10px;
+  border-right: 1.5px solid var(--c-text-2);
+  border-bottom: 1.5px solid var(--c-text-2);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.25s var(--ease);
+  margin-right: 4px;
+}
+
+.nav-drawer-item.open .nav-drawer-caret {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.nav-drawer-sub {
+  display: none;
+  padding: 2px 0 12px;
+}
+
+.nav-drawer-item.open .nav-drawer-sub { display: block; }
+
+.nav-drawer-subitem { padding: 9px 0; }
+
+.nav-drawer-subitem .nav-link {
+  display: block;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--c-text-2);
+}
+
+@media (max-width: 833px) {
+  .nav-panel { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-panel,
+  .nav-drawer-caret { transition: none; }
+}
+
+.footer-about-link {
+  color: var(--c-text-2);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.footer-about-link:hover { color: var(--c-accent); }

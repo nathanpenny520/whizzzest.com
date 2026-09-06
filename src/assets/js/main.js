@@ -33,13 +33,97 @@ window.addEventListener('resize', () => {
   if (window.innerWidth > 833) setMenu(false);
 });
 
-/* 当前页导航高亮 */
+/* 当前页导航高亮（导航改版 v2.6：子页归属主题；带查询串的快捷链接不参与归属） */
 const here = location.pathname.replace(/\/index\.html$/, '/');
+const navThemeItems = [...document.querySelectorAll('.nav-item.has-menu')];
+
+function hereMatches(href, strictPath) {
+  try {
+    const u = new URL(href || '', location.origin);
+    if (strictPath && u.search) return false;
+    return u.pathname.replace(/\/index\.html$/, '/') === here;
+  } catch {
+    return false;
+  }
+}
+
 for (const link of document.querySelectorAll('.nav-link')) {
-  const href = link.getAttribute('href');
-  if (href === here || (href === '/' && here === '/')) {
+  if (hereMatches(link.getAttribute('href'), false)) {
     link.setAttribute('aria-current', 'page');
   }
+}
+for (const item of navThemeItems) {
+  const main = item.querySelector(':scope > .nav-link');
+  if (!main || main.getAttribute('aria-current') === 'page') continue;
+  const subs = [...item.querySelectorAll('.nav-panel-link')];
+  if (subs.some((s) => hereMatches(s.getAttribute('href'), true))) {
+    main.setAttribute('aria-current', 'page');
+  }
+}
+
+/* 桌面下拉（Apple 式全宽面板）：hover 意图 + 键盘可达；触屏首击展开 */
+const navHeader = document.querySelector('.nav');
+const canHover = matchMedia('(hover: hover) and (pointer: fine)').matches;
+let navCloseTimer = null;
+
+function closeAllMenus() {
+  clearTimeout(navCloseTimer);
+  for (const item of navThemeItems) {
+    item.classList.remove('open');
+    item.querySelector(':scope > .nav-link')?.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function openNavItem(item) {
+  if (item.classList.contains('open')) return;
+  closeAllMenus();
+  item.classList.add('open');
+  item.querySelector(':scope > .nav-link')?.setAttribute('aria-expanded', 'true');
+}
+
+if (navHeader && navThemeItems.length) {
+  const desktopMenu = () => canHover && window.innerWidth > 833;
+  for (const item of navThemeItems) {
+    item.addEventListener('mouseenter', () => {
+      if (!desktopMenu()) return;
+      clearTimeout(navCloseTimer);
+      openNavItem(item);
+    });
+    item.addEventListener('mouseleave', () => {
+      if (!desktopMenu()) return;
+      clearTimeout(navCloseTimer);
+      navCloseTimer = setTimeout(closeAllMenus, 140);
+    });
+    item.addEventListener('focusin', () => openNavItem(item));
+    item.addEventListener('focusout', (e) => {
+      if (e.relatedTarget instanceof Node && item.contains(e.relatedTarget)) return;
+      navCloseTimer = setTimeout(closeAllMenus, 10);
+    });
+    // 触屏宽屏（无 hover）：首击展开面板，再击进主题主页；窄屏走抽屉链接正常跳转
+    item.querySelector(':scope > .nav-link')?.addEventListener('click', (e) => {
+      if (desktopMenu() && !item.classList.contains('open')) {
+        e.preventDefault();
+        openNavItem(item);
+      }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (e.target instanceof Element && !navHeader.contains(e.target)) closeAllMenus();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllMenus();
+  });
+}
+
+/* 移动抽屉手风琴（主题项点击展开子项） */
+for (const btn of document.querySelectorAll('.nav-drawer-toggle')) {
+  btn.addEventListener('click', () => {
+    const li = btn.closest('.nav-drawer-item');
+    if (!li) return;
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    li.classList.toggle('open', !open);
+  });
 }
 
 /* 滚动浮现（尊重 prefers-reduced-motion） */
