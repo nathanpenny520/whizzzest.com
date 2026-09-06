@@ -1372,3 +1372,101 @@ button {
     padding: 6px 24px;
   }
 }
+
+/* ---------------- 二维码灯箱（合作伙伴公众号等） ---------------- */
+
+.partner-qr-btn {
+  color: var(--c-accent);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 2px 4px;
+}
+
+.partner-qr-btn:hover {
+  text-decoration: underline;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s var(--ease), visibility 0.3s;
+}
+
+.lightbox.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.lightbox::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.lightbox-body {
+  position: relative;
+  background: var(--c-bg);
+  border-radius: 24px;
+  padding: 30px 30px 26px;
+  text-align: center;
+  max-width: min(88vw, 440px);
+  transform: scale(0.95) translateY(8px);
+  transition: transform 0.3s var(--ease);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.lightbox.open .lightbox-body {
+  transform: none;
+}
+
+.lightbox-body img {
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+.lightbox-cap {
+  margin-top: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-bg-alt);
+  color: var(--c-text-2);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.lightbox-close:hover {
+  background: #e8e8ed;
+  color: var(--c-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox,
+  .lightbox-body {
+    transition: none;
+  }
+}

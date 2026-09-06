@@ -98,7 +98,7 @@
           {{#each data.partners.list as partner}}
           <div class="partner-card">
             {{#if partner.href}}<a href="{{partner.href}}" target="_blank" rel="noopener">{{partner.name}} ↗</a>{{/if}}
-            {{#unless partner.href}}<span>{{partner.name}}</span>{{/unless}}
+            {{#if partner.qr}}<button type="button" class="partner-qr-btn" data-qr="/assets/img/{{partner.qr}}" data-cap="{{partner.cap}}" title="点击查看微信公众号二维码">{{partner.name}}</button>{{/if}}
           </div>
           {{/each}}
         </div>
@@ -136,5 +136,12 @@
 
   </main>
   {{> footer}}
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="二维码查看">
+    <div class="lightbox-body">
+      <button class="lightbox-close" type="button" aria-label="关闭">✕</button>
+      <img src="" alt="二维码">
+      <figcaption class="lightbox-cap"></figcaption>
+    </div>
+  </div>
 </body>
 </html>

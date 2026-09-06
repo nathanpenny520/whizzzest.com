@@ -83,19 +83,24 @@
     "list": [
       {
         "name": "万载县文旅局",
-        "href": ""
+        "href": "",
+        "qr": "wanzai_wenlv_QR.jpeg",
+        "cap": "万载县文旅局 · 微信公众号"
       },
       {
         "name": "万载古城景区",
-        "href": "http://zgwzgc.com/"
+        "href": "http://zgwzgc.com/",
+        "qr": ""
       },
       {
         "name": "彩天艺术焰火",
-        "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb"
+        "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb",
+        "qr": ""
       },
       {
         "name": "泰麟花炮",
-        "href": "http://www.wztlhp.com/"
+        "href": "http://www.wztlhp.com/",
+        "qr": ""
       }
     ]
   },

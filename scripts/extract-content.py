@@ -275,10 +275,10 @@ def main():
         "partners": {
             "title": ab["partners"]["title"],
             "list": [
-                {"name": ab["partners"]["list"]["partner1"]["name"], "href": ""},
-                {"name": ab["partners"]["list"]["partner2"]["name"], "href": "http://zgwzgc.com/"},
-                {"name": ab["partners"]["list"]["partner3"]["name"], "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb"},
-                {"name": ab["partners"]["list"]["partner4"]["name"], "href": "http://www.wztlhp.com/"},
+                {"name": ab["partners"]["list"]["partner1"]["name"], "href": "", "qr": "wanzai_wenlv_QR.jpeg", "cap": "万载县文旅局 · 微信公众号"},
+                {"name": ab["partners"]["list"]["partner2"]["name"], "href": "http://zgwzgc.com/", "qr": ""},
+                {"name": ab["partners"]["list"]["partner3"]["name"], "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb", "qr": ""},
+                {"name": ab["partners"]["list"]["partner4"]["name"], "href": "http://www.wztlhp.com/", "qr": ""},
             ],
         },
         "contact": {

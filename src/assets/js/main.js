@@ -67,6 +67,42 @@ for (const el of document.querySelectorAll('.js-year')) {
   el.textContent = String(new Date().getFullYear());
 }
 
+/* 二维码灯箱：页内 [data-qr] 元素点击弹出大图（合作伙伴公众号等） */
+const lightbox = document.getElementById('lightbox');
+if (lightbox) {
+  const lbImg = lightbox.querySelector('img');
+  const lbCap = lightbox.querySelector('.lightbox-cap');
+  let lastFocus = null;
+
+  const openLb = (src, caption) => {
+    lbImg.src = src;
+    lbImg.alt = caption || '二维码';
+    lbCap.textContent = caption || '';
+    lastFocus = document.activeElement;
+    lightbox.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    lightbox.querySelector('.lightbox-close')?.focus();
+  };
+
+  const closeLb = () => {
+    lightbox.classList.remove('open');
+    document.body.style.overflow = '';
+    lastFocus?.focus?.();
+  };
+
+  document.addEventListener('click', (e) => {
+    const trigger = e.target instanceof Element ? e.target.closest('[data-qr]') : null;
+    if (trigger) openLb(trigger.dataset.qr, trigger.dataset.cap || '');
+  });
+  lightbox.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element) || !e.target.closest('.lightbox-body')) closeLb();
+  });
+  lightbox.querySelector('.lightbox-close')?.addEventListener('click', closeLb);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lightbox.classList.contains('open')) closeLb();
+  });
+}
+
 /* 首页 Hero 轮播（交叉淡入；无 JS / reduced-motion 时静止第一张） */
 const carousel = document.getElementById('hero-carousel');
 if (carousel && !reduceMotion) {
