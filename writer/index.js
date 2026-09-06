@@ -401,7 +401,7 @@ async function sendCodeEmail(env, email, code, purpose) {
     pass: env.SMTP_PASS,
     to: email,
     fromName: '焰境·万载文库',
-    subject: '验证码（10 分钟内有效）',
+    subject: `验证码（10 分钟内有效）· ${code.slice(0, 2)}${Date.now().toString(36).slice(-4)}`,
     html: `<div style="margin:0;padding:32px 16px;background:#f5f5f7;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background:#ffffff;border-radius:20px;">
@@ -1498,7 +1498,10 @@ function redirect(path) {
 }
 
 function html(body, status = 200) {
-  return new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8' } });
+  return new Response(body, {
+    status,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+  });
 }
 
 function json(obj, status = 200) {

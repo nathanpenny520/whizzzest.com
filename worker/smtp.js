@@ -83,6 +83,8 @@ export async function sendMail({ user, pass, to, subject, html, fromName = 'ç„°å
       `From: =?UTF-8?B?${btoa(unescape(encodeURIComponent(fromName)))}?= <${user}>`,
       `To: <${to}>`,
       `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+      `Date: ${new Date().toUTCString()}`,
+      `Message-ID: <${Date.now()}.${Math.random().toString(36).slice(2)}@whizzzest.com>`,
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=UTF-8',
       'Content-Transfer-Encoding: base64',
