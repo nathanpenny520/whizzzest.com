@@ -483,7 +483,7 @@ async function statsOverview(env, request) {
          )`
       ).first(),
       db.prepare(
-        `SELECT date(created_at, '+8 hours') d, COUNT(*) pv, COUNT(DISTINCT vid) uv
+        `SELECT date(created_at, '+8 hours') d, COUNT(*) pv, COUNT(DISTINCT vid) uv, COUNT(DISTINCT sid) sessions
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY d ORDER BY d`
       ).all(),
       db.prepare(
@@ -494,9 +494,16 @@ async function statsOverview(env, request) {
         `SELECT COALESCE(NULLIF(kind,''),'other') kind, COUNT(DISTINCT sid) sessions, COUNT(*) pv
          FROM ${T} WHERE created_at >= ${SINCE} GROUP BY kind ORDER BY pv DESC`
       ).all(),
+      // 来源站归一化在 SQL 侧完成：自有域折叠为「站内」、外部域剥 www. —— 一个显示标签一个分组
       db.prepare(
-        `SELECT COALESCE(NULLIF(ref_host,''),'直接访问') src, COUNT(DISTINCT sid) sessions, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY src ORDER BY pv DESC LIMIT 8`
+        `SELECT src, COUNT(DISTINCT sid) sessions, COUNT(*) pv FROM (
+           SELECT CASE
+             WHEN ref_host IS NULL OR ref_host = '' THEN '直接访问'
+             WHEN ref_host = 'whizzzest.com' OR ref_host LIKE '%.whizzzest.com' THEN '站内'
+             WHEN ref_host LIKE 'www.%' THEN SUBSTR(ref_host, 5)
+             ELSE ref_host END AS src, sid
+           FROM ${T} WHERE created_at >= ${SINCE}
+         ) GROUP BY src ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(device,''),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
@@ -504,19 +511,29 @@ async function statsOverview(env, request) {
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(NULLIF(browser,''),'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(NULLIF(os,''),'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 30`
       ).all(),
+      // 语言归一化在 SQL 侧完成：按前缀映射到显示标签再分组，杜绝 en 与 en-US 各成一行、双双显示「英语」
       db.prepare(
-        `SELECT COALESCE(NULLIF(lang,''),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY lang ORDER BY pv DESC LIMIT 8`
+        `SELECT name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv FROM (
+           SELECT CASE
+             WHEN lang IS NULL OR lang = '' THEN '未知'
+             WHEN lang LIKE 'zh-Hant%' OR lang LIKE 'zh-TW%' OR lang LIKE 'zh-HK%' OR lang LIKE 'zh-MO%' THEN '繁体中文'
+             WHEN lang LIKE 'zh%' THEN '简体中文'
+             WHEN lang LIKE 'en%' THEN '英语'
+             WHEN lang LIKE 'ja%' THEN '日语'
+             WHEN lang LIKE 'ko%' THEN '韩语'
+             ELSE lang END AS name, vid, ip
+           FROM ${T} WHERE created_at >= ${SINCE}
+         ) GROUP BY name ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(country,''),'未知') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY country ORDER BY pv DESC LIMIT 8`
+         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY country ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT created_at, path, COALESCE(NULLIF(kind,''),'other') kind, ref_host, country, device, engage_ms
@@ -533,7 +550,7 @@ async function statsOverview(env, request) {
         `SELECT path, COUNT(*) n FROM (
            SELECT sid, path, ROW_NUMBER() OVER (PARTITION BY sid ORDER BY created_at) rn
            FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE}
-         ) WHERE rn = 1 GROUP BY path ORDER BY n DESC LIMIT 8`
+         ) WHERE rn = 1 GROUP BY path ORDER BY n DESC LIMIT 30`
       ).all(),
       // 会话深度分布（1 页 / 2-3 页 / 4 页以上）
       db.prepare(
@@ -1849,19 +1866,46 @@ ${BASE_CSS}
   /* 访客分析 */
   .range { display: flex; align-items: center; gap: 10px; margin: 18px auto 0; max-width: 1060px; }
   .range .updated { margin-left: auto; color: #86868b; font-size: 12px; }
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 0; }
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 12px 0 0; }
   .card2 { background: #fff; border-radius: 16px; padding: 16px 14px; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
   .card2 b { display: block; font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
   .card2 span { display: block; margin-top: 4px; color: #6e6e73; font-size: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 0; }
+  .kpi { background: #fff; border-radius: 18px; padding: 18px 20px 14px; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
+  .kpi-head { display: flex; align-items: center; justify-content: space-between; color: #6e6e73; font-size: 13px; }
+  .kpi-head .delta { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kpi-val { display: block; margin-top: 4px; font-size: 34px; font-weight: 600; letter-spacing: -.02em; }
+  .spark { width: 100%; height: 36px; margin-top: 8px; display: block; }
+  .livedot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #1a7f37; margin-right: 5px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .livedot { animation: lpulse 2s ease-in-out infinite; }
+  }
+  @keyframes lpulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .bar-row { display: grid; grid-template-columns: 110px 1fr 86px; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
-  .bar-row .label { color: #1d1d1f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar-track { height: 8px; background: #f0f0f2; border-radius: 999px; overflow: hidden; }
-  .bar-fill { height: 100%; background: linear-gradient(90deg, #d64524, #f2a03d); border-radius: 999px; }
-  .bar-row b { color: #6e6e73; font-weight: 500; text-align: right; white-space: nowrap; }
-  svg.chart { width: 100%; height: 240px; }
+  .panel { position: relative; }
+  .mini { padding: 2px 10px !important; font-size: 11px !important; float: right; margin-left: 8px; }
+  /* 维度条形：单色细条、数据端 4px 圆角、基线方角；「其他/未知」与长尾行灰色去强调 */
+  .bar-row { display: grid; grid-template-columns: minmax(56px, 8.5em) 1fr auto; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; }
+  .bar-row .label { color: #1d1d1f; overflow-wrap: anywhere; line-height: 1.3; }
+  .bar-track { height: 8px; background: #f0f0f2; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #d64524; border-radius: 0 4px 4px 0; }
+  .bar-row.dimrow .label { color: #86868b; }
+  .bar-row.dimrow .bar-fill { background: #c9c9ce; }
+  .bar-row.tailrow { cursor: pointer; }
+  .bar-row.tailrow:hover .label { color: #d64524; }
+  .bar-val { text-align: right; line-height: 1.3; white-space: nowrap; }
+  .bar-val b { color: #1d1d1f; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bar-val .u { color: #86868b; }
+  .bar-val small { display: block; color: #86868b; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .new-badge { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; background: #fdeee8; color: #d64524; font-size: 10px; font-weight: 600; vertical-align: 1px; }
+  svg.chart { width: 100%; height: 260px; outline: none; }
   svg.chart text { font-size: 12px; fill: #86868b; font-family: inherit; }
+  .viz-tip { position: absolute; display: none; pointer-events: none; background: #fff; border-radius: 10px; padding: 8px 12px; box-shadow: 0 4px 18px rgba(0,0,0,.14); font-size: 12px; color: #6e6e73; z-index: 6; min-width: 132px; }
+  .viz-tip .tt-date { font-weight: 600; color: #1d1d1f; margin-bottom: 4px; white-space: nowrap; }
+  .viz-tip .tt-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; white-space: nowrap; }
+  .viz-tip .tt-key { width: 10px; height: 3px; border-radius: 2px; flex: 0 0 auto; }
+  .viz-tip .tt-row b { margin-left: auto; padding-left: 14px; color: #1d1d1f; font-variant-numeric: tabular-nums; }
   .legend { display: flex; gap: 16px; font-size: 12px; color: #6e6e73; margin-bottom: 8px; }
   .legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
   .k-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #f5f5f7; font-size: 12px; color: #6e6e73; }
@@ -1921,6 +1965,7 @@ ${BASE_CSS}
   .mslug:hover { color: #d64524; }
   @media (max-width: 900px) {
     .cards { grid-template-columns: repeat(3, 1fr); }
+    .kpis { grid-template-columns: 1fr; }
     .grid3, .grid2 { grid-template-columns: 1fr; }
     .mgrid { grid-template-columns: 1fr 1fr; }
   }
@@ -1992,6 +2037,10 @@ ${BASE_CSS}
     <button class="tab" data-days="90" type="button">90 天</button>
     <button class="tab" data-days="180" type="button">180 天</button>
     <button class="tab" data-days="365" type="button">365 天</button>
+    <span class="dimm" style="display:flex;align-items:center;gap:2px;font-size:13px;color:#6e6e73">维度条长按
+      <button class="tab active" data-metric="pv" type="button">浏览</button>
+      <button class="tab" data-metric="uv" type="button">访客</button>
+    </span>
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73">
       <input id="include-bots" type="checkbox">包含扫描/机器人
     </label>
@@ -2001,21 +2050,36 @@ ${BASE_CSS}
     <span class="updated" id="updated"></span>
     <button id="vrefresh" type="button">刷新</button>
   </div>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-head"><span>浏览量</span><span class="delta" id="c-delta">–</span></div>
+      <b class="kpi-val" id="c-pv">–</b>
+      <svg class="spark" id="sp-pv" aria-hidden="true"></svg>
+    </div>
+    <div class="kpi">
+      <div class="kpi-head"><span>访客数</span></div>
+      <b class="kpi-val" id="c-uv">–</b>
+      <svg class="spark" id="sp-uv" aria-hidden="true"></svg>
+    </div>
+    <div class="kpi">
+      <div class="kpi-head"><span>会话数</span></div>
+      <b class="kpi-val" id="c-sessions">–</b>
+      <svg class="spark" id="sp-sess" aria-hidden="true"></svg>
+    </div>
+  </div>
   <div class="cards">
-    <div class="card2"><b id="c-pv">–</b><span>浏览量</span></div>
-    <div class="card2"><b id="c-uv">–</b><span>访客数</span></div>
-    <div class="card2"><b id="c-sessions">–</b><span>会话数</span></div>
     <div class="card2"><b id="c-bounce">–</b><span>跳出率</span></div>
     <div class="card2"><b id="c-avg">–</b><span>平均停留</span></div>
-    <div class="card2"><b id="c-new">–</b><span>新访客</span></div>
     <div class="card2"><b id="c-pps">–</b><span>页 / 会话</span></div>
-    <div class="card2"><b id="c-delta">–</b><span>浏览量环比</span></div>
-    <div class="card2"><b id="c-live">–</b><span>5 分钟内活跃</span></div>
+    <div class="card2"><b id="c-new">–</b><span>新访客占比</span></div>
+    <div class="card2"><b id="c-live">–</b><span><i class="livedot"></i>5 分钟内活跃</span></div>
   </div>
   <div class="panel">
-    <h3>每日浏览与访客</h3>
-    <div class="legend"><span><i style="background:#d64524"></i>浏览量</span><span><i style="background:#8ab4ff"></i>访客数</span><span><i style="background:#f2a03d"></i>新访客</span><span id="chart-empty" style="margin-left:auto"></span></div>
-    <svg class="chart" id="chart" viewBox="0 0 1000 240" preserveAspectRatio="none"></svg>
+    <h3>每日浏览与访客<button class="mini" id="chart-table-toggle" type="button">数据表</button></h3>
+    <div class="legend" id="chart-legend"><span><i style="background:#d64524"></i>浏览量</span><span><i style="background:#2a78d6"></i>访客数</span><span><i style="background:#129b74"></i>新访客</span><span id="chart-empty" style="margin-left:auto"></span></div>
+    <svg class="chart" id="chart" tabindex="0" role="img" aria-label="每日浏览量、访客数与新访客趋势折线图，可用左右方向键逐日查看数值"></svg>
+    <div class="viz-tip" id="chart-tip"></div>
+    <div id="chart-table" style="display:none;max-height:300px;overflow-y:auto"><table><thead><tr><th style="width:25%">日期</th><th style="width:25%">浏览量</th><th style="width:25%">访客数</th><th style="width:25%">新访客</th></tr></thead><tbody id="chart-table-body"></tbody></table></div>
   </div>
   <div class="panel">
     <h3>热门页面</h3>
@@ -2344,13 +2408,32 @@ var currentView = 'msg';
 var visitDays = 30;
 var vOffset = 0;
 var KIND_LABEL = { direct: '直接访问', internal: '站内跳转', search: '搜索引擎', social: '社交媒体', referral: '外部链接', other: '其他' };
-// 设备/语言维度存的是采集端原始值（desktop、zh-CN…），展示前转中文；未收录的原样显示
+// 设备维度存的是采集端原始值（desktop…），展示前转中文；未收录的原样显示。
+// 语言/来源站的归一化已在服务端 SQL 完成（按显示标签分组），前端拿到即最终标签，不会再出现多行同名
 var DEVICE_LABEL = { desktop: '桌面端', mobile: '移动端', tablet: '平板', '—': '未知' };
-var LANG_LABEL = {
-  'zh-CN': '简体中文', 'zh-TW': '繁體中文', 'zh-HK': '繁體中文', zh: '中文',
-  en: '英语', 'en-US': '英语', ja: '日语', 'ja-JP': '日语', ko: '韩语', '—': '未知',
-};
 function dimName(map, name) { return map[name] || name || '—'; }
+// 图表配色（经色觉区分度与白底对比度校验）；「其他/未知」与长尾行用灰去强调
+var C_PV = '#d64524', C_UV = '#2a78d6', C_NEW = '#129b74', C_GRAY = '#c9c9ce';
+function fmtNum(n) { return (n || 0).toLocaleString('zh-CN'); }
+// SQLite datetime（UTC）转「多久前」；超过两天退回月-日
+function fmtAgo(utc) {
+  var d = new Date(utc.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return utc;
+  var s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60) return '刚刚';
+  if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+  if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+  if (s < 172800) return '昨天';
+  return d.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric' });
+}
+// 该访客是否在所选时段内首访（与服务端 SINCE 同口径：北京时区零点起算）
+function isRangeNew(first) {
+  var d = new Date(first.replace(' ', 'T') + 'Z');
+  if (isNaN(d.getTime())) return false;
+  var bj = new Date(Date.now() + 8 * 3600 * 1000);
+  bj.setUTCHours(0, 0, 0, 0);
+  return d.getTime() >= bj.getTime() - (visitDays - 1) * 86400000;
+}
 
 function el(id) { return document.getElementById(id); }
 function esc(s) {
@@ -2500,40 +2583,25 @@ el('tab-all').addEventListener('click', function () {
 var includeBots = false;
 var autoRefresh = true;
 
+var lastStats = null;
+var dimMetric = 'pv';
+var barDataStore = {};
+var barOpen = {};
+var barSingle = {};
+var BAR_IDS = ['kinds', 'sources', 'devices', 'browsers', 'os', 'langs', 'countries', 'entries', 'depth'];
+
 function loadStats() {
   el('updated').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
   api('/api/stats?days=' + visitDays + (includeBots ? '&bots=1' : '')).then(function (d) {
-    el('c-pv').textContent = d.cards.pv;
-    el('c-uv').textContent = d.cards.uv;
-    el('c-sessions').textContent = d.cards.sessions;
-    el('c-bounce').textContent = d.cards.bounce + '%';
-    el('c-avg').textContent = fmtDur(d.cards.avg_time_s);
-    el('c-new').textContent = d.cards.uv ? Math.round((d.cards.new_uv / d.cards.uv) * 100) + '%' : '0%';
-    el('c-pps').textContent = d.cards.pages_per_session;
-    var dl = d.cards.delta_pv;
-    el('c-delta').textContent = dl === null ? '—' : (dl >= 0 ? '▲ ' : '▼ ') + Math.abs(dl) + '%';
-    el('c-delta').style.color = dl === null ? '#6e6e73' : (dl >= 0 ? '#1a7f37' : '#d64524');
-    el('c-live').textContent = d.live5;
-    drawChart(d.daily || []);
+    lastStats = d;
+    renderCards(d);
+    renderSparks(d);
+    registerBars(d);
+    renderBarsAll();
+    renderChart();
     fillTable('top-pages', d.top_pages, function (p) {
-      return '<tr><td>' + esc(p.path) + '</td><td>' + p.pv + '</td><td>' + p.uv + '</td><td>' + fmtDur(p.avg_s) + '</td></tr>';
+      return '<tr><td>' + esc(p.path) + '</td><td>' + fmtNum(p.pv) + '</td><td>' + fmtNum(p.uv) + '</td><td>' + fmtDur(p.avg_s) + '</td></tr>';
     });
-    fillBars('kinds', (d.kinds || []).map(function (k) { return { label: k.label || k.kind, uv: k.sessions, pv: k.pv }; }));
-    fillBars('sources', (d.sources || []).map(function (s) { return { label: s.src, uv: s.sessions, pv: s.pv }; }));
-    fillBars('devices', (d.devices || []).map(function (x) { return { label: dimName(DEVICE_LABEL, x.name), uv: x.uv, pv: x.pv }; }));
-    fillBars('browsers', (d.browsers || []).map(function (x) { return { label: x.name === 'Other' ? '其他' : (x.name || '—'), uv: x.uv, pv: x.pv }; }));
-    fillBars('os', (d.os || []).map(function (x) { return { label: x.name === 'Other' ? '其他' : (x.name || '—'), uv: x.uv, pv: x.pv }; }));
-    fillBars('langs', (d.langs || []).map(function (x) { return { label: dimName(LANG_LABEL, x.name), uv: x.uv, pv: x.pv }; }));
-    fillBars('countries', (d.countries || []).map(function (c) {
-      return { label: (flag(c.name) || '') + ' ' + c.name, uv: c.uv, pv: c.pv };
-    }));
-    fillBars('entries', (d.entries || []).map(function (x) { return { label: x.path, uv: x.n, pv: x.n }; }), true);
-    var dp = d.depth || {};
-    fillBars('depth', [
-      { label: '只看 1 页', uv: dp.d1, pv: dp.d1 },
-      { label: '2-3 页', uv: dp.d23, pv: dp.d23 },
-      { label: '4 页以上', uv: dp.d4p, pv: dp.d4p },
-    ], true);
     el('recent').innerHTML = (d.recent || []).map(function (r) {
       return '<tr><td>' + esc(fmtTime(r.created_at)) + '</td><td>' + esc(r.path) + '</td><td>' +
         '<span class="k-badge">' + esc(KIND_LABEL[r.kind] || r.kind) + '</span></td><td>' +
@@ -2542,6 +2610,114 @@ function loadStats() {
   }).catch(function (e) {
     if (e.message !== 'unauthorized') el('chart-empty').textContent = '加载失败：' + esc(e.message);
   });
+}
+
+function renderCards(d) {
+  el('c-pv').textContent = fmtNum(d.cards.pv);
+  el('c-uv').textContent = fmtNum(d.cards.uv);
+  el('c-sessions').textContent = fmtNum(d.cards.sessions);
+  el('c-bounce').textContent = d.cards.bounce + '%';
+  el('c-avg').textContent = fmtDur(d.cards.avg_time_s);
+  el('c-new').textContent = d.cards.uv ? Math.round((d.cards.new_uv / d.cards.uv) * 100) + '%' : '0%';
+  el('c-pps').textContent = d.cards.pages_per_session;
+  var dl = d.cards.delta_pv;
+  el('c-delta').textContent = dl === null ? '—' : (dl >= 0 ? '▲ ' : '▼ ') + Math.abs(dl) + '%';
+  el('c-delta').style.color = dl === null ? '#86868b' : (dl >= 0 ? '#1a7f37' : '#d64524');
+  el('c-live').textContent = fmtNum(d.live5);
+}
+
+function renderSparks(d) {
+  var daily = d.daily || [];
+  drawSpark('sp-pv', daily.map(function (x) { return x.pv; }), C_PV);
+  drawSpark('sp-uv', daily.map(function (x) { return x.uv; }), C_UV);
+  drawSpark('sp-sess', daily.map(function (x) { return x.sessions || 0; }), C_GRAY);
+}
+
+/* ---------- 维度条形（Top 6 + 长尾折叠） ---------- */
+// 登记一个维度的数据并渲染；single = 单指标卡（入口页/浏览深度，数值本身就是会话数）
+function barData(id, rows, single) {
+  barDataStore[id] = rows;
+  barSingle[id] = !!single;
+  renderBars(id);
+}
+
+function registerBars(d) {
+  barData('kinds', (d.kinds || []).map(function (k) {
+    var label = k.label || k.kind;
+    return { label: label, pv: k.pv, uv: k.sessions, uvLabel: '会话', dim: label === '其他' };
+  }));
+  barData('sources', (d.sources || []).map(function (s) {
+    return { label: s.src, pv: s.pv, uv: s.sessions, uvLabel: '会话' };
+  }));
+  barData('devices', (d.devices || []).map(function (x) {
+    var n = dimName(DEVICE_LABEL, x.name);
+    return { label: n, pv: x.pv, uv: x.uv, dim: n === '未知' };
+  }));
+  barData('browsers', (d.browsers || []).map(function (x) {
+    var n = x.name === 'Other' ? '其他' : (x.name || '—');
+    return { label: n, pv: x.pv, uv: x.uv, dim: n === '其他' || n === '—' };
+  }));
+  barData('os', (d.os || []).map(function (x) {
+    var n = x.name === 'Other' ? '其他' : (x.name || '—');
+    return { label: n, pv: x.pv, uv: x.uv, dim: n === '其他' || n === '—' };
+  }));
+  barData('langs', (d.langs || []).map(function (x) {
+    return { label: x.name || '未知', pv: x.pv, uv: x.uv, dim: !x.name || x.name === '未知' };
+  }));
+  barData('countries', (d.countries || []).map(function (c) {
+    return { label: (flag(c.name) || '') + ' ' + (c.name || '未知'), pv: c.pv, uv: c.uv, dim: !c.name || c.name === '未知' };
+  }));
+  barData('entries', (d.entries || []).map(function (x) {
+    return { label: x.path, pv: x.n, uv: x.n, pvLabel: '会话', uvLabel: '会话', one: true };
+  }), true);
+  var dp = d.depth || {};
+  barData('depth', [
+    { label: '只看 1 页', pv: dp.d1, uv: dp.d1, pvLabel: '会话', uvLabel: '会话', one: true },
+    { label: '2-3 页', pv: dp.d23, uv: dp.d23, pvLabel: '会话', uvLabel: '会话', one: true },
+    { label: '4 页以上', pv: dp.d4p, uv: dp.d4p, pvLabel: '会话', uvLabel: '会话', one: true },
+  ], true);
+}
+
+function renderBarsAll() { BAR_IDS.forEach(renderBars); }
+
+function renderBars(id) {
+  var rows = barDataStore[id] || [];
+  var box = el(id);
+  if (!rows.length) { box.innerHTML = '<div class="bar-row"><span class="label" style="color:#86868b">暂无数据</span></div>'; return; }
+  var m = dimMetric === 'uv' ? 'uv' : 'pv';
+  var max = 0, sum = 0;
+  rows.forEach(function (r) { var v = r[m] || 0; if (v > max) max = v; sum += v; });
+  var TOPN = 6, tail = null, show = rows;
+  if (!barOpen[id] && rows.length > TOPN) {
+    // 折叠长尾：默认只展示 Top 6，其余聚合成一行灰色的「其余 N 项」
+    show = rows.slice(0, TOPN);
+    tail = { label: '其余 ' + (rows.length - TOPN) + ' 项', pv: 0, uv: 0, dim: true, tail: true, uvLabel: rows[0].uvLabel, pvLabel: rows[0].pvLabel };
+    rows.slice(TOPN).forEach(function (r) { tail.pv += r.pv || 0; tail.uv += r.uv || 0; });
+  } else if (barOpen[id] && rows.length > TOPN) {
+    tail = { label: '收起', tail: true, open: true };
+  }
+  var html = show.map(function (r) { return barRow(r, m, max, sum); }).join('');
+  if (tail) html += barRow(tail, m, max, sum);
+  box.innerHTML = html;
+}
+
+function barRow(r, m, max, sum) {
+  if (r.tail && r.open) {
+    return '<div class="bar-row tailrow"><span class="label">收起 ▴</span><div class="bar-track"></div><div class="bar-val"></div></div>';
+  }
+  var v = r[m] || 0;
+  var w = max ? Math.round((v / max) * 100) : 0;
+  var pct = sum ? Math.round((v / sum) * 100) : 0;
+  var u1 = m === 'pv' ? (r.pvLabel || '浏览') : (r.uvLabel || '访客');
+  var val = '<b>' + fmtNum(v) + '</b><span class="u"> ' + u1 + ' · ' + pct + '%</span>';
+  if (!r.one) {
+    var other = m === 'pv' ? { v: r.uv || 0, u: r.uvLabel || '访客' } : { v: r.pv || 0, u: r.pvLabel || '浏览' };
+    val += '<small>' + fmtNum(other.v) + ' ' + other.u + '</small>';
+  }
+  return '<div class="bar-row' + (r.dim ? ' dimrow' : '') + (r.tail ? ' tailrow' : '') + '">' +
+    '<span class="label" title="' + esc(r.label) + '">' + esc(r.label) + '</span>' +
+    '<div class="bar-track"><div class="bar-fill" style="width:' + w + '%"></div></div>' +
+    '<div class="bar-val">' + val + '</div></div>';
 }
 
 function fillTable(id, rows, fn) {
@@ -2565,37 +2741,183 @@ function fillBars(id, rows, single) {
     : '<div class="bar-row"><span class="label dim">暂无数据</span></div>';
 }
 
-function drawChart(daily) {
-  var svg = el('chart');
-  el('chart-empty').textContent = daily.length ? '' : '暂无数据';
-  if (!daily.length) { svg.innerHTML = ''; return; }
-  var W = 1000, H = 240, PAD = 24;
+/* ---------- 趋势图（等比 SVG + 十字线悬浮读数 + 数据表视图） ---------- */
+function drawSpark(id, vals, color) {
+  var svg = el(id);
+  vals = vals || [];
+  if (!vals.length) { svg.innerHTML = ''; return; }
+  var W = svg.clientWidth || 160, H = 36;
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   var max = 1;
-  daily.forEach(function (d) { if (d.pv > max) max = d.pv; if (d.uv > max) max = d.uv; });
-  var step = daily.length > 1 ? (W - PAD * 2) / (daily.length - 1) : 0;
-  var y = function (v) { return H - PAD - (v / max) * (H - PAD * 2); };
-  var pts = function (key) {
-    return daily.map(function (d, i) { return (PAD + i * step).toFixed(1) + ',' + y(d[key]).toFixed(1); }).join(' ');
-  };
+  vals.forEach(function (v) { if (v > max) max = v; });
+  var step = vals.length > 1 ? (W - 6) / (vals.length - 1) : 0;
+  var pts = vals.map(function (v, i) {
+    return (3 + i * step).toFixed(1) + ',' + (H - 5 - (v / max) * (H - 12)).toFixed(1);
+  }).join(' ');
+  var lx = 3 + (vals.length - 1) * step;
+  var ly = H - 5 - (vals[vals.length - 1] / max) * (H - 12);
+  svg.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".4"/>' +
+    '<circle cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="2.5" fill="' + color + '"/>';
+}
+
+// 纵轴上限取 2/4/8 × 10 的幂，保证四等分刻度都是整洁数
+function niceCeil(v) {
+  var k = Math.pow(10, Math.floor(Math.log10(Math.max(1, v))));
+  var c = [2 * k, 4 * k, 8 * k];
+  for (var i = 0; i < c.length; i++) { if (c[i] >= v) return c[i]; }
+  return 20 * k;
+}
+function fmtTick(v) {
+  var r = Math.round(v * 10) / 10;
+  return r >= 1000 ? (r / 1000).toFixed(r % 1000 ? 1 : 0) + 'k' : String(r);
+}
+
+var chartTableMode = false;
+
+function renderChart() {
+  var svg = el('chart');
+  var daily = (lastStats && lastStats.daily) || [];
+  el('chart-empty').textContent = daily.length ? '' : '暂无数据';
+  el('chart').style.display = chartTableMode ? 'none' : '';
+  el('chart-legend').style.display = chartTableMode ? 'none' : '';
+  el('chart-table').style.display = chartTableMode ? '' : 'none';
+  buildChartTable(daily);
+  if (chartTableMode || !daily.length) { svg.innerHTML = ''; return; }
+  // viewBox 按渲染时的实际像素宽生成（1:1 绘制），线条与圆点不会因拉伸变形；resize 时重绘
+  var W = svg.clientWidth || 900, H = 260;
+  var P = { t: 12, r: 66, b: 26, l: 46 };
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  var maxV = 1;
+  daily.forEach(function (d) { if (d.pv > maxV) maxV = d.pv; if (d.uv > maxV) maxV = d.uv; });
+  var yMax = niceCeil(maxV);
+  var n = daily.length;
+  var step = n > 1 ? (W - P.l - P.r) / (n - 1) : 0;
+  function X(i) { return P.l + i * step; }
+  function Y(v) { return P.t + (1 - (v || 0) / yMax) * (H - P.t - P.b); }
   var grid = '';
   for (var g = 0; g <= 4; g++) {
-    var gy = (PAD + ((H - PAD * 2) * g) / 4).toFixed(1);
-    grid += '<line x1="' + PAD + '" y1="' + gy + '" x2="' + (W - PAD) + '" y2="' + gy + '" stroke="rgba(0,0,0,.06)"/>';
-    grid += '<text x="4" y="' + (+gy + 4) + '">' + Math.round(max - (max * g) / 4) + '</text>';
+    var gy = Y(yMax * (4 - g) / 4);
+    grid += '<line x1="' + P.l + '" y1="' + gy.toFixed(1) + '" x2="' + (W - P.r) + '" y2="' + gy.toFixed(1) + '" stroke="#eef0f2" stroke-width="1"/>' +
+      '<text x="' + (P.l - 8) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end">' + fmtTick(yMax * (4 - g) / 4) + '</text>';
   }
-  var xLabels = '';
-  [0, Math.floor((daily.length - 1) / 2), daily.length - 1].forEach(function (i, k) {
-    if (i < 0 || i >= daily.length || (k === 1 && daily.length < 5)) return;
-    xLabels += '<text x="' + (PAD + i * step) + '" y="' + (H - 4) + '" text-anchor="middle">' + daily[i].d.slice(5) + '</text>';
+  var tickEvery = Math.max(1, Math.ceil(n / 6));
+  var xlab = '';
+  for (var i = 0; i < n; i += tickEvery) {
+    xlab += '<text x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + daily[i].d.slice(5) + '</text>';
+  }
+  if ((n - 1) % tickEvery !== 0) {
+    xlab += '<text x="' + X(n - 1).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + daily[n - 1].d.slice(5) + '</text>';
+  }
+  function line(key, color) {
+    var pts = daily.map(function (d, i) { return X(i).toFixed(1) + ',' + Y(d[key]).toFixed(1); }).join(' ');
+    return '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+  // 31 天内逐日画点（白描边防重叠糊住）；更长时段靠十字线读数
+  var dots = n <= 31 ? daily.map(function (d, i) {
+    return '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(d.pv).toFixed(1) + '" r="3" fill="' + C_PV + '" stroke="#fff" stroke-width="2"/>' +
+      '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(d.uv).toFixed(1) + '" r="3" fill="' + C_UV + '" stroke="#fff" stroke-width="2"/>' +
+      '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(d.new_uv).toFixed(1) + '" r="3" fill="' + C_NEW + '" stroke="#fff" stroke-width="2"/>';
+  }).join('') : '';
+  // 线端直标数值（重叠时向下错开 14px）
+  var ends = [
+    { v: daily[n - 1].pv, color: C_PV },
+    { v: daily[n - 1].uv, color: C_UV },
+    { v: daily[n - 1].new_uv, color: C_NEW },
+  ];
+  ends.forEach(function (e) { e.y = Y(e.v); });
+  ends.sort(function (a, b) { return a.y - b.y; });
+  for (var j = 1; j < ends.length; j++) { if (ends[j].y - ends[j - 1].y < 14) ends[j].y = ends[j - 1].y + 14; }
+  var elab = '';
+  ends.forEach(function (e) {
+    elab += '<rect x="' + (W - P.r + 6) + '" y="' + (e.y - 1.5).toFixed(1) + '" width="8" height="3" rx="1.5" fill="' + e.color + '"/>' +
+      '<text x="' + (W - P.r + 18) + '" y="' + (e.y + 4).toFixed(1) + '">' + fmtNum(e.v) + '</text>';
   });
-  svg.innerHTML = grid +
-    '<polyline points="' + pts('pv') + '" fill="none" stroke="#d64524" stroke-width="2.5" stroke-linejoin="round"/>' +
-    '<polyline points="' + pts('uv') + '" fill="none" stroke="#8ab4ff" stroke-width="2.5" stroke-linejoin="round"/>' +
-    '<polyline points="' + pts('new_uv') + '" fill="none" stroke="#f2a03d" stroke-width="2" stroke-linejoin="round" stroke-dasharray="6 4"/>' +
-    daily.map(function (d, i) {
-      return '<circle cx="' + (PAD + i * step).toFixed(1) + '" cy="' + y(d.pv).toFixed(1) + '" r="3" fill="#d64524"/>' +
-        '<circle cx="' + (PAD + i * step).toFixed(1) + '" cy="' + y(d.uv).toFixed(1) + '" r="3" fill="#8ab4ff"/>';
-    }).join('') + xLabels;
+  svg.innerHTML = grid + line('pv', C_PV) + line('uv', C_UV) + line('new_uv', C_NEW) + dots + elab + xlab +
+    '<line id="xhair" x1="0" x2="0" y1="' + P.t + '" y2="' + (H - P.b) + '" stroke="#c7c7cc" stroke-width="1" style="display:none"/>' +
+    '<g id="xdots" style="display:none"></g>' +
+    '<rect id="chart-hit" x="' + P.l + '" y="0" width="' + (W - P.l - P.r) + '" height="' + H + '" fill="transparent"/>';
+  bindChartInteraction(svg, daily, X, Y, P, step, n);
+}
+
+function bindChartInteraction(svg, daily, X, Y, P, step, n) {
+  var tip = el('chart-tip');
+  function showIdx(i) {
+    i = Math.max(0, Math.min(n - 1, i));
+    svg._cur = i;
+    var x = X(i).toFixed(1);
+    var ln = document.getElementById('xhair');
+    var gd = document.getElementById('xdots');
+    if (!ln || !gd) return;
+    ln.setAttribute('x1', x); ln.setAttribute('x2', x); ln.style.display = '';
+    gd.innerHTML = '<circle cx="' + x + '" cy="' + Y(daily[i].pv).toFixed(1) + '" r="4" fill="' + C_PV + '" stroke="#fff" stroke-width="2"/>' +
+      '<circle cx="' + x + '" cy="' + Y(daily[i].uv).toFixed(1) + '" r="4" fill="' + C_UV + '" stroke="#fff" stroke-width="2"/>' +
+      '<circle cx="' + x + '" cy="' + Y(daily[i].new_uv).toFixed(1) + '" r="4" fill="' + C_NEW + '" stroke="#fff" stroke-width="2"/>';
+    gd.style.display = '';
+    // tooltip 内容用 textContent 构建（来源数据不可拼进 innerHTML）
+    tip.innerHTML = '';
+    var h = document.createElement('div');
+    h.className = 'tt-date';
+    h.textContent = daily[i].d;
+    tip.appendChild(h);
+    [['浏览量', daily[i].pv, C_PV], ['访客数', daily[i].uv, C_UV], ['新访客', daily[i].new_uv, C_NEW]].forEach(function (row) {
+      var r = document.createElement('div');
+      r.className = 'tt-row';
+      var k = document.createElement('i');
+      k.className = 'tt-key';
+      k.style.background = row[2];
+      var s = document.createElement('span');
+      s.textContent = row[0];
+      var b = document.createElement('b');
+      b.textContent = fmtNum(row[1]);
+      r.appendChild(k); r.appendChild(s); r.appendChild(b);
+      tip.appendChild(r);
+    });
+    tip.style.display = 'block';
+    // 定位：SVG 无 offsetLeft/Top，用相对面板的 rect 差值换算（tooltip 绝对定位于面板）
+    var pr = svg.parentElement.getBoundingClientRect();
+    var sr = svg.getBoundingClientRect();
+    var sx = sr.left - pr.left, sy = sr.top - pr.top;
+    var px = sx + X(i) + 14;
+    if (px + tip.offsetWidth + 8 > sx + svg.clientWidth) px = sx + X(i) - tip.offsetWidth - 14;
+    tip.style.left = Math.max(sx, px) + 'px';
+    tip.style.top = (sy + P.t + 6) + 'px';
+  }
+  function hideTip() {
+    var ln = document.getElementById('xhair');
+    var gd = document.getElementById('xdots');
+    if (ln) ln.style.display = 'none';
+    if (gd) gd.style.display = 'none';
+    tip.style.display = 'none';
+    svg._cur = null;
+  }
+  var hit = document.getElementById('chart-hit');
+  hit.addEventListener('pointermove', function (e) {
+    var rect = svg.getBoundingClientRect();
+    showIdx(Math.round((e.clientX - rect.left - P.l) / (step || 1)));
+  });
+  hit.addEventListener('pointerleave', hideTip);
+  // 键盘可达：聚焦后左右方向键逐日读数，与悬浮同一份信息
+  svg._show = showIdx; svg._hide = hideTip; svg._n = n;
+  if (!svg.dataset.kbd) {
+    svg.dataset.kbd = '1';
+    svg.addEventListener('focus', function () { if (svg._show && svg._n) svg._show(svg._n - 1); });
+    svg.addEventListener('blur', function () { if (svg._hide) svg._hide(); });
+    svg.addEventListener('keydown', function (e) {
+      if (!svg._n || !svg._show) return;
+      var cur = svg._cur == null ? svg._n - 1 : svg._cur;
+      if (e.key === 'ArrowLeft') cur = Math.max(0, cur - 1);
+      else if (e.key === 'ArrowRight') cur = Math.min(svg._n - 1, cur + 1);
+      else return;
+      e.preventDefault();
+      svg._show(cur);
+    });
+  }
+}
+
+function buildChartTable(daily) {
+  el('chart-table-body').innerHTML = (daily || []).slice().reverse().map(function (d) {
+    return '<tr><td>' + esc(d.d) + '</td><td>' + fmtNum(d.pv) + '</td><td>' + fmtNum(d.uv) + '</td><td>' + fmtNum(d.new_uv) + '</td></tr>';
+  }).join('') || '<tr><td colspan="4" class="empty">暂无数据</td></tr>';
 }
 
 var vOffset = 0;
@@ -2620,11 +2942,12 @@ function renderVisitor(v) {
   var tr = document.createElement('tr');
   tr.className = 'vrow';
   tr.innerHTML =
-    '<td>' + esc(fmtTime(v.last)) + '</td>' +
+    '<td title="最近 ' + esc(fmtTime(v.last)) + ' · 首次 ' + esc(fmtTime(v.first)) + '">' + esc(fmtAgo(v.last)) +
+      (isRangeNew(v.first) ? '<span class="new-badge">新</span>' : '') + '</td>' +
     '<td><span class="flag">' + flag(v.country) + '</span>' + esc(v.country || '—') + '</td>' +
     '<td>' + esc(dimName(DEVICE_LABEL, v.device)) + '</td>' +
     '<td>' + esc(v.browser || '—') + ' · ' + esc(v.os || '—') + '</td>' +
-    '<td>' + v.views + '</td><td>' + v.sessions + '</td>' +
+    '<td>' + fmtNum(v.views) + '</td><td>' + fmtNum(v.sessions) + '</td>' +
     '<td>' + esc(fmtTime(v.first)) + '</td>';
   tr.addEventListener('click', function () {
     var open = tr.dataset.open === '1';
@@ -2656,6 +2979,38 @@ function renderVisitor(v) {
 el('vrefresh').addEventListener('click', function () { loadStats(); loadVisitors(true); });
 el('include-bots').addEventListener('change', function (e) { includeBots = e.target.checked; loadStats(); loadVisitors(true); });
 el('auto-refresh').addEventListener('change', function (e) { autoRefresh = e.target.checked; });
+// 维度条长指标切换（浏览/访客）——数据已缓存，切换只重绘不发请求
+document.querySelectorAll('#view-visit .dimm [data-metric]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var m = b.getAttribute('data-metric');
+    if (dimMetric === m) return;
+    dimMetric = m;
+    document.querySelectorAll('#view-visit .dimm [data-metric]').forEach(function (x) { x.classList.toggle('active', x === b); });
+    renderBarsAll();
+  });
+});
+// 长尾折叠行点击展开/收起（事件委托：行内容会被整体重绘）
+BAR_IDS.forEach(function (id) {
+  el(id).addEventListener('click', function (e) {
+    if (!e.target.closest('.tailrow')) return;
+    barOpen[id] = !barOpen[id];
+    renderBars(id);
+  });
+});
+// 趋势图与数据表互切；stopPropagation 防止触发面板折叠
+el('chart-table-toggle').addEventListener('click', function (e) {
+  e.stopPropagation();
+  chartTableMode = !chartTableMode;
+  this.textContent = chartTableMode ? '趋势图' : '数据表';
+  renderChart();
+});
+// viewBox 按渲染时实际像素宽生成，窗口尺寸变化后重绘一次
+var rszT = 0;
+window.addEventListener('resize', function () {
+  if (currentView !== 'visit' || !lastStats) return;
+  clearTimeout(rszT);
+  rszT = setTimeout(function () { renderSparks(lastStats); renderChart(); }, 150);
+});
 setInterval(function () {
   if (currentView === 'visit' && autoRefresh && document.visibilityState === 'visible') { loadStats(); loadVisitors(false); }
 }, 30000);
