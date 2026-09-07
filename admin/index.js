@@ -64,8 +64,10 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
 
-    // 全站响应统一带安全头
+    // 全站响应统一带安全头；后台为登录态面板，HTML/JSON 一律 no-store（防浏览器缓存陈旧页面：
+    // 曾出现用户标签页停留在旧 HTML 上、事件未绑定、列表永远「加载中」的情况）
     const baseHeaders = {
+      'cache-control': 'no-store',
       'x-robots-tag': 'noindex, nofollow',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
