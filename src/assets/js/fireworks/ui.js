@@ -67,7 +67,8 @@
 		nodes.fullscreen.checked = state.fullscreen;
 		nodes.longExposure.checked = state.config.longExposure;
 		nodes.scaleFactor.value = state.config.scaleFactor.toFixed(2);
-		nodes.backgroundInput.value = state.background.configured ? state.background.value : "";
+		nodes.backgroundInput.value =
+			state.background.configured && state.background.mode !== "library" ? state.background.value : "";
 
 		nodes.menuInnerWrap.style.opacity = state.openHelpTopic ? 0.12 : 1;
 		nodes.helpModal.classList.toggle("active", Boolean(state.openHelpTopic));
@@ -84,6 +85,41 @@
 	function setBackgroundStatus(nodes, text, state) {
 		nodes.backgroundStatus.textContent = text;
 		nodes.backgroundStatus.dataset.state = state;
+	}
+
+	function renderBackgroundGallery(nodes, items, selectedId) {
+		const gallery = nodes.backgroundGallery;
+		gallery.textContent = "";
+
+		if (!items.length) {
+			gallery.hidden = true;
+			return;
+		}
+
+		gallery.hidden = false;
+		items.forEach((item) => {
+			const cell = document.createElement("div");
+			cell.className = "background-gallery__item";
+			cell.dataset.id = item.id;
+
+			const thumbButton = document.createElement("button");
+			thumbButton.type = "button";
+			thumbButton.className = "background-gallery__thumb";
+			thumbButton.classList.toggle("is-selected", item.id === selectedId);
+			thumbButton.title = item.name;
+			thumbButton.setAttribute("aria-label", `使用背景图 ${item.name}`);
+			thumbButton.setAttribute("aria-pressed", String(item.id === selectedId));
+			thumbButton.style.backgroundImage = `url("${item.thumb}")`;
+
+			const deleteButton = document.createElement("button");
+			deleteButton.type = "button";
+			deleteButton.className = "background-gallery__delete";
+			deleteButton.textContent = "×";
+			deleteButton.setAttribute("aria-label", `删除背景图 ${item.name}`);
+
+			cell.append(thumbButton, deleteButton);
+			gallery.append(cell);
+		});
 	}
 
 	function bindAppControls(options) {
@@ -112,6 +148,28 @@
 
 		nodes.backgroundClearBtn.addEventListener("click", options.onBackgroundClear);
 
+		nodes.backgroundUploadInput.addEventListener("change", () => {
+			const file = nodes.backgroundUploadInput.files && nodes.backgroundUploadInput.files[0];
+			nodes.backgroundUploadInput.value = "";
+			if (file) {
+				options.onBackgroundUpload(file);
+			}
+		});
+
+		nodes.backgroundGallery.addEventListener("click", (event) => {
+			const cell = event.target.closest(".background-gallery__item");
+			if (!cell) {
+				return;
+			}
+
+			if (event.target.closest(".background-gallery__delete")) {
+				options.onBackgroundDelete(cell.dataset.id);
+				return;
+			}
+
+			options.onBackgroundSelect(cell.dataset.id);
+		});
+
 		nodes.backgroundInput.addEventListener("keydown", (event) => {
 			if (event.key === "Enter") {
 				event.preventDefault();
@@ -134,6 +192,7 @@
 		populateControls,
 		readConfigFromDom,
 		renderApp,
+		renderBackgroundGallery,
 		setBackgroundStatus,
 		bindAppControls,
 	});

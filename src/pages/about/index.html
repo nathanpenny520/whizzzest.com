@@ -25,7 +25,7 @@
           {{#each data.team.members as member}}
           <div class="team-card reveal">
             <span class="team-avatar" aria-hidden="true">
-              {{#if member.icon}}<img class="team-avatar-icon" src="/{{member.icon}}" alt="">{{/if}}
+              {{#if member.icon}}<img class="team-avatar-icon" src="/{{member.icon}}" alt="" data-sizes="96px">{{/if}}
               {{#unless member.icon}}{{member.initial}}{{/unless}}
             </span>
             <h3>{{member.name}}</h3>
@@ -76,6 +76,37 @@
     <section class="section">
       <div class="container">
         <div class="section-head reveal">
+          <h2>{{data.tech.title}}</h2>
+        </div>
+        <div class="grid grid-2">
+          <div class="feature-card reveal">
+            <h3>{{data.tech.edgeTitle}}</h3>
+            <p>{{data.tech.edgeDesc}}</p>
+          </div>
+          <div class="feature-card reveal">
+            <h3>{{data.tech.zeroTitle}}</h3>
+            <p>{{data.tech.zeroDesc}}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-band" aria-label="{{data.stats.title}}">
+      <div class="container">
+        <ul class="stats-row reveal">
+          {{#each data.stats.items as s}}
+          <li class="stat">
+            <b class="stat-num"><span class="stat-v" data-stat="{{s.key}}">{{s.value}}</span><i class="stat-unit">{{s.unit}}</i></b>
+            <span class="stat-label">{{s.label}}</span>
+          </li>
+          {{/each}}
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head reveal">
           <h2>{{data.timeline.title}}</h2>
         </div>
         <ol class="timeline-events">
@@ -92,7 +123,7 @@
       </div>
     </section>
 
-    <section class="section section-alt">
+    <section class="section">
       <div class="container">
         <div class="section-head reveal">
           <h2>{{data.partners.title}}</h2>
@@ -108,7 +139,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section section-alt">
       <div class="container">
         <div class="section-head reveal">
           <h2>{{data.contact.title}}</h2>

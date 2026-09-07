@@ -3,10 +3,17 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'
+  Content-Security-Policy-Report-Only: default-src 'self'; img-src 'self' blob: data:; style-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# PWA：SW 与 manifest 必须每次协商缓存（304），否则更新延迟到达
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
 
 /favicon.svg
   Cache-Control: public, max-age=604800

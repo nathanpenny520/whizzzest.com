@@ -231,3 +231,32 @@ function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+/* ---------------- /api/music/latest（首页「万载音乐」条数据源，公开 JSON） ---------------- */
+
+// 60s 实例内缓存（同 handleTvLatest 模式）；排序同播放页（编辑 sort 优先），取前 6 首
+let musicLatestCache = { at: 0, items: [] };
+
+export async function handleMusicLatest(env) {
+  if (Date.now() - musicLatestCache.at > 60 * 1000) {
+    const { results } = await env.DB
+      .prepare(`SELECT id, title, artist, cover, duration FROM music_tracks WHERE ${PUB_WHERE} ORDER BY sort, id LIMIT 6`)
+      .all();
+    musicLatestCache = {
+      at: Date.now(),
+      items: (results || []).map((t) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist || '佚名',
+        cover: mCover(t.cover),
+        dur: Number(t.duration) || 0,
+      })),
+    };
+  }
+  return new Response(JSON.stringify({ ok: true, items: musicLatestCache.items }), {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, max-age=60',
+    },
+  });
+}

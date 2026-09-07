@@ -57,7 +57,7 @@
 		}
 
 		return {
-			mode: rawBackground.mode === "style" ? "style" : "image",
+			mode: rawBackground.mode === "style" ? "style" : rawBackground.mode === "library" ? "library" : "image",
 			value,
 			configured: typeof rawBackground.configured === "boolean" ? rawBackground.configured : inferConfiguredFromValue,
 		};

@@ -72,6 +72,8 @@ Gitee：https://gitee.com/nianbroken/Firework_Simulator
 			backgroundLabel: ".background-label",
 			backgroundApplyBtn: ".background-apply-btn",
 			backgroundClearBtn: ".background-clear-btn",
+			backgroundUploadInput: ".background-upload-input",
+			backgroundGallery: ".background-gallery",
 			backgroundStatus: ".background-status",
 			helpModal: ".help-modal",
 			helpModalOverlay: ".help-modal__overlay",
@@ -126,7 +128,7 @@ Gitee：https://gitee.com/nianbroken/Firework_Simulator
 			},
 			background: {
 				header: "自定义背景",
-				body: "支持输入图片地址，也支持输入 `url(...)` 或 `linear-gradient(...)` 这类背景样式。网页端背景优先于代码默认背景。",
+				body: "点「上传图片」可以把图片保存到当前浏览器（IndexedDB），刷新或下次打开后点缩略图即可选用；也支持输入图片地址或 `url(...)`、`linear-gradient(...)` 这类背景样式。清除浏览器站点数据会删除已上传的图片。",
 			},
 		}),
 		helpNodeMap: Object.freeze({

@@ -15,8 +15,8 @@ import { sendMail } from './smtp.js';
 import { handleMerchants } from './merchants.js';
 import { handleTv, handleMedia, handleTvLatest } from './tv.js';
 import { handleLibrary } from './library.js';
-import { handleMusic, handleMusicPlay } from './music.js';
-import { handleAttractions } from './attractions.js';
+import { handleMusic, handleMusicPlay, handleMusicLatest } from './music.js';
+import { handleAttractions, handleAttractionsLatest } from './attractions.js';
 import { handleAiChat, handleAiConfig } from './ai.js';
 
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|monitor/i;
@@ -45,6 +45,19 @@ export default {
     // 万载TV 最新视频（首页「焰境影像」条数据源，公开 JSON，docs/万载TV方案.md）
     if (url.pathname === '/api/tv/latest' && request.method === 'GET') {
       return handleTvLatest(env);
+    }
+
+    // 景点精选 / 万载音乐（首页板块数据源，公开 JSON，同 handleTvLatest 模式）
+    if (url.pathname === '/api/attractions/latest' && request.method === 'GET') {
+      return handleAttractionsLatest(env);
+    }
+    if (url.pathname === '/api/music/latest' && request.method === 'GET') {
+      return handleMusicLatest(env);
+    }
+
+    // 平台内容计数（关于页「平台一览」数字条数据源，公开 JSON）
+    if (url.pathname === '/api/stats' && request.method === 'GET') {
+      return handleStats(env);
     }
 
     // 万载音乐播放计数（前端开始播放一首时回报一次，2026-09-06）
@@ -221,6 +234,37 @@ async function handleDwell(request, env, ctx) {
     );
   }
   return new Response(null, { status: 204 });
+}
+
+/* ---------------- 平台内容计数（关于页数字条） ---------------- */
+
+/** 实例内 60s 缓存（同 handleTvLatest 模式）；单项查询失败返回 null，前端跳过该项 */
+let statsCache = { at: 0, data: null };
+
+async function handleStats(env) {
+  if (Date.now() - statsCache.at > 60 * 1000) {
+    const count = async (sql) => {
+      try {
+        return Number(await env.DB.prepare(sql).first('n')) || 0;
+      } catch {
+        return null;
+      }
+    };
+    const [videos, tracks, attractions, books, merchants] = await Promise.all([
+      count(`SELECT COUNT(*) n FROM videos WHERE status = 'published'`),
+      count(`SELECT COUNT(*) n FROM music_tracks WHERE status = 'published'`),
+      count(`SELECT COUNT(*) n FROM attractions WHERE status = 'published'`),
+      count(`SELECT COUNT(*) n FROM books WHERE status = 'approved'`),
+      count(`SELECT COUNT(*) n FROM merchants WHERE status = 'approved'`),
+    ]);
+    statsCache = { at: Date.now(), data: { videos, tracks, attractions, books, merchants } };
+  }
+  return new Response(JSON.stringify({ ok: true, stats: statsCache.data }), {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, max-age=60',
+    },
+  });
 }
 
 /* ---------------- 联系表单 ---------------- */

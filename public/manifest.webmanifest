@@ -1,0 +1,35 @@
+{
+  "name": "焰境·万载",
+  "short_name": "焰境万载",
+  "description": "探索千年烟花文化，体验非遗魅力，品味特色美食，领略万载风光。中国花炮之乡·江西万载。",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "lang": "zh-CN",
+  "background_color": "#fbfbfd",
+  "theme_color": "#fbfbfd",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "数字烟花模拟器",
+      "url": "/digital-fireworks/",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "万载音乐",
+      "url": "/music/",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "旅游景点",
+      "url": "/attractions/",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

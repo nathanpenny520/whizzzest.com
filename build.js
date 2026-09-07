@@ -278,6 +278,17 @@ function buildPage(dirName, site, images) {
     inLanguage: 'zh-CN',
     isPartOf: { '@id': `${SITE_URL}/#website` },
   };
+  if (dirName === 'about') {
+    // 关于页：AboutPage + 挂载团队实体（与首页 Organization 同 @id 关联）
+    jsonld['@type'] = 'AboutPage';
+    jsonld.mainEntity = {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#organization`,
+      name: site.name,
+      url: `${SITE_URL}/`,
+      email: site.email,
+    };
+  }
   if (dirName === 'index') {
     jsonld['@graph'] = [
       {
@@ -406,11 +417,11 @@ ${pages
   const aiCssPath = path.join(DIST, 'assets', 'css', 'ai-chat.css');
   fs.writeFileSync(aiCssPath, minifyCss(read(aiCssPath)));
 
-  // 烟花模拟器（/digital-fireworks/）：13 个零依赖 JS 依依赖顺序拼接为单文件
+  // 烟花模拟器（/digital-fireworks/）：14 个零依赖 JS 依依赖顺序拼接为单文件
   // （globals 协作，顺序即加载顺序；mid-file 的 "use strict" 字面量无副作用），CSS 一并压缩
   const FIREWORKS_JS_ORDER = [
     'fscreen', 'Stage', 'MyMath',                                       // lib
-    'config', 'store', 'background-manager', 'ui',                      // app
+    'config', 'store', 'background-library', 'background-manager', 'ui', // app
     'runtime', 'shells', 'interaction', 'simulation', 'audio', 'engine', // fireworks
   ];
   const fwDir = path.join(SRC, 'assets', 'js', 'fireworks');
@@ -458,6 +469,29 @@ ${pages
 
   // Worker 页面引用带指纹的 CSS/JS 用
   fs.writeFileSync(path.join(DIST, 'build-meta.json'), JSON.stringify(versions));
+
+  // PWA Service Worker（docs/PWA应用方案.md §3.2）：public/sw.js 是模板，预缓存清单与脏戳
+  // 由构建注入 → dist/sw.js。清单带 ?v= 指纹、脏戳取指纹哈希——任一资产内容变化 SW 字节即变，
+  // 浏览器自动重装换新缓存，与页面 ?v= 同一套失效逻辑。
+  const swStamp = createHash('md5').update(JSON.stringify(versions)).digest('hex').slice(0, 8);
+  const precache = [
+    ...built.filter((b) => b.slug !== '/404/').map((b) => b.slug),
+    '/offline.html',
+    '/manifest.webmanifest',
+    '/favicon.svg',
+    '/icons/icon-192.png',
+    '/icons/icon-512.png',
+    '/icons/maskable-192.png',
+    '/icons/maskable-512.png',
+    '/icons/apple-touch-icon.png',
+    ...Object.keys(versions).map((a) => `${a}?v=${versions[a]}`),
+  ];
+  fs.writeFileSync(
+    path.join(DIST, 'sw.js'),
+    read(path.join(ROOT, 'public', 'sw.js'))
+      .replace("'__BUILD__'", JSON.stringify(`v-${swStamp}`))
+      .replace('__PRECACHE__', JSON.stringify(precache))
+  );
 
   const kb = (p) => (fs.statSync(p).size / 1024).toFixed(1);
   console.log(`✔ ${built.length} 页构建完成 → dist/（${Date.now() - t0}ms）`);

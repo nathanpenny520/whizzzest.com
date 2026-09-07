@@ -11,7 +11,15 @@ Gitee：https://gitee.com/nianbroken/Firework_Simulator
 const appConfig = window.FireworksAppConfig;
 const { createDefaultState, createStore } = window.FireworksAppStore;
 const { createBackgroundManager } = window.FireworksBackgroundManager;
-const { queryNodes, populateControls, renderApp, setBackgroundStatus, bindAppControls } = window.FireworksAppUI;
+const backgroundLibrary = window.FireworksBackgroundLibrary;
+const {
+	queryNodes,
+	populateControls,
+	renderApp,
+	renderBackgroundGallery,
+	setBackgroundStatus,
+	bindAppControls,
+} = window.FireworksAppUI;
 
 const IS_MOBILE = window.innerWidth <= 640;
 const IS_DESKTOP = window.innerWidth > 800;
@@ -107,6 +115,10 @@ const backgroundManager = createBackgroundManager({
 		setBackgroundStatus(appNodes, message, state);
 	},
 });
+
+let backgroundGalleryItems = [];
+let renderedGalleryItems = null;
+let renderedGallerySelectedId = "";
 
 const wordBurstTracker = {
 	shellsSinceLastBurst: 0,
@@ -234,24 +246,26 @@ function handleStateChange(state, previousState) {
 	soundManager.pauseAll();
 }
 
-function handleBackgroundApply(rawValue) {
-	backgroundManager.applyBackground({ value: rawValue }).then((result) => {
-		if (!result.ok || result.cancelled) {
-			return;
-		}
+function commitBackgroundSettings(result) {
+	if (!result.ok || result.cancelled) {
+		return;
+	}
 
-		const hasEffectiveBackground = Boolean(result.settings.value);
-		store.setState({
-			background: {
-				...result.settings,
-				configured: hasEffectiveBackground,
-			},
-		});
-
-		if (!hasEffectiveBackground) {
-			applyResolvedBackground();
-		}
+	const hasEffectiveBackground = Boolean(result.settings.value);
+	store.setState({
+		background: {
+			...result.settings,
+			configured: hasEffectiveBackground,
+		},
 	});
+
+	if (!hasEffectiveBackground) {
+		applyResolvedBackground();
+	}
+}
+
+function handleBackgroundApply(rawValue) {
+	backgroundManager.applyBackground({ value: rawValue }).then(commitBackgroundSettings);
 }
 
 function handleBackgroundClear() {
@@ -264,6 +278,75 @@ function handleBackgroundClear() {
 		},
 	});
 	applyResolvedBackground();
+}
+
+function getSelectedBackgroundId() {
+	const background = store.state.background;
+	return background.configured && background.mode === "library" ? background.value : "";
+}
+
+function renderGalleryWithSelection() {
+	const selectedId = getSelectedBackgroundId();
+	if (renderedGalleryItems === backgroundGalleryItems && renderedGallerySelectedId === selectedId) {
+		return;
+	}
+
+	renderedGalleryItems = backgroundGalleryItems;
+	renderedGallerySelectedId = selectedId;
+	renderBackgroundGallery(appNodes, backgroundGalleryItems, selectedId);
+}
+
+function refreshBackgroundGallery() {
+	const listPromise = backgroundLibrary.isSupported() ? backgroundLibrary.listImages() : Promise.resolve([]);
+	return listPromise
+		.then((items) => {
+			backgroundGalleryItems = items;
+			renderGalleryWithSelection();
+		})
+		.catch(() => {
+			backgroundGalleryItems = [];
+			renderGalleryWithSelection();
+		});
+}
+
+async function handleBackgroundUpload(file) {
+	backgroundManager.setStatus("正在处理图片", "loading");
+
+	try {
+		const record = await backgroundLibrary.addImage(file);
+		backgroundGalleryItems = [...backgroundGalleryItems, record];
+		renderGalleryWithSelection();
+		commitBackgroundSettings(await backgroundManager.applyLibraryImage(record));
+	} catch (error) {
+		backgroundManager.setStatus(error && error.message ? error.message : "图片保存失败", "error");
+	}
+}
+
+async function handleBackgroundSelect(id) {
+	const background = store.state.background;
+	if (background.configured && background.mode === "library" && background.value === id) {
+		return;
+	}
+
+	const record = await backgroundLibrary.getImage(id);
+	if (!record) {
+		refreshBackgroundGallery();
+		return;
+	}
+
+	commitBackgroundSettings(await backgroundManager.applyLibraryImage(record));
+}
+
+async function handleBackgroundDelete(id) {
+	await backgroundLibrary.deleteImage(id);
+	backgroundGalleryItems = backgroundGalleryItems.filter((item) => item.id !== id);
+
+	const background = store.state.background;
+	if (background.configured && background.mode === "library" && background.value === id) {
+		handleBackgroundClear();
+	}
+
+	renderGalleryWithSelection();
 }
 
 function getCodeDefaultBackground() {
@@ -315,6 +398,11 @@ function applyResolvedBackground() {
 	const resolvedBackground = resolvePreferredBackground();
 
 	if (resolvedBackground.source === "user") {
+		if (resolvedBackground.background.mode === "library") {
+			applyUserLibraryBackground();
+			return;
+		}
+
 		backgroundManager.applyBackground(resolvedBackground.background).then((result) => {
 			if (result.ok) {
 				backgroundManager.setStatus("正在使用网页端背景", "success");
@@ -355,6 +443,42 @@ function applyResolvedBackground() {
 	}
 
 	backgroundManager.clearBackground();
+}
+
+async function applyUserLibraryBackground() {
+	const record = await backgroundLibrary.getImage(store.state.background.value);
+	if (record) {
+		const result = await backgroundManager.applyLibraryImage(record);
+		if (result.ok && !result.cancelled) {
+			backgroundManager.setStatus("正在使用保存的背景图", "success");
+		}
+		return;
+	}
+
+	store.setState({
+		background: {
+			mode: "none",
+			value: "",
+			configured: false,
+		},
+	});
+
+	const fallbackBackground = getCodeDefaultBackground();
+	if (!fallbackBackground.value) {
+		backgroundManager.clearBackground();
+		backgroundManager.setStatus("保存的背景图已失效，当前未设置默认背景", "error");
+		return;
+	}
+
+	backgroundManager.applyBackground(fallbackBackground).then((fallbackResult) => {
+		if (fallbackResult.ok) {
+			backgroundManager.setStatus("保存的背景图已失效，已回退到代码默认背景", "idle");
+			return;
+		}
+
+		backgroundManager.clearBackground();
+		backgroundManager.setStatus("保存的背景图和代码默认背景都无效", "error");
+	});
 }
 
 fscreen.addEventListener("fullscreenchange", () => {

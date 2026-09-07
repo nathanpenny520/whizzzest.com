@@ -505,6 +505,11 @@
   function submit(raw) {
     var text = String(raw || '').trim();
     if (!text || busy) return;
+    if (!navigator.onLine) {
+      // 离线不发请求、不清空输入框，方便联网后原样重发（docs/PWA应用方案.md §3.5）
+      appendBubble('ai', '当前离线，花傩需要联网才能回答，请恢复网络后再问。', null, false);
+      return;
+    }
     els.input.value = '';
     autosize();
 
@@ -554,7 +559,7 @@
       }
       done(reply, extra);
     }).catch(function () {
-      done('网络异常，请稍后再试。', {});
+      done(navigator.onLine ? '网络异常，请稍后再试。' : '网络已断开，请恢复网络后再问。', {});
     }).finally(function () {
       busy = false;
       els.send.disabled = !els.input.value.trim();

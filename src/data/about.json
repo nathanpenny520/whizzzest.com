@@ -12,40 +12,40 @@
         "role": "项目负责人",
         "description": "统筹全局战略规划与团队协作，协调各方资源整合，确保项目高效推进与核心目标的精准达成。",
         "initial": "龙",
-        "icon": ""
+        "icon": "assets/img/team-longziqin.jpeg"
       },
       {
         "name": "聂磐",
         "role": "技术架构师",
         "description": "主导网站全栈开发与系统架构设计，运用前沿技术栈构建高性能平台，打造流畅的用户交互体验。",
         "initial": "聂",
-        "icon": ""
+        "icon": "assets/img/team-niepan.jpeg"
       },
       {
         "name": "黄婧瑶",
         "role": "品牌运营总监",
         "description": "统筹新媒体矩阵运营与品牌传播策略，策划创意内容营销，持续提升平台影响力与用户触达率。",
         "initial": "黄",
-        "icon": ""
+        "icon": "assets/img/team-huangjingyao.jpeg"
       },
       {
         "name": "龙子萱",
         "role": "视频创意总监",
         "description": "主导视觉内容的策划与制作，运用影像艺术语言生动展现万载烟花文化的独特魅力与深厚底蕴。",
         "initial": "龙",
-        "icon": ""
+        "icon": "assets/img/team-longzixuan.jpeg"
       },
       {
         "name": "闻可佳",
         "role": "内容战略总监",
         "description": "制定平台内容规划与项目方案撰写，深度挖掘文化价值内涵，输出专业文案与品牌叙事体系。",
         "initial": "闻",
-        "icon": ""
+        "icon": "assets/img/team-wenkejia.jpeg"
       },
       {
         "name": "Claude AI",
         "role": "智能赋能助手",
-        "description": "基于前沿人工智能技术，为团队提供智能创作支持与效率赋能，协助内容生成、技术优化与创意策划，推动项目数字化转型与智能化升级。",
+        "description": "驱动全站「花傩」智能问答（Workers AI + RAG 站内知识库），并深度参与文案生成、代码评审与视觉创作，是团队随叫随到的智能伙伴。",
         "initial": "C",
         "icon": "icons/claude.svg"
       }
@@ -64,6 +64,24 @@
     "missionDesc": "传承与弘扬万载千年烟花文化，让每一位访客都能感受到这座城市的热情与魅力。我们致力于打造最全面的万载文旅信息平台，让游客轻松规划行程，深度体验当地文化。",
     "visionTitle": "我们的愿景",
     "visionDesc": "成为万载文旅数字化转型和新媒体矩阵构建的标杆，与当地企业、政府部门紧密合作，让\"焰境·万载\"成为国内外游客了解万载的重要入口。未来，我们计划将这一发展路径从万载推广开来，打造成为县域经济实现破局发展的关键方案。"
+  },
+  "tech": {
+    "title": "技术架构",
+    "edgeTitle": "全球边缘计算",
+    "edgeDesc": "全站托管于 Cloudflare 全球边缘网络：静态构建产物直达全球 300+ 边缘节点，商户、文库、万载TV、音乐与景点由 Workers 边缘动态渲染，D1 数据库与 R2 对象存储就近读写，弱网环境下首屏加载仅约 1.5 秒。",
+    "zeroTitle": "零依赖工程哲学",
+    "zeroDesc": "不依赖任何前端框架，以原生 HTML/CSS/JavaScript 与自研零依赖构建管线打造全站；图片自动优化为 WebP 响应式多档，AI 推理（Workers AI）与邮件服务同域闭环，无外部服务依赖，快速、安全、可控。"
+  },
+  "stats": {
+    "title": "平台一览",
+    "items": [
+      { "key": "heritage", "value": 6, "label": "非遗项目", "unit": "项" },
+      { "key": "videos", "value": "–", "label": "视频节目", "unit": "部" },
+      { "key": "tracks", "value": "–", "label": "万载音乐", "unit": "首" },
+      { "key": "attractions", "value": "–", "label": "旅游景点", "unit": "处" },
+      { "key": "books", "value": "–", "label": "文库作品", "unit": "部" },
+      { "key": "merchants", "value": "–", "label": "入驻好店", "unit": "家" }
+    ]
   },
   "timeline": {
     "title": "发展历程",
@@ -87,6 +105,36 @@
         "date": "2026年4月",
         "title": "品牌运营",
         "description": "启动新媒体矩阵运营战略，构建微信公众号、抖音等多元化宣传渠道，持续拓展用户触达路径，提升平台品牌影响力。"
+      },
+      {
+        "date": "2026年9月",
+        "title": "品牌升级与技术重构",
+        "description": "正式启用 whizzzest.com 新域名，完成从旧站的整体迁移：全站内容以零依赖原生 Web 技术重写，托管于 Cloudflare 全球边缘网络，性能与体验全面升级。"
+      },
+      {
+        "date": "2026年9月",
+        "title": "商户生态上线",
+        "description": "「焰境好店」商户体系全流程打通：展示、自助入驻、邮箱验证码登录与认证置顶变现闭环，商户信息由边缘数据库权威管理、实时更新。"
+      },
+      {
+        "date": "2026年9月",
+        "title": "万载TV 开播",
+        "description": "视频频道上线，支持后台流式上传与 B 站内容联动，短剧《一朝相逢便是万载》全季与城市宣传片《遇见万载》已入库，万载影像有了自己的阵地。"
+      },
+      {
+        "date": "2026年9月",
+        "title": "文库与影音拓展",
+        "description": "焰境文库与作者门户（writer.whizzzest.com）上线，作品/章节双级审核保障内容质量；万载音乐播放器与旅游景点瀑布流同步推出，内容矩阵成型。"
+      },
+      {
+        "date": "2026年9月",
+        "title": "AI 与互动体验",
+        "description": "全站 AI 助手「花傩」上线（Workers AI + RAG 站内知识库），随问随答万载文旅；数字烟花模拟器沉浸式开放，访客可以亲手点亮一朵万载烟花。"
+      },
+      {
+        "date": "2026年9月",
+        "title": "数据化运营",
+        "description": "多账号管理后台与访客分析看板建成，内容审核、数据洞察全链路打通；接入 GitHub Actions 自动部署，迭代分钟级上线。"
       }
     ]
   },

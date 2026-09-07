@@ -18,6 +18,7 @@
   --nav-h: 48px;
   --radius: 20px;
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --bg-theater: linear-gradient(180deg, #2b1208, #1c0d06 45%, #150a05); /* 焰棕深色影院风（万载TV 全页与首页深色条共用） */
 }
 
 /* ---------------- Reset ---------------- */
@@ -1284,15 +1285,16 @@ a.feature-card:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--c-accent), #f2a03d);
   color: #fff;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 600;
   letter-spacing: 0;
   overflow: hidden;
+  box-shadow: 0 0 0 1px var(--c-hairline), 0 10px 26px rgba(0, 0, 0, 0.1);
 }
 
 .team-avatar-icon {
@@ -1321,17 +1323,71 @@ a.feature-card:hover {
   line-height: 1.55;
 }
 
+/* 关于页「平台一览」数字条：全宽焰色渐变 */
+.stats-band {
+  background: linear-gradient(135deg, var(--c-accent-dark), var(--c-accent) 55%, #f2a03d);
+  color: #fff;
+  padding: 72px 0;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 32px 16px;
+  text-align: center;
+}
+
+.stat-num {
+  display: block;
+  font-size: clamp(30px, 4vw, 46px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-unit {
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 600;
+  margin-left: 4px;
+  opacity: 0.9;
+}
+
+.stat-label {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 833px) {
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 时间线：焰色渐变轴线 + 光环节点 + 焰色日期胶囊（灰底 section-alt） */
 .timeline-events {
   max-width: 720px;
   margin: 0 auto;
-  border-left: 2px solid var(--c-hairline);
+  border-left: 2px solid;
+  border-image: linear-gradient(to bottom, var(--c-accent) 0%, rgba(214, 69, 36, 0.3) 88%, transparent 100%) 1;
   padding-left: 28px;
   list-style: none;
 }
 
 .timeline-events li {
   position: relative;
-  padding: 0 0 40px 20px;
+  padding: 0 0 44px 20px;
+}
+
+.timeline-events li:last-child {
+  padding-bottom: 8px;
 }
 
 .timeline-events li::before {
@@ -1343,9 +1399,14 @@ a.feature-card:hover {
   height: 12px;
   border-radius: 50%;
   background: var(--c-accent);
+  box-shadow: 0 0 0 4px var(--c-bg-alt), 0 0 0 5.5px rgba(214, 69, 36, 0.28);
 }
 
 .event-date {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(214, 69, 36, 0.08);
   font-size: 13px;
   font-weight: 600;
   color: var(--c-accent);
@@ -2399,7 +2460,7 @@ a.feature-card:hover {
 
 /* 分类 Tab + 视频网格 */
 .tv-page {
-  background: linear-gradient(180deg, #2b1208, #1c0d06 45%, #150a05);
+  background: var(--bg-theater);
   color: #f5f5f7;
 }
 
@@ -2651,13 +2712,14 @@ a.feature-card:hover {
   .tv-facade:hover .tv-play::after { transition: none; transform: none; }
 }
 
-/* 首页「焰境影像」条（#tv-strip，JS 填充后显示；复用 tv-card/tv-media 深色组件） */
+/* 首页深色媒体条（#tv-strip「焰境影像」，复用 tv-card/tv-media 深色组件；背景对齐 /tv/ 影院风） */
 .tv-strip-wrap {
-  background: #0d0d12;
+  background: var(--bg-theater);
   color: #f5f5f7;
 }
 
-.tv-strip-head {
+.tv-strip-head,
+.home-strip-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -2665,7 +2727,8 @@ a.feature-card:hover {
   margin-bottom: 34px;
 }
 
-.tv-strip-kicker {
+.tv-strip-kicker,
+.home-strip-kicker {
   display: block;
   margin-bottom: 10px;
   font-size: 13px;
@@ -2674,12 +2737,14 @@ a.feature-card:hover {
   color: #f2a03d;
 }
 
-.tv-strip-head h2 {
+.tv-strip-head h2,
+.home-strip-head h2 {
   font-size: clamp(26px, 3.6vw, 40px);
   letter-spacing: -0.02em;
 }
 
-.tv-strip-more {
+.tv-strip-more,
+.home-strip-more {
   flex: 0 0 auto;
   font-size: 15px;
   font-weight: 500;
@@ -2687,9 +2752,11 @@ a.feature-card:hover {
   text-decoration: none;
 }
 
-.tv-strip-more:hover { text-decoration: underline; }
+.tv-strip-more:hover,
+.home-strip-more:hover { text-decoration: underline; }
 
-.tv-strip-row {
+.tv-strip-row,
+.home-strip-row {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: calc((100% - 100px) / 6);
@@ -2705,13 +2772,244 @@ a.feature-card:hover {
 .tv-strip-row .tv-meta { color: rgba(245, 245, 247, 0.55); }
 
 @media (max-width: 1100px) {
-  .tv-strip-row { grid-auto-columns: calc((100% - 60px) / 4); }
+  .tv-strip-row,
+  .home-strip-row { grid-auto-columns: calc((100% - 60px) / 4); }
 }
 
 @media (max-width: 833px) {
-  .tv-strip-head { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .tv-strip-row { grid-auto-columns: calc((100% - 40px) / 2.5); gap: 14px; }
+  .tv-strip-head,
+  .home-strip-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .tv-strip-row,
+  .home-strip-row { grid-auto-columns: calc((100% - 40px) / 2.5); gap: 14px; }
 }
+
+/* ============================================================
+   首页改版板块：三主题压缩卡 / 景点精选条 / 万载音乐条 / 数字体验卡
+   条类板块同「焰境影像」模式：JS 拉 latest JSON，无数据整块隐藏
+   ============================================================ */
+
+/* 三主题卡（压缩原三段大图文；section-alt 底、白卡） */
+.theme-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  background: var(--c-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+}
+
+.theme-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+}
+
+.theme-media {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--c-bg-alt);
+}
+
+.theme-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s var(--ease);
+}
+
+.theme-card:hover .theme-media img { transform: scale(1.04); }
+
+.theme-body { padding: 22px 26px 26px; }
+
+.theme-body h3 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.theme-body p {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--c-text-2);
+  line-height: 1.55;
+}
+
+.theme-more {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-accent);
+}
+
+/* 景点精选条卡片（白底条） */
+.home-at-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+  scroll-snap-align: start;
+  background: var(--c-bg);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.home-at-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.home-at-media {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--c-bg-alt);
+}
+
+.home-at-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s var(--ease);
+}
+
+.home-at-card:hover .home-at-media img { transform: scale(1.04); }
+
+.home-at-body { padding: 13px 16px 15px; }
+
+.home-at-body h3 {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-at-body p {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+/* 万载音乐条卡片（灰底白卡，方形封面 + tv-dur 时长角标） */
+.home-mu-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+  scroll-snap-align: start;
+  background: var(--c-bg);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+
+.home-mu-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+.home-mu-media {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--c-bg-alt);
+}
+
+.home-mu-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s var(--ease);
+}
+
+.home-mu-card:hover .home-mu-media img { transform: scale(1.04); }
+
+.home-mu-body { padding: 13px 16px 15px; }
+
+.home-mu-body h3 {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-mu-body p {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--c-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 数字体验卡（数字烟花 + 焰境文库，深色焰面） */
+.exp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 260px;
+  padding: 40px 38px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  color: #f5f5f7;
+  text-decoration: none;
+  box-shadow: inset 0 0 0 1px rgba(245, 245, 247, 0.08);
+  transition: transform 0.35s var(--ease);
+}
+
+.exp-card:hover { transform: translateY(-6px); }
+
+.exp-fireworks {
+  background:
+    radial-gradient(120% 140% at 85% 0%, rgba(242, 160, 61, 0.5), transparent 55%),
+    radial-gradient(140% 120% at 15% 100%, rgba(214, 69, 36, 0.55), transparent 60%),
+    #150a05;
+}
+
+.exp-library {
+  background:
+    radial-gradient(120% 140% at 85% 0%, rgba(242, 160, 61, 0.28), transparent 55%),
+    linear-gradient(160deg, #2b1208, #150a05);
+}
+
+.exp-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: #f2a03d;
+}
+
+.exp-card h3 {
+  margin-top: 4px;
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.exp-card p {
+  margin-top: 8px;
+  max-width: 40ch;
+  font-size: 15px;
+  color: rgba(245, 245, 247, 0.72);
+}
+
+.exp-go {
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f2a03d;
+}
+
+@media (max-width: 833px) {
+  .exp-card { min-height: 210px; padding: 28px 26px; }
+}
+
 
 /* ============================================================
    导航下拉（Apple 式全宽毛玻璃面板）+ 移动端手风琴（导航改版 v2.6）

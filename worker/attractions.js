@@ -247,6 +247,8 @@ function pageShell(chrome, { title, description, url, body, jsonLd }) {
   <meta property="og:image" content="${SITE_URL}${ogImage}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css?v=${esc(cssV)}">
 ${ld}</head>
 <body>
@@ -278,4 +280,32 @@ function esc(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/* ---------------- /api/attractions/latest（首页「景点精选」条数据源，公开 JSON） ---------------- */
+
+// 60s 实例内缓存（同 handleTvLatest 模式）；排序同列表页（编辑 sort 优先），取前 6 条
+let attraLatestCache = { at: 0, items: [] };
+
+export async function handleAttractionsLatest(env) {
+  if (Date.now() - attraLatestCache.at > 60 * 1000) {
+    const { results } = await env.DB
+      .prepare(`SELECT slug, name, tags, cover FROM attractions WHERE ${PUB_WHERE} ORDER BY sort, id DESC LIMIT 6`)
+      .all();
+    attraLatestCache = {
+      at: Date.now(),
+      items: (results || []).map((a) => ({
+        slug: a.slug,
+        name: a.name,
+        tag: parseTags(a.tags)[0] || '景点',
+        cover: aCover(a.cover),
+      })),
+    };
+  }
+  return new Response(JSON.stringify({ ok: true, items: attraLatestCache.items }), {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, max-age=60',
+    },
+  });
 }

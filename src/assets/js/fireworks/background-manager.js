@@ -59,13 +59,24 @@
 		const container = options.container;
 		const onStatusChange = options.onStatusChange;
 		let requestId = 0;
+		let activeObjectUrl = "";
 
 		function setStatus(message, state) {
 			onStatusChange(message, state);
 		}
 
+		function revokeActiveObjectUrl() {
+			if (!activeObjectUrl) {
+				return;
+			}
+
+			URL.revokeObjectURL(activeObjectUrl);
+			activeObjectUrl = "";
+		}
+
 		function clearBackground() {
 			requestId += 1;
+			revokeActiveObjectUrl();
 			container.style.backgroundImage = "";
 			container.style.backgroundPosition = "";
 			container.style.backgroundRepeat = "";
@@ -115,6 +126,7 @@
 				container.style.backgroundPosition = "center";
 				container.style.backgroundRepeat = "no-repeat";
 				container.style.backgroundSize = "cover";
+				revokeActiveObjectUrl();
 				setStatus("自定义背景已应用", "success");
 
 				return {
@@ -137,8 +149,56 @@
 			}
 		}
 
+		async function applyLibraryImage(record) {
+			const currentRequestId = ++requestId;
+			setStatus("正在加载背景", "loading");
+
+			try {
+				const objectUrl = URL.createObjectURL(record.blob);
+				const validationNode = document.createElement("div");
+				validationNode.style.backgroundImage = `url("${objectUrl}")`;
+				if (!validationNode.style.backgroundImage) {
+					URL.revokeObjectURL(objectUrl);
+					throw new Error("背景样式无效");
+				}
+
+				if (currentRequestId !== requestId) {
+					URL.revokeObjectURL(objectUrl);
+					return { ok: false, cancelled: true };
+				}
+
+				revokeActiveObjectUrl();
+				activeObjectUrl = objectUrl;
+				container.style.backgroundImage = `url("${objectUrl}")`;
+				container.style.backgroundPosition = "center";
+				container.style.backgroundRepeat = "no-repeat";
+				container.style.backgroundSize = "cover";
+				setStatus("已应用上传的背景图", "success");
+
+				return {
+					ok: true,
+					settings: {
+						mode: "library",
+						value: record.id,
+						configured: true,
+					},
+				};
+			} catch (error) {
+				if (currentRequestId !== requestId) {
+					return { ok: false, cancelled: true };
+				}
+
+				setStatus("背景加载失败，请重试", "error");
+				return {
+					ok: false,
+					error,
+				};
+			}
+		}
+
 		return {
 			applyBackground,
+			applyLibraryImage,
 			clearBackground,
 			setStatus,
 		};

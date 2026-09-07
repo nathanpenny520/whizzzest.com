@@ -245,27 +245,31 @@ if (carousel && !reduceMotion) {
   carousel?.querySelector('.hero-slide')?.classList.add('active');
 }
 
-/* 首页「焰境影像」条：拉 /api/tv/latest 渲染最新视频（失败静默，整块保持隐藏） */
+/* 首页媒体条（焰境影像 / 景点精选 / 万载音乐）共用工具与拉取：
+   失败或空数据回调 null，整块保持 hidden 不占位 */
+const escT = (s) =>
+  String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const stripDur = (sec) => {
+  sec = Number(sec) || 0;
+  if (sec <= 0) return '';
+  const m = Math.floor(sec / 60);
+  const s = String(sec % 60).padStart(2, '0');
+  return `${m}:${s}`;
+};
+const stripFetch = (url) =>
+  fetch(url)
+    .then((r) => r.json())
+    .then((d) => (d && d.ok && d.items && d.items.length ? d.items : null))
+    .catch(() => null);
+
+/* 首页「焰境影像」条：拉 /api/tv/latest 渲染最新视频 */
 const tvStrip = document.getElementById('tv-strip');
 if (tvStrip) {
-  const escT = (s) =>
-    String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const stripDur = (sec) => {
-    sec = Number(sec) || 0;
-    if (sec <= 0) return '';
-    const m = Math.floor(sec / 60);
-    const s = String(sec % 60).padStart(2, '0');
-    return `${m}:${s}`;
-  };
-  fetch('/api/tv/latest')
-    .then((r) => r.json())
-    .then((d) => {
-      const items = d && d.ok ? d.items : null;
-      if (!items || !items.length) return;
-      const row = document.getElementById('tv-strip-row');
-      row.innerHTML = items
-        .map(
-          (v) => `
+  stripFetch('/api/tv/latest').then((items) => {
+    if (!items) return;
+    document.getElementById('tv-strip-row').innerHTML = items
+      .map(
+        (v) => `
         <a class="tv-card" href="/tv/${Number(v.id)}/">
           <div class="tv-media">${
             v.cover
@@ -275,9 +279,107 @@ if (tvStrip) {
           <h3>${escT(v.title)}</h3>
           <p class="tv-meta">${escT(v.cat)}</p>
         </a>`
-        )
-        .join('');
-      tvStrip.hidden = false;
+      )
+      .join('');
+    tvStrip.hidden = false;
+  });
+}
+
+/* 首页「景点精选」条：拉 /api/attractions/latest（编辑 sort 排序前 6） */
+const attractStrip = document.getElementById('attract-strip');
+if (attractStrip) {
+  stripFetch('/api/attractions/latest').then((items) => {
+    if (!items) return;
+    document.getElementById('attract-strip-row').innerHTML = items
+      .map(
+        (a) => `
+        <a class="home-at-card" href="/attractions/${escT(a.slug)}/">
+          <div class="home-at-media">${
+            a.cover
+              ? `<img src="${escT(a.cover)}" alt="${escT(a.name)}" loading="lazy" decoding="async">`
+              : '<span class="tv-ph" aria-hidden="true">游</span>'
+          }</div>
+          <div class="home-at-body"><h3>${escT(a.name)}</h3><p>${escT(a.tag)}</p></div>
+        </a>`
+      )
+      .join('');
+    attractStrip.hidden = false;
+  });
+}
+
+/* 首页「万载音乐」条：拉 /api/music/latest（编辑 sort 排序前 6），点击深链 /music/?t= 直达播放 */
+const musicStrip = document.getElementById('music-strip');
+if (musicStrip) {
+  stripFetch('/api/music/latest').then((items) => {
+    if (!items) return;
+    document.getElementById('music-strip-row').innerHTML = items
+      .map(
+        (t) => `
+        <a class="home-mu-card" href="/music/?t=${Number(t.id)}">
+          <div class="home-mu-media">${
+            t.cover
+              ? `<img src="${escT(t.cover)}" alt="${escT(t.title)}" loading="lazy" decoding="async">`
+              : '<span class="tv-ph" aria-hidden="true">焰</span>'
+          }${t.dur ? `<span class="tv-dur">${stripDur(t.dur)}</span>` : ''}</div>
+          <div class="home-mu-body"><h3>${escT(t.title)}</h3><p>${escT(t.artist)}</p></div>
+        </a>`
+      )
+      .join('');
+    musicStrip.hidden = false;
+  });
+}
+
+/* 关于页「平台一览」数字条：静态项（非遗）保持构建期值；动态项拉 /api/stats 填充，
+   进视口后计数动画（接口失败保持占位符「–」，无 JS 时不显示误导性的 0） */
+const statsRow = document.querySelector('.stats-row');
+if (statsRow) {
+  const statEls = [...statsRow.querySelectorAll('.stat-v[data-stat]')];
+  const pending = new Map();
+  const setNum = (el, to) => {
+    if (reduceMotion) {
+      el.textContent = String(to);
+      return;
+    }
+    const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / 700);
+      el.textContent = String(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const statIo = 'IntersectionObserver' in window
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            statIo.unobserve(entry.target);
+            const to = pending.get(entry.target);
+            if (to != null) {
+              pending.delete(entry.target);
+              setNum(entry.target, to);
+            }
+          }
+        },
+        { threshold: 0.4 }
+      )
+    : null;
+
+  fetch('/api/stats')
+    .then((r) => r.json())
+    .then((d) => {
+      const stats = d && d.ok ? d.stats : null;
+      if (!stats) return;
+      for (const el of statEls) {
+        const to = stats[el.dataset.stat];
+        if (to == null) continue; // 静态项（如非遗）或接口缺项 → 保持原值
+        if (!statIo) {
+          setNum(el, Number(to));
+          continue;
+        }
+        pending.set(el, Number(to));
+        statIo.observe(el);
+      }
     })
     .catch(() => {});
 }
@@ -575,3 +677,17 @@ form?.addEventListener('submit', async (e) => {
     btn.disabled = false;
   }
 });
+
+/* ---------------- PWA（docs/PWA应用方案.md §3.4-3.5）：SW 注册 ----------------
+ * 全站统一脚本：静态页与 Worker 渲染页（/music /attractions /tv /library /merchants）都加载本文件。 */
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+/* 安装提示一律不弹（2026-09-07 用户反馈：主动弹窗讨嫌）；离线提示胶囊同样不做（同日反馈）。
+ * 仅静默 preventDefault，压掉 Chrome Android 的自动安装横幅；安装走浏览器原生入口：
+ * 桌面 Chrome/Edge 地址栏安装图标、Android 三点菜单「安装应用」、iOS Safari 分享 → 添加到主屏幕。 */
+window.addEventListener('beforeinstallprompt', (e) => e.preventDefault());

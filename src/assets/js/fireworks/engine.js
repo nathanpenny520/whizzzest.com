@@ -57,11 +57,13 @@ function init() {
 	renderApp(store.state, appNodes);
 	configDidUpdate();
 	applyResolvedBackground();
+	refreshBackgroundGallery();
 }
 
 function attachRuntimeBindings() {
 	store.subscribe((state) => renderApp(state, appNodes));
 	store.subscribe(handleStateChange);
+	store.subscribe(() => renderGalleryWithSelection());
 
 	bindAppControls({
 		nodes: appNodes,
@@ -70,6 +72,9 @@ function attachRuntimeBindings() {
 		onToggleFullscreen: toggleFullscreen,
 		onBackgroundApply: handleBackgroundApply,
 		onBackgroundClear: handleBackgroundClear,
+		onBackgroundUpload: handleBackgroundUpload,
+		onBackgroundSelect: handleBackgroundSelect,
+		onBackgroundDelete: handleBackgroundDelete,
 		onHelpOpen(helpTopic) {
 			store.setState({ openHelpTopic: helpTopic });
 		},

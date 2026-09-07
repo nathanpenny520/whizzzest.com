@@ -50,22 +50,43 @@
       </div>
     </section>
 
-    {{#each data.sections as sec}}
-    <section class="section{{#if_odd}} section-alt{{/if_odd}}">
+    <!-- 三主题压缩卡（原三段大图文改为一张卡网格，v2.7 首页改版） -->
+    <section class="section section-alt">
       <div class="container">
-        <article class="split reveal{{#if_odd}} split-rev{{/if_odd}}">
-          <div class="split-media">
-            <img src="/assets/img/{{sec.img}}" alt="{{sec.title}}" loading="lazy" decoding="async" data-sizes="(max-width: 833px) 100vw, 512px" {{#if sec.ar}}style="aspect-ratio:{{sec.ar}}"{{/if}}>
-          </div>
-          <div class="split-body">
-            <h2 class="split-title">{{sec.title}}</h2>
-            <p>{{sec.desc}}</p>
-            <p class="split-link"><a class="btn-text" href="{{sec.href}}">{{sec.learnMore}} ›</a></p>
-          </div>
-        </article>
+        <div class="section-head reveal">
+          <h2>{{data.themes.title}}</h2>
+          <p>{{data.themes.desc}}</p>
+        </div>
+        <div class="grid grid-3">
+          {{#each data.themes.items as t}}
+          <a class="theme-card reveal" href="{{t.href}}">
+            <div class="theme-media">
+              <img src="/assets/img/{{t.img}}" alt="{{t.title}}" loading="lazy" decoding="async" data-sizes="(max-width: 833px) 100vw, 380px">
+            </div>
+            <div class="theme-body">
+              <h3>{{t.title}}</h3>
+              <p>{{t.desc}}</p>
+              <span class="theme-more">{{t.learnMore}} ›</span>
+            </div>
+          </a>
+          {{/each}}
+        </div>
       </div>
     </section>
-    {{/each}}
+
+    <!-- 景点精选：JS 从 /api/attractions/latest 拉取填充；无 JS / 无数据时整块隐藏不占位 -->
+    <section class="section home-strip" id="attract-strip" hidden>
+      <div class="container-wide">
+        <div class="home-strip-head reveal in">
+          <div>
+            <span class="home-strip-kicker">旅游景点 · 万载山水</span>
+            <h2>游万载，古城山水焰火间</h2>
+          </div>
+          <a class="home-strip-more" href="/attractions/">全部景点 ›</a>
+        </div>
+        <div class="home-strip-row" id="attract-strip-row"></div>
+      </div>
+    </section>
 
     <section class="section section-alt home-merchants">
       <div class="container">
@@ -97,6 +118,40 @@
           <a class="tv-strip-more" href="/tv/">进入频道 ›</a>
         </div>
         <div class="tv-strip-row" id="tv-strip-row"></div>
+      </div>
+    </section>
+
+    <!-- 万载音乐：JS 从 /api/music/latest 拉取填充；无 JS / 无数据时整块隐藏不占位 -->
+    <section class="section section-alt home-strip" id="music-strip" hidden>
+      <div class="container-wide">
+        <div class="home-strip-head reveal in">
+          <div>
+            <span class="home-strip-kicker">万载音乐 · 听见万载</span>
+            <h2>万载的声音，都在这里</h2>
+          </div>
+          <a class="home-strip-more" href="/music/">进入音乐馆 ›</a>
+        </div>
+        <div class="home-strip-row" id="music-strip-row"></div>
+      </div>
+    </section>
+
+    <!-- 数字体验：数字烟花 + 焰境文库（静态入口卡） -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.experience.title}}</h2>
+          <p>{{data.experience.desc}}</p>
+        </div>
+        <div class="grid grid-2">
+          {{#each data.experience.items as e}}
+          <a class="exp-card exp-{{e.key}} reveal" href="{{e.href}}">
+            <span class="exp-kicker">{{e.kicker}}</span>
+            <h3>{{e.title}}</h3>
+            <p>{{e.desc}}</p>
+            <span class="exp-go">{{e.cta}} ›</span>
+          </a>
+          {{/each}}
+        </div>
       </div>
     </section>
 

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<!-- 离线兜底页（docs/PWA应用方案.md §3.5）：请求的页面既没联网拿到、又无缓存版时，
+     Service Worker 回退到此页。自身在预缓存清单内，style.css 引用由构建统一补 ?v= 指纹；
+     <style> 内联底样式保证极端情况下（CSS 未缓存）也不白屏。 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>离线 · 焰境·万载</title>
+  <meta name="theme-color" content="#fbfbfd">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .offline-wrap { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 8px; }
+    .offline-wrap img { width: 64px; height: 64px; }
+    .offline-wrap h1 { font-size: 22px; margin: 8px 0 0; }
+    .offline-wrap p { color: #666; max-width: 30em; line-height: 1.7; }
+    .offline-retry { margin-top: 16px; padding: 10px 28px; border: 0; border-radius: 999px; background: #d64524; color: #fff; font-size: 15px; cursor: pointer; }
+    .offline-retry:hover { opacity: .9; }
+  </style>
+</head>
+<body class="offline-page">
+  <main class="offline-wrap">
+    <img src="/icons/icon-192.png" alt="" width="64" height="64">
+    <h1>当前处于离线状态</h1>
+    <p>没有找到本页的缓存版本。已看过的页面、听过的音乐和数字烟花在离线时仍可打开；恢复联网后，这里会自动恢复最新内容。</p>
+    <button class="offline-retry" onclick="location.reload()">重新连接</button>
+  </main>
+</body>
+</html>
