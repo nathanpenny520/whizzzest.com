@@ -1,7 +1,8 @@
 /**
  * /music/* 万载音乐（2026-09-06）
  *  - GET /music/                    播放器页（正在播放面板 + 曲目列表 + 底部固定播放条，焰棕深色影院风）
- *  - POST /api/music/play/<id>      播放计数（前端开始播放一首时回报一次，非阻塞 UPDATE）
+ *                                   行内下载（同源 download 属性直存歌名文件）/ 分享（系统分享→剪贴板，深链 ?t=<id> 直达单曲）
+ *  - POST /api/music/play/<id>      播放计数（前端真正开始播放一首时回报一次，非阻塞 UPDATE）
  *
  * 内容以 D1 为权威（music_tracks，admin「音乐」Tab 直传 MP3）：后台发布即时生效，对标 /tv/*。
  * 音频/封面存 R2 whizzzest-media（music/ 前缀），经主站 /media/* 代理公开读取——
@@ -21,7 +22,7 @@ export async function handleMusic(request, env, url, ctx) {
   return notFound(env, url);
 }
 
-/** 播放计数：POST /api/music/play/<id>（页面加载后每首开始播放时回报一次） */
+/** 播放计数：POST /api/music/play/<id>（每首真正开始播放时回报一次） */
 export async function handleMusicPlay(request, env, url) {
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { allow: 'POST' } });
@@ -81,7 +82,7 @@ async function musicHome(env, url, ctx) {
         <button class="music-no" type="button" aria-label="播放：${esc(t.title)}"><span class="music-idx">${String(i + 1).padStart(2, '0')}</span><span class="music-eq" aria-hidden="true"><i></i><i></i><i></i></span></button>
         <span class="music-thumb">${cover ? `<img src="${esc(cover)}" alt="" loading="lazy" decoding="async">` : '<span class="tv-ph" aria-hidden="true">焰</span>'}</span>
         <span class="music-item-body"><b>${esc(t.title)}</b><i>${esc(t.artist || '佚名')}</i></span>
-        <span class="music-item-dur">${dur || '--:--'}</span>
+        <span class="music-item-side"><span class="music-item-dur">${dur || '--:--'}</span><span class="music-item-acts"><a class="music-act" href="${esc(mAudio(t.file_key))}" download="${esc(t.title)}.mp3" aria-label="下载：${esc(t.title)}" title="下载"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16l-5-5 1.4-1.4L11 12.2V4h2v8.2l2.6-2.6L17 11l-5 5zm-7 2h14v2H5v-2z"/></svg></a><button class="music-act music-share" type="button" aria-label="分享：${esc(t.title)}" title="分享"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg></button></span></span>
       </li>`;
     })
     .join('');
@@ -124,7 +125,7 @@ async function musicHome(env, url, ctx) {
         <span class="music-time" id="music-tcur">0:00</span>
         <input class="music-seek" id="music-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度">
         <span class="music-time" id="music-tend">${first ? fmtDur(first.duration) || '0:00' : '0:00'}</span>
-        <button class="music-ctl music-loop" id="music-loop" type="button" aria-label="列表循环（开）" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+        <button class="music-ctl music-loop on" id="music-loop" type="button" aria-label="循环模式：列表循环" aria-pressed="true"><svg class="i-all" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg><svg class="i-one" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/></svg></button>
         <input class="music-vol" id="music-vol" type="range" min="0" max="100" value="100" aria-label="音量">
       </div>
     </div>
@@ -196,6 +197,8 @@ function pageShell(chrome, { title, description, url, body, jsonLd }) {
   <meta property="og:image" content="${SITE_URL}${ogImage}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css?v=${esc(cssV)}">
 ${ld}</head>
 <body class="music-body">

@@ -304,8 +304,26 @@ if (musicPage) {
   if (audio && rows.length && toggleBtn) {
     let current = -1;
     let seeking = false;
-    let loopOn = true;
-    const counted = new Set(); // 每首每次进页面只计一次播放
+    // 循环三态：all 列表循环 / one 单曲循环 / off 顺序播放（播完即停）
+    const LOOP_LABEL = { all: '列表循环', one: '单曲循环', off: '顺序播放' };
+    let loopMode = 'all';
+    const counted = new Set(); // 每首每次进页面只计一次播放（真正开始播放时回报）
+
+    // 轻提示（分享复制等反馈）
+    let toastEl = null;
+    let toastTimer = 0;
+    const toast = (msg) => {
+      if (!toastEl) {
+        toastEl = document.createElement('div');
+        toastEl.className = 'music-toast';
+        toastEl.setAttribute('role', 'status');
+        document.body.appendChild(toastEl);
+      }
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2000);
+    };
 
     const fmt = (s) => {
       s = Math.max(0, Math.floor(Number(s) || 0));
@@ -355,7 +373,7 @@ if (musicPage) {
       current = i;
       rows.forEach((r, k) => {
         r.classList.toggle('on', k === i);
-        r.classList.remove('paused');
+        r.classList.toggle('paused', k === i); // 未真正播放前按暂停态显示均衡条
       });
       audio.src = tr.dataset.src;
       setNow(tr);
@@ -367,7 +385,12 @@ if (musicPage) {
           artwork: tr.dataset.cover ? [{ src: tr.dataset.cover, sizes: '512x512', type: 'image/jpeg' }] : [],
         });
       }
-      count(tr.dataset.id);
+      // 地址栏带上当前曲目，复制链接即分享单首（replaceState 不产生历史记录）
+      try {
+        const u = new URL(location.href);
+        u.searchParams.set('t', tr.dataset.id);
+        history.replaceState(null, '', u);
+      } catch { /* 沙箱环境等忽略 */ }
     };
 
     const step = (d) => {
@@ -397,15 +420,55 @@ if (musicPage) {
       }
     };
 
-    rows.forEach((r, i) => r.addEventListener('click', () => selectRow(i)));
+    rows.forEach((r, i) =>
+      r.addEventListener('click', (e) => {
+        if (e.target.closest('.music-act')) return; // 下载/分享按钮不触发播放
+        selectRow(i);
+      })
+    );
     prevBtn?.addEventListener('click', () => step(-1));
     nextBtn?.addEventListener('click', () => step(1));
     toggleBtn.addEventListener('click', toggle);
-    loopBtn?.addEventListener('click', () => {
-      loopOn = !loopOn;
-      loopBtn.classList.toggle('on', loopOn);
-      loopBtn.setAttribute('aria-pressed', String(loopOn));
-      loopBtn.setAttribute('aria-label', loopOn ? '列表循环（开）' : '列表循环（关）');
+
+    const setLoopMode = (mode) => {
+      loopMode = mode;
+      loopBtn.classList.toggle('on', mode !== 'off');
+      loopBtn.classList.toggle('one', mode === 'one');
+      loopBtn.setAttribute('aria-pressed', String(mode !== 'off'));
+      loopBtn.setAttribute('aria-label', `循环模式：${LOOP_LABEL[mode]}`);
+    };
+    if (loopBtn) {
+      setLoopMode('all'); // 与服务端渲染的初始高亮对齐
+      loopBtn.addEventListener('click', () => {
+        setLoopMode(loopMode === 'all' ? 'one' : loopMode === 'one' ? 'off' : 'all');
+        toast(LOOP_LABEL[loopMode]);
+      });
+    }
+
+    // 分享单曲：系统分享 → 复制链接 → prompt 兜底（微信内置浏览器等）
+    musicPage.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.music-share');
+      if (!btn) return;
+      const tr = btn.closest('.music-item');
+      if (!tr) return;
+      let shareUrl = `${location.origin}/music/?t=${encodeURIComponent(tr.dataset.id)}`;
+      try {
+        shareUrl = new URL(`/music/?t=${encodeURIComponent(tr.dataset.id)}`, location.origin).href;
+      } catch { /* 忽略，用拼接值 */ }
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `${tr.dataset.title} — 万载音乐 · 焰境万载`, url: shareUrl });
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return; // 用户取消分享
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast('链接已复制，去分享给朋友吧');
+      } catch {
+        prompt('长按/全选复制链接：', shareUrl);
+      }
     });
 
     seek.addEventListener('input', () => {
@@ -423,6 +486,7 @@ if (musicPage) {
     });
 
     audio.addEventListener('play', () => {
+      count(rows[current]?.dataset.id);
       toggleBtn.classList.add('playing');
       toggleBtn.setAttribute('aria-label', '暂停');
       rows[current]?.classList.remove('paused');
@@ -435,7 +499,12 @@ if (musicPage) {
       nowMeta.textContent = '已暂停';
     });
     audio.addEventListener('ended', () => {
-      if (loopOn || current < rows.length - 1) step(1);
+      if (loopMode === 'one') {
+        audio.currentTime = 0;
+        audio.play();
+        return;
+      }
+      if (loopMode === 'all' || current < rows.length - 1) step(1);
     });
     audio.addEventListener('loadedmetadata', () => {
       tEnd.textContent = fmt(audio.duration);
@@ -448,6 +517,14 @@ if (musicPage) {
       }
       tCur.textContent = fmt(audio.currentTime);
     });
+
+    // 深链：/music/?t=<id> 直达单曲（不自动播放：受浏览器策略限制，也不虚增播放数）
+    const wantId = new URLSearchParams(location.search).get('t');
+    const wantIdx = rows.findIndex((r) => r.dataset.id === wantId);
+    if (wantIdx >= 0) {
+      load(wantIdx);
+      rows[wantIdx].scrollIntoView({ block: 'center' });
+    }
 
     if ('mediaSession' in navigator) {
       navigator.mediaSession.setActionHandler('previoustrack', () => step(-1));
