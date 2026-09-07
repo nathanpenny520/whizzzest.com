@@ -1485,10 +1485,9 @@ async function removeAttraction(env, id) {
 /* ---------------- AI 助手「花傩」管理（docs/AI助手方案.md） ---------------- */
 
 // 与主站 worker/ai.js MODEL_ALLOW 对应的白名单（改这里需同步主站）
+// 2026-09 实测淘汰两个：DeepSeek-V4-Flash Free 套餐 403、GLM-4.7-Flash 单答 15~30s 会撞 30s 超时
 const AI_MODEL_OPTIONS = [
   { id: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3-30B-A3B（默认 · 快/省）' },
-  { id: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7-Flash（轻量）' },
-  { id: '@cf/deepseek-ai/deepseek-v4-flash-0731', label: 'DeepSeek-V4-Flash（高质量）' },
   { id: '@cf/qwen/qwen3.8-27b', label: 'Qwen3.8-27B（旗舰）' },
 ];
 

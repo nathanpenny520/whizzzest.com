@@ -24,9 +24,8 @@ const CACHE_TTL_MS = 60_000;
 
 const MODEL_ALLOW = new Set([
   '@cf/qwen/qwen3-30b-a3b-fp8',          // 默认：MoE 快、中文强、便宜（≈22 neuron/轮）
-  '@cf/zai-org/glm-4.7-flash',
-  '@cf/deepseek-ai/deepseek-v4-flash-0731',
   '@cf/qwen/qwen3.8-27b',
+  // 2026-09 实测淘汰：DeepSeek-V4-Flash（Free 套餐 403）、GLM-4.7-Flash（单答 15~30s 撞 AI_TIMEOUT_MS）
 ]);
 const MODEL_DEFAULT = '@cf/qwen/qwen3-30b-a3b-fp8';
 
