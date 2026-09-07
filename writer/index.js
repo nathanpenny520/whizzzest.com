@@ -872,6 +872,8 @@ const BASE_CSS = `
   .btn-text:hover { text-decoration: underline; }
   .btn-danger { color: #d64524; }
   .wrap { max-width: 860px; margin: 0 auto; }
+  .wrap.wrapwide { max-width: 1100px; }
+  .btn.btn-sm { padding: 3px 10px; font-size: 12px; }
   .card {
     margin-top: 18px; padding: 22px 24px; background: #fff; border-radius: 18px;
     box-shadow: 0 2px 12px rgba(0,0,0,.04); display: flex; gap: 16px; align-items: flex-start;
@@ -932,7 +934,7 @@ const BASE_CSS = `
   form.card { display: block; }
   .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 16px; }
   .fgrid label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6e6e73; }
-  .fgrid label.wide { grid-column: 1 / -1; }
+  .fgrid label.wide, .fgrid div.wide { grid-column: 1 / -1; }
   .fgrid input, .fgrid select, .fgrid textarea {
     padding: 11px 13px; font-size: 15px; color: #1d1d1f; background: #f5f5f7;
     border: 1px solid transparent; border-radius: 12px; outline: none; font-family: inherit;
@@ -940,7 +942,7 @@ const BASE_CSS = `
   }
   .fgrid input:focus, .fgrid select:focus, .fgrid textarea:focus { border-color: #d64524; background: #fff; }
   .fgrid input[type="file"] { padding: 9px; font-size: 13px; }
-  .fgrid textarea { resize: vertical; line-height: 1.7; }
+  .fgrid textarea { resize: vertical; line-height: 1.7; width: 100%; display: block; }
   .inl {
     padding: 11px 13px; font-size: 15px; color: #1d1d1f; background: #f5f5f7;
     border: 1px solid transparent; border-radius: 12px; outline: none; font-family: inherit;
@@ -1466,6 +1468,7 @@ async function chaptersHtml(env, book, url) {
       <span class="t"><a href="/book/${book.id}/chapter/${c.id}">${esc(c.title)}</a>${reason}</span>
       <span class="w">${(c.word_count || 0).toLocaleString('zh-CN')} 字</span>
       <span class="mst ${st}" style="flex:0 0 auto">${stText}</span>
+      <a class="btn btn-sm" href="/book/${book.id}/chapter/${c.id}">编辑</a>
       <button type="button" data-del="${c.id}" class="btn-danger">删除</button>
     </div>`;
   }).join('');
@@ -1514,8 +1517,8 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
       ? '<p class="hint" style="color:#d64524">该章审核中：「保存草稿」会先撤回审核，改完再重新提交。</p>'
       : '';
   return shell(`
-    <header><h1 id="h1title">${isEdit ? '编辑章节 — ' + esc(ch.title) : '新建章节'} — ${esc(book.title)}</h1><a class="btn-text" href="/book/${book.id}/chapters">返回章节列表</a></header>
-    <div class="wrap">
+    <header style="max-width:1100px"><h1 id="h1title">${isEdit ? '编辑章节 — ' + esc(ch.title) : '新建章节'} — ${esc(book.title)}</h1><a class="btn-text" href="/book/${book.id}/chapters">返回章节列表</a></header>
+    <div class="wrap wrapwide">
       <div class="ok-line">正文支持 <b>Markdown</b>：# 标题　**粗体**　*斜体*　\`行内码\`　&gt; 引用　- 列表　1. 有序列表　--- 分隔线　[文字](链接)；空行分段。「保存草稿」随写随存不进审核（草稿仅自己可见，可自动保存）；「提交审核」通过后读者才可阅读。</div>
       <div class="saveline-row">
         <span style="font-size:12px;color:#6e6e73">状态 <span id="st-badge" class="mst mst-hidden">未保存</span></span>
@@ -1537,7 +1540,7 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
               <button type="button" id="tab-preview">👁 预览</button>
               <span class="hint" style="margin-left:auto">字数：<b id="wc">${isEdit ? (ch.word_count || 0).toLocaleString('zh-CN') : 0}</b></span>
             </div>
-            <textarea id="body" name="body" rows="16" maxlength="${MAX_BODY}" aria-label="章节正文" placeholder="第一段……&#10;&#10;## 小节标题&#10;&#10;正文支持 Markdown，空行分段……">${isEdit ? esc(ch.body) : ''}</textarea>
+            <textarea id="body" name="body" rows="22" maxlength="${MAX_BODY}" aria-label="章节正文" placeholder="第一段……&#10;&#10;## 小节标题&#10;&#10;正文支持 Markdown，空行分段……">${isEdit ? esc(ch.body) : ''}</textarea>
             <div id="preview" class="mdprev" style="display:none"></div>
           </div>
           ${draftWarn ? `<div class="wide">${draftWarn}</div>` : ''}
