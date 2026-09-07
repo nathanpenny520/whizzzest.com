@@ -87,7 +87,7 @@ export default {
         "script-src 'unsafe-inline'", // MVP：内联脚本，无外部依赖
         "style-src 'unsafe-inline'",
         "connect-src 'self'",
-        "img-src 'self' data: https://whizzzest.com", // 视频封面缩略图来自主站（/assets 或 /media 代理）
+        "img-src 'self' data: blob: https://whizzzest.com", // 封面缩略图来自主站（/assets /assets-merchant /media 代理）；blob: = 表单里本地图的即时预览
         "object-src 'none'",
         "base-uri 'none'",
         "frame-ancestors 'none'",
@@ -191,6 +191,14 @@ async function handleApi(request, env, path) {
   if ((m = path.match(/^\/api\/merchants\/(\d+)\/redeem$/)) && method === 'POST') {
     return redeemMerchant(env, Number(m[1]), request);
   }
+  // 封面图上传（≤5MB，魔数校验 JPG/PNG/WebP；与商户门户同桶同 m<id>/ 前缀，
+  // 主站经 /assets-merchant/<key> 代理展示，删除商户按前缀级联清理）
+  // ?m= 商户 id 必填——新建未入库没有归属前缀，前端先建档拿到 id 再传图
+  if (path === '/api/merchants/cover' && method === 'PUT') {
+    const mid = parseInt(new URL(request.url).searchParams.get('m') || '', 10);
+    if (!mid) return json({ ok: false, error: 'merchant_required' }, 400);
+    return uploadImageR2(env, request, `m${mid}/`, env.IMG);
+  }
 
   // 万载TV 视频管理（docs/万载TV方案.md）；DELETE 级联删除 R2 视频/封面
   if (path === '/api/tv' && method === 'GET') return listVideos(env, request);
@@ -224,6 +232,10 @@ async function handleApi(request, env, path) {
   }
   if ((m = path.match(/^\/api\/books\/(\d+)\/chapters\/(\d+)$/)) && method === 'DELETE') {
     return removeChapter(env, Number(m[1]), Number(m[2]));
+  }
+  // admin 直改章节（序号/标题/正文/删单张插图）：站长即审核人，不改变审核状态
+  if ((m = path.match(/^\/api\/books\/(\d+)\/chapters\/(\d+)\/edit$/)) && method === 'POST') {
+    return editChapter(env, Number(m[1]), Number(m[2]), request);
   }
 
   // 万载音乐管理（2026-09-06）：曲目 CRUD + MP3/封面上传；DELETE 级联清理 R2 音频/封面
@@ -1116,6 +1128,8 @@ async function updateBook(env, id, request) {
     if (!(k in body)) continue;
     f[k] = String(body[k] ?? '').trim().slice(0, k === 'intro' ? 500 : 200) || null;
   }
+  // 封面：站内路径（/…）或 R2 键（book/…），空串即清除（此前漏在白名单外导致后台无法改封面）
+  if ('cover' in body) f.cover = String(body.cover ?? '').trim().slice(0, 300) || null;
   if ('sort_weight' in body) f.sort_weight = Math.max(0, Math.min(999, Math.round(Number(body.sort_weight) || 0)));
   if ('title' in f && !f.title) return json({ ok: false, error: 'invalid_fields' }, 400);
   if ('category' in f && f.category && !B_CATEGORIES.includes(f.category)) return json({ ok: false, error: 'invalid_fields' }, 400);
@@ -1123,7 +1137,7 @@ async function updateBook(env, id, request) {
   if (f.status === 'rejected' && !f.reject_reason) return json({ ok: false, error: 'reject_reason_required' }, 400);
   if (f.reject_reason === null) delete f.reject_reason; // 只传空串不清原因
 
-  const old = await env.DB.prepare('SELECT id, slug FROM books WHERE id = ?1').bind(id).first();
+  const old = await env.DB.prepare('SELECT id, slug, cover FROM books WHERE id = ?1').bind(id).first();
   if (!old) return json({ ok: false, error: 'not_found' }, 404);
 
   const sets = [];
@@ -1139,6 +1153,10 @@ async function updateBook(env, id, request) {
   // 上线且无 slug：补 b<id>（元数据重审通过后 slug 保留）
   if ((f.status === 'approved' || !('status' in f)) && !old.slug) {
     await env.DB.prepare('UPDATE books SET slug = ?1 WHERE id = ?2').bind('b' + id, id).run();
+  }
+  // 换了封面且旧封面是 R2 键：旧对象清理（站内路径 /… 非本桶对象，跳过）
+  if ('cover' in f && f.cover !== old.cover && old.cover && !old.cover.startsWith('/') && env.MEDIA) {
+    try { await env.MEDIA.delete(old.cover); } catch (err) { console.error(`old cover cleanup failed for ${old.cover}:`, err); }
   }
   return json({ ok: true });
 }
@@ -1212,6 +1230,73 @@ async function reviewChapter(env, bookId, cid, request) {
   return json({ ok: true });
 }
 
+/** 重算作品冗余计数（草稿章不计入——与作者端口径一致，读者可见内容才算数） */
+async function recountBook(env, bookId, touch = true) {
+  await env.DB.prepare(
+    `UPDATE books SET
+       chapter_count = (SELECT COUNT(*) FROM book_chapters WHERE book_id = ?1 AND status != 'draft'),
+       word_count = (SELECT COALESCE(SUM(word_count), 0) FROM book_chapters WHERE book_id = ?1 AND status != 'draft')
+       ${touch ? ", updated_at = datetime('now')" : ''}
+     WHERE id = ?1`
+  ).bind(bookId).run();
+}
+
+/** admin 直改章节（部分更新：idx/title/body/remove_image）；不改变审核状态，已上线章即时生效 */
+async function editChapter(env, bookId, cid, request) {
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ ok: false, error: 'invalid_json' }, 400);
+  const ch = await env.DB.prepare('SELECT * FROM book_chapters WHERE id = ?1 AND book_id = ?2')
+    .bind(cid, bookId).first();
+  if (!ch) return json({ ok: false, error: 'not_found' }, 404);
+
+  const f = {};
+  if ('title' in body) {
+    f.title = String(body.title ?? '').trim().slice(0, 100);
+    if (!f.title) return json({ ok: false, error: 'invalid_fields' }, 400);
+  }
+  if ('body' in body) {
+    f.body = String(body.body ?? '').replace(/\r\n/g, '\n').slice(0, 30000);
+    f.word_count = f.body.replace(/\[图\]/g, '').replace(/\s/g, '').length;
+  }
+  if ('idx' in body) {
+    f.idx = Math.max(1, Math.min(500, Math.round(Number(body.idx) || 0)));
+    const dup = await env.DB.prepare(
+      'SELECT id FROM book_chapters WHERE book_id = ?1 AND idx = ?2 AND id != ?3'
+    ).bind(bookId, f.idx, cid).first();
+    if (dup) return json({ ok: false, error: 'dupidx' }, 400);
+  }
+
+  let images = null;
+  let removedKey = null;
+  if ('remove_image' in body) {
+    removedKey = String(body.remove_image ?? '');
+    images = safeImages2(ch.images);
+    const at = images.indexOf(removedKey);
+    if (at < 0) return json({ ok: false, error: 'invalid_fields' }, 400);
+    images.splice(at, 1);
+  }
+
+  const sets = [];
+  const vals = [];
+  for (const [k, v] of Object.entries(f)) {
+    sets.push(`${k} = ?${vals.length + 1}`);
+    vals.push(v);
+  }
+  if (images) {
+    sets.push(`images = ?${vals.length + 1}`);
+    vals.push(JSON.stringify(images));
+  }
+  if (!sets.length) return json({ ok: false, error: 'no_fields' }, 400);
+  sets.push(`updated_at = datetime('now')`);
+  await env.DB.prepare(`UPDATE book_chapters SET ${sets.join(', ')} WHERE id = ?${vals.length + 1}`).bind(...vals, cid).run();
+  await recountBook(env, bookId);
+
+  if (removedKey && env.MEDIA) {
+    try { await env.MEDIA.delete(removedKey); } catch (err) { console.error(`R2 cleanup failed for ${removedKey}:`, err); }
+  }
+  return json({ ok: true });
+}
+
 /** 删除章节（admin）：级联插图 + 重算作品计数 */
 async function removeChapter(env, bookId, cid) {
   const ch = await env.DB.prepare('SELECT id, images FROM book_chapters WHERE id = ?1 AND book_id = ?2')
@@ -1225,13 +1310,7 @@ async function removeChapter(env, bookId, cid) {
       try { await env.MEDIA.delete(k); } catch (err) { console.error(`R2 cleanup failed for ${k}:`, err); }
     }
   }
-  await env.DB.prepare(
-    `UPDATE books SET
-       chapter_count = (SELECT COUNT(*) FROM book_chapters WHERE book_id = ?1),
-       word_count = (SELECT COALESCE(SUM(word_count), 0) FROM book_chapters WHERE book_id = ?1),
-       updated_at = datetime('now')
-     WHERE id = ?1`
-  ).bind(bookId).run();
+  await recountBook(env, bookId);
   return json({ ok: true });
 }
 
@@ -1378,9 +1457,11 @@ async function uploadTrackFile(env, request) {
   return json({ ok: true, key });
 }
 
-/** 图片上传（共用）：≤5MB，魔数校验 JPG/PNG/WebP，存入指定前缀（music/c-* / attra/c-*） */
-async function uploadImageR2(env, request, prefix) {
-  if (!env.MEDIA) return json({ ok: false, error: 'storage_missing' }, 500);
+/** 图片上传（共用）：≤5MB，魔数校验 JPG/PNG/WebP，存入指定前缀
+ *  （music/c-* / attra/c-* 走 MEDIA 媒体桶；商户 m<id>/ 走 IMG 商户图桶，与门户同桶） */
+async function uploadImageR2(env, request, prefix, bucket) {
+  const store = bucket || env.MEDIA;
+  if (!store) return json({ ok: false, error: 'storage_missing' }, 500);
   const buf = new Uint8Array(await request.arrayBuffer());
   if (!buf.length || buf.length > MAX_COVER_BYTES) return json({ ok: false, error: 'bad_cover' }, 400);
   const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
@@ -1391,7 +1472,7 @@ async function uploadImageR2(env, request, prefix) {
   if (!ext) return json({ ok: false, error: 'bad_cover' }, 400);
   const key = `${prefix}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   try {
-    await env.MEDIA.put(key, buf, { httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` } });
+    await store.put(key, buf, { httpMetadata: { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` } });
   } catch (err) {
     console.error('image upload failed:', err);
     return json({ ok: false, error: 'upload_failed' }, 500);
@@ -1946,6 +2027,7 @@ ${BASE_CSS}
   .mst-pending { background: #fdeee8; color: #d64524; }
   .mst-approved { background: #e5f3e8; color: #1a7f37; }
   .mst-rejected { background: #f0f0f2; color: #6e6e73; }
+  .mst-draft { background: #eef0f4; color: #515154; }
   .mst-expired { background: #fbf3dd; color: #9a6b00; }
   /* 万载TV 视频管理 */
   .vrow1 { display: flex; align-items: flex-start; gap: 12px; }
@@ -1956,6 +2038,15 @@ ${BASE_CSS}
   .chitem { border-top: 1px solid rgba(0,0,0,.06); padding: 12px 0; }
   .chitem:first-child { border-top: 0; padding-top: 4px; }
   .chbody { margin-top: 8px; padding: 10px 12px; background: #fff; border: 1px solid rgba(0,0,0,.05); border-radius: 10px; font-size: 13px; white-space: pre-wrap; word-break: break-word; color: #333; max-height: 280px; overflow-y: auto; line-height: 1.7; }
+  .figwrap { position: relative; display: inline-block; }
+  .figwrap img { display: block; }
+  .figwrap .figdel { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; padding: 0; border-radius: 999px; font-size: 11px; line-height: 1; background: #fff; border: 1px solid rgba(0,0,0,.15); color: #d64524; cursor: pointer; }
+  .chedit { margin: 10px 0 4px; padding: 12px 14px; background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .chedit-grid { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
+  .chedit label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #6e6e73; }
+  .chedit input, .chedit textarea { padding: 9px 11px; font-size: 14px; color: #1d1d1f; background: #fafafc; border: 1px solid rgba(0,0,0,.1); border-radius: 10px; outline: none; font-family: inherit; }
+  .chedit input:focus, .chedit textarea:focus { border-color: #d64524; background: #fff; }
+  .chedit textarea { resize: vertical; line-height: 1.7; white-space: pre-wrap; }
   .vprog { height: 6px; background: #f0f0f2; border-radius: 999px; margin-top: 14px; overflow: hidden; }
   .vprog div { height: 100%; width: 0; background: linear-gradient(90deg, #d64524, #f2a03d); transition: width .2s; }
   .vhint { color: #86868b; font-size: 12px; }
@@ -2152,7 +2243,12 @@ ${BASE_CSS}
       <label>Slug（上线地址，留空自动 m<id）<input id="f-slug" placeholder="liuda-wan"></label>
       <label>付费到期（YYYY-MM-DD，空 = 免费期）<input id="f-paid" placeholder="2027-09-06"></label>
       <label>置顶权重（大者靠前）<input id="f-weight" type="number" value="0"></label>
-      <label class="wide">封面图 URL（可用站内图 /assets/img/…）<input id="f-cover" placeholder="/assets/img/wanzaizha1rou.jpeg"></label>
+      <label class="wide">封面图（可上传本地图 JPG/PNG/WebP ≤5MB，或直接填站内地址 /assets/img/…）
+        <input id="f-cover" placeholder="/assets/img/wanzaizha1rou.jpeg（选了上传文件时以文件为准）">
+        <input id="f-coverfile" type="file" accept="image/jpeg,image/png,image/webp">
+        <span class="vfile" id="f-coverinfo"></span>
+        <img id="f-coverprev" alt="" style="display:none;width:132px;height:88px;object-fit:cover;border-radius:8px;background:#f5f5f7">
+      </label>
       <label class="wide">一句话简介（卡片展示）<input id="f-intro"></label>
       <label class="wide">详情（空行自动分段）<textarea id="f-detail" rows="4"></textarea></label>
       <label>地址<input id="f-address"></label>
@@ -3164,6 +3260,9 @@ function openForm(x) {
   el('f-paid').value = x ? x.paid_until || '' : '';
   el('f-weight').value = x ? x.sort_weight || 0 : 0;
   el('f-cover').value = x ? x.cover || '' : '';
+  el('f-coverfile').value = '';
+  el('f-coverinfo').textContent = x && x.cover ? '当前封面：' + x.cover : '';
+  setCoverPrev(x && x.cover ? merchantImg(x.cover) : '');
   el('f-intro').value = x ? x.intro || '' : '';
   el('f-detail').value = x ? x.detail || '' : '';
   el('f-address').value = x ? x.address || '' : '';
@@ -3189,13 +3288,64 @@ el('fsave').addEventListener('click', function () {
     contact_name: val('f-cname'), contact_phone: val('f-cphone')
   };
   if (!payload.name) { alert('请填写商户名称'); return; }
-  api(editingId ? '/api/merchants/' + editingId : '/api/merchants', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload)
+  var coverfile = el('f-coverfile').files && el('f-coverfile').files[0];
+  if (coverfile && coverfile.size > 5 * 1048576) { alert('封面图超过 5MB。'); return; }
+
+  var btn = el('fsave');
+  btn.disabled = true;
+  // 带图新建：先建档拿 id（图片必须归 m<id>/ 前缀，删商户才能级联清理），再传图、补封面
+  var createdId = null;
+  var seq = Promise.resolve();
+  if (coverfile && !editingId) {
+    seq = seq.then(function () {
+      return api('/api/merchants', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }).then(function (d) {
+      createdId = d.id; editingId = d.id;
+      el('mform-title').textContent = '编辑商户 #' + d.id;
+    });
+  }
+  if (coverfile) {
+    seq = seq.then(function () {
+      return putFile('/api/merchants/cover?m=' + editingId, coverfile);
+    }).then(function (d) { payload.cover = d.key; });
+  }
+  seq.then(function () {
+    if (createdId) {
+      // 建档已成功，此处只补封面字段
+      return api('/api/merchants/' + createdId, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cover: payload.cover })
+      });
+    }
+    return api(editingId ? '/api/merchants/' + editingId : '/api/merchants', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
   }).then(function () { closeForm(); loadMerchants(true); })
-    .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); });
+    .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); })
+    .then(function () { btn.disabled = false; });
 });
 el('mmore').addEventListener('click', function () { mState.offset += ${PAGE_SIZE}; loadMerchants(false); });
+
+// 商户图展示地址：/ 开头 = 主站静态图；否则为商户图桶 R2 键，走主站 /assets-merchant/ 代理
+function merchantImg(v) {
+  if (!v) return '';
+  return SITE_HOME + (v.indexOf('/') === 0 ? v : '/assets-merchant/' + v);
+}
+function setCoverPrev(src) {
+  var prev = el('f-coverprev');
+  if (src) { prev.src = src; prev.style.display = ''; }
+  else { prev.removeAttribute('src'); prev.style.display = 'none'; }
+}
+el('f-coverfile').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  setCoverPrev(f ? URL.createObjectURL(f) : '');
+  if (f) el('f-coverinfo').textContent = '已选择：' + f.name + '（保存后生效，覆盖上方地址）';
+  else el('f-coverinfo').textContent = editingId && el('f-cover').value ? '当前封面：' + el('f-cover').value : '';
+});
 
 /* ---------- 万载TV 视频管理（docs/万载TV方案.md） ---------- */
 var tState = { status: '', offset: 0 };
@@ -3608,7 +3758,7 @@ function renderBook(x) {
   return div;
 }
 
-/** 展开/收起某作品的章节审核面板（先读后审：正文全量展示） */
+/** 展开/收起某作品的章节审核面板（先读后审：正文全量展示；支持直改章节与删单张插图） */
 function toggleChapters(book, card) {
   var existing = card.nextElementSibling;
   if (existing && existing.className === 'chdetail') { existing.remove(); return; }
@@ -3617,24 +3767,28 @@ function toggleChapters(book, card) {
   det.innerHTML = '<p class="empty">章节加载中…</p>';
   card.after(det);
   api('/api/books/' + book.id + '/chapters').then(function (d) {
-    var rows = (d.chapters || []).map(function (c) {
+    var chapters = d.chapters || [];
+    var rows = chapters.map(function (c) {
       var imgs = [];
       try { imgs = JSON.parse(c.images || '[]') || []; } catch (err) { imgs = []; }
       var imgHtml = imgs.length
         ? '<div class="thumbs" style="margin-top:8px">' + imgs.map(function (k) {
-            return '<img class="land" loading="lazy" alt="" src="' + SITE_HOME + (k.indexOf('/') === 0 ? '' : '/media/') + esc(k) + '">';
+            return '<span class="figwrap"><img class="land" loading="lazy" alt="" src="' + SITE_HOME + (k.indexOf('/') === 0 ? '' : '/media/') + esc(k) + '">' +
+              '<button type="button" class="figdel" data-imgdel="' + c.id + '|' + esc(k) + '" title="删除此图">✕</button></span>';
           }).join('') + '</div>'
         : '';
-      return '<div class="chitem">' +
+      var stCls = c.status === 'approved' ? 'mst-approved' : c.status === 'rejected' ? 'mst-rejected' : c.status === 'draft' ? 'mst-draft' : 'mst-pending';
+      var stTxt = c.status === 'approved' ? '已上线' : c.status === 'rejected' ? '已驳回' : c.status === 'draft' ? '草稿' : '待审';
+      return '<div class="chitem" data-chitem="' + c.id + '">' +
         '<div class="row1"><span class="name" style="font-size:14px">第' + c.idx + '章 · ' + esc(c.title) + '</span>' +
-        '<span class="mst ' + (c.status === 'approved' ? 'mst-approved' : c.status === 'rejected' ? 'mst-rejected' : 'mst-pending') + '">' +
-        (c.status === 'approved' ? '已上线' : c.status === 'rejected' ? '已驳回' : '待审') + '</span>' +
+        '<span class="mst ' + stCls + '">' + stTxt + '</span>' +
         '<span class="vhint">' + (c.word_count || 0) + ' 字</span></div>' +
         (c.status === 'rejected' && c.reject_reason ? '<div class="vhint">驳回原因：' + esc(c.reject_reason) + '</div>' : '') +
         '<div class="chbody">' + esc(c.body) + '</div>' + imgHtml +
         '<div class="ops">' +
         (c.status !== 'approved' ? '<button type="button" data-chok="' + c.id + '">通过上线</button>' : '') +
         (c.status !== 'rejected' ? '<button type="button" data-chrej="' + c.id + '">驳回</button>' : '') +
+        '<button type="button" data-chedit="' + c.id + '">编辑</button>' +
         '<button type="button" data-chdel="' + c.id + '" class="danger">删除</button></div>' +
         '</div>';
     }).join('');
@@ -3643,6 +3797,8 @@ function toggleChapters(book, card) {
       var ok = e.target.getAttribute('data-chok');
       var rej = e.target.getAttribute('data-chrej');
       var del = e.target.getAttribute('data-chdel');
+      var editId = e.target.getAttribute('data-chedit');
+      var imgdel = e.target.getAttribute('data-imgdel');
       if (ok) {
         api('/api/books/' + book.id + '/chapters/' + ok, {
           method: 'POST', headers: { 'content-type': 'application/json' },
@@ -3659,11 +3815,67 @@ function toggleChapters(book, card) {
         if (!confirm('确定删除该章节？章节图片将一并删除，不可恢复。')) return;
         api('/api/books/' + book.id + '/chapters/' + del, { method: 'DELETE' })
           .then(function () { toggleChapters(book, card); loadBooks(false); });
+      } else if (imgdel) {
+        // data-imgdel = "<章节id>|<R2键>"（键内无 |，split 后 join 兜底）
+        var parts = imgdel.split('|');
+        var imgCid = parts.shift();
+        var imgKey = parts.join('|');
+        if (!confirm('删除这张插图？正文中对应的 [图] 占位将不再显示图片。')) return;
+        api('/api/books/' + book.id + '/chapters/' + imgCid + '/edit', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ remove_image: imgKey })
+        }).then(function () { toggleChapters(book, card); loadBooks(false); })
+          .catch(function (err) { if (err.message !== 'unauthorized') alert('删除失败：' + err.message); });
+      } else if (editId) {
+        var item = det.querySelector('[data-chitem="' + editId + '"]');
+        var opened = item && item.nextElementSibling;
+        if (opened && opened.className === 'chedit') { opened.remove(); return; }
+        det.querySelectorAll('.chedit').forEach(function (x) { x.remove(); });
+        var c = null;
+        for (var i = 0; i < chapters.length; i++) if (String(chapters[i].id) === String(editId)) c = chapters[i];
+        if (!c || !item) return;
+        item.after(chapterEditForm(c));
+      } else if (e.target.getAttribute('data-saveedit')) {
+        var box = e.target.closest('.chedit');
+        if (!box) return;
+        var saveId = e.target.getAttribute('data-saveedit');
+        var payload = {};
+        box.querySelectorAll('[data-f]').forEach(function (inp) {
+          payload[inp.getAttribute('data-f')] = inp.value;
+        });
+        e.target.disabled = true;
+        api('/api/books/' + book.id + '/chapters/' + saveId + '/edit', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function () { toggleChapters(book, card); loadBooks(false); })
+          .catch(function (err) {
+            e.target.disabled = false;
+            if (err.message !== 'unauthorized') alert(err.message === 'dupidx' ? '序号与已有章节重复' : '保存失败：' + err.message);
+          });
+      } else if (e.target.getAttribute('data-canceledit')) {
+        var frm = e.target.closest('.chedit');
+        if (frm) frm.remove();
       }
     });
   }).catch(function (e) {
     det.innerHTML = '<p class="empty">加载失败：' + esc(e.message) + '</p>';
   });
+}
+
+/** 章节直改表单（admin）：序号/标题/正文；保存即时生效且不改变审核状态 */
+function chapterEditForm(c) {
+  var wrap = document.createElement('div');
+  wrap.className = 'chedit';
+  wrap.innerHTML =
+    '<div class="chedit-grid">' +
+      '<label>序号<input type="number" min="1" max="500" value="' + c.idx + '" data-f="idx"></label>' +
+      '<label>标题<input value="' + esc(c.title) + '" maxlength="100" data-f="title"></label>' +
+    '</div>' +
+    '<label>正文（空行分段，[图] 占位行按插图顺序替换为图片）<textarea rows="10" data-f="body">' + esc(c.body) + '</textarea></label>' +
+    '<div class="ops"><button type="button" class="primary" data-saveedit="' + c.id + '">保存修改</button>' +
+    '<button type="button" data-canceledit="1">取消</button></div>' +
+    '<p class="vhint">保存即时生效：已上线章节直接对读者可见，审核状态不变。</p>';
+  return wrap;
 }
 
 function openBookForm(x) {
