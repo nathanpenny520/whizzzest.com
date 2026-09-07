@@ -900,6 +900,13 @@ const BASE_CSS = `
   td { padding: 8px 0; word-break: break-word; }
   .tip { color: #6e6e73; font-size: 13px; line-height: 1.8; }
   .tip b { color: #1d1d1f; }
+  .guide { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gitem { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: #f5f5f7; border-radius: 12px; }
+  .gitem .gico { flex: 0 0 auto; font-size: 20px; line-height: 1.3; }
+  .gitem b { display: block; font-size: 13px; font-weight: 600; color: #1d1d1f; }
+  .gitem p { margin-top: 4px; color: #6e6e73; font-size: 12.5px; line-height: 1.7; }
+  .gitem p b { display: inline; font-weight: 600; }
+  @media (max-width: 640px) { .guide { grid-template-columns: 1fr; } }
   .thumbs { display: flex; gap: 10px; flex-wrap: wrap; }
   .thumbs img { width: 72px; height: 96px; object-fit: cover; border-radius: 8px; background: #f5f5f7; }
   .thumbs img.land { width: 96px; height: 72px; }
@@ -1346,10 +1353,12 @@ async function dashboardHtml(env, user, url) {
       ${bindEmailPanel}
       <div class="panel">
         <h3>创作与审核说明</h3>
-        <p class="tip">· 作品信息（标题/分类/简介/封面）改动后整本重新审核；<br>
-        · <b>已上线的作品不受影响</b>——新写/修改的章节单独审核，通过后读者即可阅读；<br>
-        · 章节正文用空行分段，需要插图的位置单独写一行 <b>[图]</b>，上传的图片会按顺序填入；<br>
-        · 审核通常 24 小时内完成，驳回原因会显示在作品卡片上。有疑问联系 <b>${CONTACT_EMAIL}</b>。</p>
+        <div class="guide">
+          <div class="gitem"><span class="gico">🔄</span><div><b>审核范围</b><p>作品信息（标题/分类/简介/封面）改动后，整本重新审核。</p></div></div>
+          <div class="gitem"><span class="gico">✅</span><div><b>已上线不受影响</b><p>新写/修改的章节单独审核，通过后读者即可阅读。</p></div></div>
+          <div class="gitem"><span class="gico">🖋️</span><div><b>正文用 Markdown</b><p>空行分段，支持 <b># 标题</b>、<b>**粗体**</b>、<b>&gt; 引用</b>、<b>- 列表</b>、<b>[文字](链接)</b> 等，编辑器内可实时预览。</p></div></div>
+          <div class="gitem"><span class="gico">⏱️</span><div><b>24 小时内审核</b><p>驳回原因会显示在作品卡片上。有疑问联系 <b>${CONTACT_EMAIL}</b>。</p></div></div>
+        </div>
       </div>
     </div>
   <script>
@@ -1479,6 +1488,7 @@ async function chaptersHtml(env, book, url) {
 
   return shell(`
     <header><h1>章节管理 — ${esc(book.title)}</h1>
+      <a class="btn-text" href="/dashboard">返回作品台</a>
       <a class="btn-text" href="/book/${book.id}/edit">编辑信息</a>
       <a class="btn primary" href="/book/${book.id}/chapter/new">+ 新建章节</a>
     </header>
