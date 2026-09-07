@@ -56,24 +56,102 @@ function safeImages(json) {
   }
 }
 
-/** 章节正文渲染：空行分段 + [图] 占位按 images 顺序替换 <figure> */
-function chapterBodyHtml(ch) {
-  const imgs = safeImages(ch.images);
-  let i = 0;
-  return String(ch.body || '')
-    .split(/\n{2,}/)
-    .map((seg) => {
-      const t = seg.trim();
-      if (!t) return '';
-      if (t === '[图]') {
-        const key = imgs[i++];
-        return key
-          ? `<figure class="bk-fig"><img src="/media/${esc(key)}" alt="" loading="lazy" decoding="async"></figure>`
-          : '';
+/* ---------------- Markdown 白名单渲染（esc-first，天然免疫 XSS） ----------------
+ * 先整段 HTML 转义、再按白名单语法生成标签；链接只放行 http(s):// 与站内相对路径。
+ * 支持语法：# 标题、**粗**、*斜*、`行内码`、```代码块```、> 引用、- / 1. 列表、--- 分隔线、[文字](链接)。
+ * 注意：本函数与 writer 门户编辑器的客户端预览渲染（writer/index.js「mdInline/mdBlocks」）为同一套规则的双份实现，
+ * 修改语法必须两处同步（零依赖项目不做共享模块）。
+ * [图] 独立成段的旧图文格式分支保留：存量有图章节照常渲染（新章节编辑器已不再提供插图）。
+ */
+
+/** 行内格式（输入须已 esc）：代码 span 先出栈占位防嵌套改写，链接白名单协议，粗体/斜体最后。
+ *  占位哨兵用 \u0000（正文先经 esc 不会产生控制字符，恢复前不会与可见文本碰撞） */
+function mdInline(s) {
+  const stash = [];
+  s = s.replace(/`([^`\n]+)`/g, (m, c) => {
+    stash.push(`<code>${c}</code>`);
+    return '\u0000' + (stash.length - 1) + '\u0000';
+  });
+  s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/gi, (m, text, url) => {
+    const external = /^https?:\/\//i.test(url);
+    return `<a href="${url}"${external ? ' target="_blank" rel="noopener nofollow"' : ''}>${text}</a>`;
+  });
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+  s = s.replace(/\u0000(\d+)\u0000/g, (m, i) => stash[Number(i)]);
+  return s;
+}
+
+/** 块级解析（逐行状态机）：空行分段；``` 围栏代码块内部保留空行与原样（已 esc）；
+ *  [图] 独立成段走旧图文分支；--- / *** 分隔线；# 标题；> 引用；- / 1. 列表；其余为段落（行间 <br>） */
+function mdBlocks(body, imgs) {
+  const out = [];
+  let imgIdx = 0;
+  let para = [];
+  let fence = null; // 非 null = 正在收集代码块行（已 esc）
+  const flushPara = () => {
+    const t = para.join('\n').trim();
+    para = [];
+    if (!t) return;
+    if (t === '[图]') {
+      const key = imgs[imgIdx++];
+      if (key) out.push(`<figure class="bk-fig"><img src="/media/${esc(key)}" alt="" loading="lazy" decoding="async"></figure>`);
+      return;
+    }
+    if (/^(-{3,}|\*{3,})$/.test(t)) {
+      out.push('<hr>');
+      return;
+    }
+    if (!t.includes('\n') && /^#{1,6} /.test(t)) {
+      const level = Math.min(t.match(/^#+/)[0].length + 1, 4); // # → h2（页面 h1 是章题），###### 封顶 h4
+      out.push(`<h${level}>${mdInline(t.replace(/^#+ /, ''))}</h${level}>`);
+      return;
+    }
+    const ls = t.split('\n');
+    if (ls.every((l) => l.startsWith('&gt; '))) {
+      out.push(`<blockquote><p>${ls.map((l) => mdInline(l.slice(5))).join('<br>')}</p></blockquote>`);
+      return;
+    }
+    if (ls.every((l) => /^[-*] /.test(l))) {
+      out.push(`<ul>${ls.map((l) => `<li>${mdInline(l.slice(2))}</li>`).join('')}</ul>`);
+      return;
+    }
+    if (ls.every((l) => /^\d+[.] /.test(l))) {
+      out.push(`<ol>${ls.map((l) => `<li>${mdInline(l.replace(/^\d+[.] /, ''))}</li>`).join('')}</ol>`);
+      return;
+    }
+    out.push(`<p>${ls.map(mdInline).join('<br>')}</p>`);
+  };
+  for (const rawLine of String(body || '').split('\n')) {
+    const line = rawLine.replace(/\s+$/, '');
+    if (fence !== null) {
+      if (/^```/.test(line)) {
+        out.push(`<pre><code>${fence.join('\n')}</code></pre>`);
+        fence = null;
+      } else {
+        fence.push(esc(line));
       }
-      return `<p>${esc(t)}</p>`;
-    })
-    .join('');
+      continue;
+    }
+    if (/^```/.test(line.trim())) {
+      flushPara();
+      fence = [];
+      continue;
+    }
+    if (!line.trim()) {
+      flushPara();
+      continue;
+    }
+    para.push(esc(line));
+  }
+  if (fence !== null && fence.length) out.push(`<pre><code>${fence.join('\n')}</code></pre>`); // 未闭合兜底
+  flushPara();
+  return out.join('');
+}
+
+/** 章节正文渲染：Markdown 白名单 + [图] 占位按 images 顺序替换 <figure>（旧图文格式兼容） */
+function chapterBodyHtml(ch) {
+  return mdBlocks(ch.body, safeImages(ch.images));
 }
 
 /* ---------------- 书架页 ---------------- */

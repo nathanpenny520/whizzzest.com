@@ -3487,6 +3487,52 @@ div.bk-cover {
 
 .bk-body p { margin-bottom: 1.35em; text-align: justify; }
 
+/* Markdown 白名单元素（worker/library.js mdBlocks 生成） */
+.bk-body h2, .bk-body h3, .bk-body h4 {
+  margin: 1.6em 0 0.7em;
+  letter-spacing: -0.01em;
+  color: #1d1d1f;
+}
+.bk-body h2 { font-size: 1.35em; }
+.bk-body h3 { font-size: 1.18em; }
+.bk-body h4 { font-size: 1.05em; }
+.bk-body blockquote {
+  margin: 1.4em 0;
+  padding: 0.6em 1.1em;
+  border-left: 3px solid #e83518;
+  background: rgba(232, 53, 24, 0.05);
+  border-radius: 0 10px 10px 0;
+  color: #555;
+}
+.bk-body blockquote p { margin: 0; }
+.bk-body ul, .bk-body ol { margin: 0 0 1.35em; padding-left: 1.6em; }
+.bk-body li { margin-bottom: 0.35em; }
+.bk-body hr {
+  border: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.12);
+  margin: 2.2em auto;
+  width: 62%;
+}
+.bk-body code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  background: rgba(0, 0, 0, 0.055);
+  padding: 0.15em 0.45em;
+  border-radius: 6px;
+}
+.bk-body pre {
+  margin: 1.5em 0;
+  padding: 1em 1.2em;
+  background: #f6f6f8;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 12px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+.bk-body pre code { background: none; padding: 0; font-size: 0.85em; }
+.bk-body a { color: #e83518; text-decoration: underline; text-underline-offset: 3px; }
+
 .bk-fig {
   margin: 2em auto;
   text-align: center;

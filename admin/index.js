@@ -3886,7 +3886,7 @@ function chapterEditForm(c) {
       '<label>序号<input type="number" min="1" max="500" value="' + c.idx + '" data-f="idx"></label>' +
       '<label>标题<input value="' + esc(c.title) + '" maxlength="100" data-f="title"></label>' +
     '</div>' +
-    '<label>正文（空行分段，[图] 占位行按插图顺序替换为图片）<textarea rows="10" data-f="body">' + esc(c.body) + '</textarea></label>' +
+    '<label>正文（支持 Markdown：# 标题、**粗体**、*斜体*、> 引用、列表、[文字](链接)；[图] 为旧图文占位）<textarea rows="10" data-f="body">' + esc(c.body) + '</textarea></label>' +
     '<div class="ops"><button type="button" class="primary" data-saveedit="' + c.id + '">保存修改</button>' +
     '<button type="button" data-canceledit="1">取消</button></div>' +
     '<p class="vhint">保存即时生效：已上线章节直接对读者可见，审核状态不变。</p>';

@@ -964,16 +964,35 @@ const BASE_CSS = `
   .saveline.info { color: #6e6e73; }
   .ta-tools { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
   .ta-tools button { padding: 4px 12px; font-size: 12px; }
+  .ta-tools button.active { background: #d64524; border-color: #d64524; color: #fff; }
+  .ta-tools button.active:hover { background: #b5371a; color: #fff; }
   .ta-tools b { font-size: 13px; color: #1d1d1f; }
-  .figsec { margin-top: 14px; }
-  .figsec-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #6e6e73; }
-  .figsec-head button { padding: 5px 14px; font-size: 12px; }
-  .figbox { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; min-height: 20px; }
-  .figcard { width: 96px; border: 1px solid rgba(0,0,0,.08); border-radius: 10px; overflow: hidden; background: #f5f5f7; }
-  .figcard img { width: 96px; height: 72px; object-fit: cover; display: block; }
-  .figcard .figcap { font-size: 11px; color: #86868b; text-align: center; padding: 2px 0; }
-  .figcard .figops { display: flex; justify-content: center; gap: 2px; padding-bottom: 5px; }
-  .figcard .figops button { padding: 2px 8px; font-size: 11px; border-radius: 7px; }
+  .mdprev {
+    min-height: 320px; padding: 14px 16px; background: #f5f5f7; border: 1px solid transparent;
+    border-radius: 12px; font-size: 15px; line-height: 1.9; color: #1d1d1f; word-break: break-word;
+  }
+  .mdprev h2, .mdprev h3, .mdprev h4 { margin: 1.2em 0 0.5em; letter-spacing: -0.01em; }
+  .mdprev h2 { font-size: 1.3em; }
+  .mdprev h3 { font-size: 1.15em; }
+  .mdprev h4 { font-size: 1.03em; }
+  .mdprev blockquote {
+    margin: 1em 0; padding: 0.5em 1em; border-left: 3px solid #d64524;
+    background: rgba(214, 69, 36, 0.05); border-radius: 0 10px 10px 0; color: #555;
+  }
+  .mdprev blockquote p { margin: 0; }
+  .mdprev ul, .mdprev ol { margin: 0 0 1em; padding-left: 1.6em; }
+  .mdprev hr { border: 0; height: 1px; background: rgba(0,0,0,.12); margin: 1.6em auto; width: 62%; }
+  .mdprev code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.86em;
+    background: rgba(0,0,0,.055); padding: 0.15em 0.45em; border-radius: 6px;
+  }
+  .mdprev pre { margin: 1em 0; padding: 0.9em 1.1em; background: #ececf0; border-radius: 10px; overflow-x: auto; line-height: 1.6; }
+  .mdprev pre code { background: none; padding: 0; }
+  .mdprev a { color: #d64524; text-decoration: underline; text-underline-offset: 3px; }
+  .mdprev .md-figph {
+    text-align: center; color: #86868b; background: #ececf0;
+    border-radius: 10px; padding: 14px; margin: 12px 0; font-size: 13px;
+  }
   .recover {
     margin-top: 12px; padding: 12px 16px; background: #fbf3dd; color: #9a6b00;
     border-radius: 12px; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -1487,7 +1506,6 @@ async function chaptersHtml(env, book, url) {
 
 function chapterFormHtml(book, ch, idx, usedIdx = []) {
   const isEdit = !!ch;
-  const imgs = isEdit ? safeImages(ch.images) : [];
   const status = isEdit ? ch.status : 'new';
   // 已上线/审核中的章「保存草稿」= 暂时下线/撤回，需明示
   const draftWarn = status === 'approved'
@@ -1495,11 +1513,10 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
     : status === 'pending'
       ? '<p class="hint" style="color:#d64524">该章审核中：「保存草稿」会先撤回审核，改完再重新提交。</p>'
       : '';
-  const figInit = JSON.stringify(imgs.map((k) => ({ kind: 'old', key: k, url: `${SITE}/media/${k}` })));
   return shell(`
     <header><h1 id="h1title">${isEdit ? '编辑章节 — ' + esc(ch.title) : '新建章节'} — ${esc(book.title)}</h1><a class="btn-text" href="/book/${book.id}/chapters">返回章节列表</a></header>
     <div class="wrap">
-      <div class="ok-line">「保存草稿」随写随存不进审核（草稿仅自己可见，可自动保存）；「提交审核」通过后读者才可阅读。正文空行分段，插图位置放 <b>[图]</b>：工具栏一键插入，或把图片直接拖进正文 / Ctrl+V 粘贴截图。</div>
+      <div class="ok-line">正文支持 <b>Markdown</b>：# 标题　**粗体**　*斜体*　\`行内码\`　&gt; 引用　- 列表　1. 有序列表　--- 分隔线　[文字](链接)；空行分段。「保存草稿」随写随存不进审核（草稿仅自己可见，可自动保存）；「提交审核」通过后读者才可阅读。</div>
       <div class="saveline-row">
         <span style="font-size:12px;color:#6e6e73">状态 <span id="st-badge" class="mst mst-hidden">未保存</span></span>
         <span id="saveline" class="saveline"></span>
@@ -1516,22 +1533,14 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
           <label>章节标题 *<input id="title" name="title" maxlength="100" required value="${isEdit ? esc(ch.title) : ''}"></label>
           <div class="wide">
             <div class="ta-tools">
-              <button type="button" id="btn-ph" title="在光标处插入插图占位行">插入 [图] 占位</button>
-              <span id="ph-count" class="hint"></span>
-              <span class="hint" style="margin-left:auto">字数（不含图）：<b id="wc">${isEdit ? (ch.word_count || 0).toLocaleString('zh-CN') : 0}</b></span>
+              <button type="button" id="tab-edit" class="active">✍ 写正文</button>
+              <button type="button" id="tab-preview">👁 预览</button>
+              <span class="hint" style="margin-left:auto">字数：<b id="wc">${isEdit ? (ch.word_count || 0).toLocaleString('zh-CN') : 0}</b></span>
             </div>
-            <textarea id="body" name="body" rows="16" maxlength="${MAX_BODY}" aria-label="章节正文" placeholder="第一段……&#10;&#10;[图]&#10;&#10;第二段……">${isEdit ? esc(ch.body) : ''}</textarea>
+            <textarea id="body" name="body" rows="16" maxlength="${MAX_BODY}" aria-label="章节正文" placeholder="第一段……&#10;&#10;## 小节标题&#10;&#10;正文支持 Markdown，空行分段……">${isEdit ? esc(ch.body) : ''}</textarea>
+            <div id="preview" class="mdprev" style="display:none"></div>
           </div>
           ${draftWarn ? `<div class="wide">${draftWarn}</div>` : ''}
-        </div>
-        <div class="figsec">
-          <div class="figsec-head">
-            <span>插图（最多 ${MAX_FIGURES} 张，按 [图] 占位顺序填入；JPG/PNG/WebP，单张 ≤5MB）</span>
-            <button type="button" id="btn-addfig">+ 添加插图</button>
-            <input type="file" id="figfile" accept="image/jpeg,image/png,image/webp" multiple hidden>
-          </div>
-          <div class="figbox" id="figbox"></div>
-          <p class="hint" style="margin-top:8px">← → 调整顺序，✕ 删除；编辑时旧图自动保留，只传新增的图。</p>
         </div>
         <div class="ops" style="margin-top:14px">
           <button class="primary" type="submit" id="btn-review">提交审核</button>
@@ -1546,42 +1555,123 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
     var chId = ${isEdit ? ch.id : 0};
     var chStatus = ${JSON.stringify(status)};
     var usedIdx = ${JSON.stringify(usedIdx)};
-    var MAXFIG = ${MAX_FIGURES};
-    var MAXB = ${MAX_IMG_BYTES};
+
     var form = document.getElementById('chform');
     var ta = document.getElementById('body');
     var wc = document.getElementById('wc');
-    var phEl = document.getElementById('ph-count');
-    var figbox = document.getElementById('figbox');
-    var fileInput = document.getElementById('figfile');
     var saveline = document.getElementById('saveline');
     var stBadge = document.getElementById('st-badge');
-    var figs = ${figInit};
+    var preview = document.getElementById('preview');
     var dirty = false, saving = false, autoOn = false, autoTimer = null;
     var LSKEY = 'wrch:' + bookId + ':' + (chId || 'new');
     var ERRS = { fields: '标题或正文不完整', dupidx: '章节序号与已有章节重复',
-      img: '插图上传失败：请确认 JPG/PNG/WebP、单张 ≤5MB、最多 ${MAX_FIGURES} 张',
+      img: '正文里有单独成行的 [图]（旧版插图占位），但本章没有插图——请删除该行后再提交',
       format: '提交数据异常，请刷新页面重试' };
     var ST = { new: '未保存', draft: '草稿', pending: '审核中', approved: '已上线', rejected: '已驳回' };
     var STC = { draft: 'mst-draft', pending: 'mst-pending', approved: 'mst-approved', rejected: 'mst-rejected' };
 
     function fmtTime(ts) { try { return new Date(ts).toLocaleString('zh-CN'); } catch (e) { return ''; } }
-    function phCount(v) {
-      var segs = v.split(/\\n{2,}/), n = 0;
-      for (var i = 0; i < segs.length; i++) if (segs[i].replace(/\\s/g, '') === '[图]') n++;
-      return n;
+
+    /* ---------- Markdown 白名单预览渲染 ----------
+     * 与主站 worker/library.js 的 mdInline/mdBlocks 是同一套规则的双份实现（零依赖项目不共享模块），改语法必须两处同步。
+     * 唯一差异：[图] 独立段此处渲染提示框，主站渲染真实插图（旧图文章节兼容）。 ---------- */
+    function escHtml(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-    function refreshCounters() {
+    function mdInline(s) {
+      var stash = [];
+      s = s.replace(/\`([^\`\\n]+)\`/g, function (m, c) {
+        stash.push('<code>' + c + '</code>');
+        return '\\u0000' + (stash.length - 1) + '\\u0000';
+      });
+      s = s.replace(/\\[([^\\]\\n]+)\\]\\((https?:\\/\\/[^)\\s]+|\\/[^)\\s]*)\\)/gi, function (m, text, url) {
+        var external = /^https?:\\/\\//i.test(url);
+        return '<a href="' + url + '"' + (external ? ' target="_blank" rel="noopener nofollow"' : '') + '>' + text + '</a>';
+      });
+      s = s.replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<strong>$1</strong>');
+      s = s.replace(/\\*([^*\\n]+)\\*/g, '<em>$1</em>');
+      s = s.replace(/\\u0000(\\d+)\\u0000/g, function (m, i) { return stash[Number(i)]; });
+      return s;
+    }
+    function mdBlocks(body) {
+      var out = [];
+      var para = [];
+      var fence = null;
+      function flushPara() {
+        var t = para.join('\\n').trim();
+        para = [];
+        if (!t) return;
+        if (t === '[图]') { out.push('<div class="md-figph">〔插图占位〕</div>'); return; }
+        if (/^(-{3,}|\\*{3,})$/.test(t)) { out.push('<hr>'); return; }
+        if (t.indexOf('\\n') < 0 && /^#{1,6} /.test(t)) {
+          var level = Math.min(t.match(/^#+/)[0].length + 1, 4);
+          out.push('<h' + level + '>' + mdInline(t.replace(/^#+ /, '')) + '</h' + level + '>');
+          return;
+        }
+        var ls = t.split('\\n'), i, ok;
+        ok = true;
+        for (i = 0; i < ls.length; i++) if (ls[i].indexOf('&gt; ') !== 0) { ok = false; break; }
+        if (ok) {
+          var q = [];
+          for (i = 0; i < ls.length; i++) q.push(mdInline(ls[i].slice(5)));
+          out.push('<blockquote><p>' + q.join('<br>') + '</p></blockquote>');
+          return;
+        }
+        ok = true;
+        for (i = 0; i < ls.length; i++) if (!/^[-*] /.test(ls[i])) { ok = false; break; }
+        if (ok) {
+          var ul = [];
+          for (i = 0; i < ls.length; i++) ul.push('<li>' + mdInline(ls[i].slice(2)) + '</li>');
+          out.push('<ul>' + ul.join('') + '</ul>');
+          return;
+        }
+        ok = true;
+        for (i = 0; i < ls.length; i++) if (!/^\\d+[.] /.test(ls[i])) { ok = false; break; }
+        if (ok) {
+          var ol = [];
+          for (i = 0; i < ls.length; i++) ol.push('<li>' + mdInline(ls[i].replace(/^\\d+[.] /, '')) + '</li>');
+          out.push('<ol>' + ol.join('') + '</ol>');
+          return;
+        }
+        out.push('<p>' + ls.map(mdInline).join('<br>') + '</p>');
+      }
+      var lines = String(body || '').split('\\n');
+      for (var j = 0; j < lines.length; j++) {
+        var line = lines[j].replace(/\\s+$/, '');
+        if (fence !== null) {
+          if (/^\`\`\`/.test(line)) { out.push('<pre><code>' + fence.join('\\n') + '</code></pre>'); fence = null; }
+          else fence.push(escHtml(line));
+          continue;
+        }
+        if (/^\`\`\`/.test(line.trim())) { flushPara(); fence = []; continue; }
+        if (!line.trim()) { flushPara(); continue; }
+        para.push(escHtml(line));
+      }
+      if (fence !== null && fence.length) out.push('<pre><code>' + fence.join('\\n') + '</code></pre>');
+      flushPara();
+      return out.join('');
+    }
+
+    /* ---------- 编辑 / 预览切换 ---------- */
+    function refreshWc() {
       wc.textContent = ta.value.replace(/\\[图\\]/g, '').replace(/\\s/g, '').length.toLocaleString('zh-CN');
-      var n = phCount(ta.value), m = figs.length;
-      phEl.textContent = '占位 ' + n + ' / 插图 ' + m + (n === m ? ' ✓' : ' ⚠ 不一致');
-      phEl.style.color = (n === m) ? '' : '#d64524';
     }
-    function updateBadge() {
-      stBadge.className = 'mst ' + (STC[chStatus] || 'mst-hidden');
-      stBadge.textContent = ST[chStatus] || chStatus;
+    function showPreview() {
+      preview.innerHTML = mdBlocks(ta.value) || '<p class="hint">（正文为空）</p>';
+      preview.style.display = '';
+      ta.style.display = 'none';
+      document.getElementById('tab-edit').className = '';
+      document.getElementById('tab-preview').className = 'active';
     }
-    function showLine(cls, msg) { saveline.className = 'saveline ' + cls; saveline.textContent = msg; }
+    function showEdit() {
+      preview.style.display = 'none';
+      ta.style.display = '';
+      document.getElementById('tab-edit').className = 'active';
+      document.getElementById('tab-preview').className = '';
+      try { ta.focus(); } catch (e) {}
+    }
+    document.getElementById('tab-edit').addEventListener('click', showEdit);
+    document.getElementById('tab-preview').addEventListener('click', showPreview);
 
     /* ---------- 本地备份（防崩溃/误关，提交成功后清除） ---------- */
     function backup() {
@@ -1596,7 +1686,7 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
     /* ---------- 修改标记 + 自动保存（仅草稿章，停顿 4 秒落库） ---------- */
     function changed() {
       dirty = true;
-      refreshCounters();
+      refreshWc();
       backup();
       if (autoOn) {
         if (autoTimer) clearTimeout(autoTimer);
@@ -1605,118 +1695,7 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
     }
     function setupAuto() { autoOn = !!chId && chStatus === 'draft'; }
 
-    /* ---------- 插图面板 ---------- */
-    function renderFigs() {
-      figbox.innerHTML = '';
-      if (!figs.length) {
-        figbox.innerHTML = '<p class="hint">还没有插图：点「+ 添加插图」选文件，或把图片拖进正文 / 直接 Ctrl+V 粘贴截图（自动插入占位）。</p>';
-        refreshCounters();
-        return;
-      }
-      figs.forEach(function (f, i) {
-        var card = document.createElement('div');
-        card.className = 'figcard';
-        var img = document.createElement('img');
-        img.src = f.url; img.alt = ''; img.loading = 'lazy';
-        card.appendChild(img);
-        var cap = document.createElement('div');
-        cap.className = 'figcap';
-        cap.textContent = '第' + (i + 1) + '张' + (f.kind === 'new' ? '（新）' : '');
-        card.appendChild(cap);
-        var ops = document.createElement('div');
-        ops.className = 'figops';
-        var bL = document.createElement('button'); bL.type = 'button'; bL.textContent = '←'; bL.title = '前移';
-        bL.addEventListener('click', function () {
-          if (i === 0) return;
-          var t = figs[i - 1]; figs[i - 1] = figs[i]; figs[i] = t;
-          changed(); renderFigs();
-        });
-        var bR = document.createElement('button'); bR.type = 'button'; bR.textContent = '→'; bR.title = '后移';
-        bR.addEventListener('click', function () {
-          if (i === figs.length - 1) return;
-          var t = figs[i + 1]; figs[i + 1] = figs[i]; figs[i] = t;
-          changed(); renderFigs();
-        });
-        var bD = document.createElement('button'); bD.type = 'button'; bD.textContent = '✕'; bD.title = '删除此图';
-        bD.addEventListener('click', function () {
-          if (f.kind === 'new' && f.url) URL.revokeObjectURL(f.url);
-          figs.splice(i, 1);
-          changed(); renderFigs();
-        });
-        ops.appendChild(bL); ops.appendChild(bR); ops.appendChild(bD);
-        card.appendChild(ops);
-        figbox.appendChild(card);
-      });
-      refreshCounters();
-    }
-
-    function addFiles(list, at) {
-      var files = Array.prototype.slice.call(list || []);
-      var okTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      var pos = (at == null) ? null : at;
-      var added = 0;
-      for (var i = 0; i < files.length; i++) {
-        var file = files[i];
-        if (figs.length >= MAXFIG) { showLine('bad', '插图最多 ' + MAXFIG + ' 张'); break; }
-        if (okTypes.indexOf(file.type) < 0) { showLine('bad', '「' + file.name + '」不是 JPG/PNG/WebP，已跳过'); continue; }
-        if (file.size > MAXB) { showLine('bad', '「' + file.name + '」超过 5MB，已跳过'); continue; }
-        figs.push({ kind: 'new', file: file, url: URL.createObjectURL(file) });
-        if (pos != null) pos = insertPlaceholder(pos);
-        added++;
-      }
-      if (added) changed();
-      renderFigs();
-    }
-
-    document.getElementById('btn-addfig').addEventListener('click', function () { fileInput.click(); });
-    fileInput.addEventListener('change', function () {
-      addFiles(fileInput.files, null);
-      fileInput.value = '';
-    });
-
-    /* ---------- [图] 占位：光标插入 / 拖放落点 / 粘贴 ---------- */
-    function insertPlaceholder(pos) {
-      var v = ta.value;
-      var s = (pos == null) ? ta.selectionStart : pos;
-      var e = (pos == null) ? ta.selectionEnd : pos;
-      var before = v.slice(0, s), after = v.slice(e);
-      if (before && before.slice(-2) !== '\\n\\n') before += (before.slice(-1) === '\\n') ? '\\n' : '\\n\\n';
-      if (after && after.slice(0, 2) !== '\\n\\n') after = (after.charAt(0) === '\\n' ? '\\n' : '\\n\\n') + after;
-      ta.value = before + '[图]' + after;
-      var caret = (before + '[图]').length;
-      try { ta.focus(); ta.setSelectionRange(caret, caret); } catch (err) {}
-      changed();
-      return caret;
-    }
-    document.getElementById('btn-ph').addEventListener('click', function () { insertPlaceholder(null); });
-
-    ta.addEventListener('dragover', function (e) { e.preventDefault(); });
-    ta.addEventListener('drop', function (e) {
-      e.preventDefault();
-      var files = e.dataTransfer ? e.dataTransfer.files : null;
-      if (!files || !files.length) return;
-      var pos = null;
-      try {
-        if (document.caretRangeFromPoint) {
-          var r = document.caretRangeFromPoint(e.clientX, e.clientY);
-          if (r && r.startContainer === ta) pos = r.startOffset;
-        } else if (document.caretPositionFromPoint) {
-          var p = document.caretPositionFromPoint(e.clientX, e.clientY);
-          if (p && p.offsetNode === ta) pos = p.offset;
-        }
-      } catch (err) {}
-      if (pos == null) pos = ta.value.length;
-      addFiles(files, pos);
-    });
-    ta.addEventListener('paste', function (e) {
-      var files = e.clipboardData ? e.clipboardData.files : null;
-      if (files && files.length) {
-        e.preventDefault();
-        addFiles(files, ta.selectionStart);
-      }
-    });
-
-    /* ---------- 保存（AJAX，不跳页） ---------- */
+    /* ---------- 保存（AJAX，不跳页；无 image_plan/figures——旧图文管线休眠，服务端保留原插图） ---------- */
     function buildForm(status) {
       var fd = new FormData();
       fd.append('website', '');
@@ -1724,12 +1703,6 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
       fd.append('idx', document.getElementById('idx').value);
       fd.append('title', document.getElementById('title').value);
       fd.append('body', ta.value);
-      var plan = [], n = 0;
-      for (var i = 0; i < figs.length; i++) {
-        if (figs[i].kind === 'old') plan.push({ k: figs[i].key });
-        else { plan.push({ n: n }); fd.append('figures', figs[i].file); n++; }
-      }
-      fd.append('image_plan', JSON.stringify(plan));
       return fd;
     }
     function setBtns(on) {
@@ -1738,14 +1711,10 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
     }
     function save(status) {
       if (saving) return;
+      showEdit();
       var titleEl = document.getElementById('title');
       if (!titleEl.value.trim()) { showLine('bad', '请先填写章节标题'); titleEl.focus(); return; }
       if (status !== 'draft' && !ta.value.trim()) { showLine('bad', '提交审核前请填写正文'); ta.focus(); return; }
-      var ph = phCount(ta.value);
-      if (status !== 'draft' && ph > figs.length) {
-        showLine('bad', '正文有 ' + ph + ' 个 [图] 占位但只有 ' + figs.length + ' 张插图，请补插图或删占位');
-        return;
-      }
       var idxVal = parseInt(document.getElementById('idx').value, 10);
       if (usedIdx.indexOf(idxVal) >= 0) { showLine('bad', '第' + idxVal + '章已存在，请换一个章节序号'); return; }
       saving = true; setBtns(true);
@@ -1773,6 +1742,11 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
         document.getElementById('h1title').textContent = '编辑章节 — ' + document.getElementById('title').value.trim();
       }
       setupAuto();
+    }
+    function showLine(cls, msg) { saveline.className = 'saveline ' + cls; saveline.textContent = msg; }
+    function updateBadge() {
+      stBadge.className = 'mst ' + (STC[chStatus] || 'mst-hidden');
+      stBadge.textContent = ST[chStatus] || chStatus;
     }
     document.getElementById('btn-draft').addEventListener('click', function () {
       if ((chStatus === 'approved' || chStatus === 'pending') &&
@@ -1817,8 +1791,7 @@ function chapterFormHtml(book, ch, idx, usedIdx = []) {
 
     updateBadge();
     setupAuto();
-    refreshCounters();
-    renderFigs();
+    refreshWc();
   })();
   </script>
   `);
