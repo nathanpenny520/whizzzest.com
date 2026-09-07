@@ -2550,7 +2550,7 @@ function fillTable(id, rows, fn) {
   // 行回调须返回 <tr>…</tr>；漏写时兜底补上 —— 否则全部单元格并入一行，
   // fixed 布局下多出的列宽为 0，路径文字会 1 字/行竖排（热门页面表格曾踩此坑）
   el(id).innerHTML = (rows && rows.length)
-    ? rows.map(function (x) { var r = fn(x); return /^<tr[\s>]/.test(r) ? r : '<tr>' + r + '</tr>'; }).join('')
+    ? rows.map(function (x) { var r = fn(x); return /^<tr[\\s>]/.test(r) ? r : '<tr>' + r + '</tr>'; }).join('')
     : '<tr><td class="empty">暂无数据</td></tr>';
 }
 
@@ -3780,7 +3780,7 @@ drop.addEventListener('click', function (e) {
 });
 
 /* ---------- AI 助手「花傩」（docs/AI助手方案.md） ---------- */
-// 注意：APP_HTML 是模板字符串——内嵌脚本不写反斜杠与 \n 字面量，换行统一用 AI_NL
+// 注意：APP_HTML 是模板字符串——内嵌脚本原则上不写反斜杠（正则里的转义须双写，单写会被外层吃掉），换行统一用 AI_NL
 var AI_NL = String.fromCharCode(10);
 var editingKId = null;
 var kState = { offset: 0, status: '' };
