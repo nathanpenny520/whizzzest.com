@@ -200,6 +200,15 @@ async function handleApi(request, env, path) {
     return uploadImageR2(env, request, `m${mid}/`, env.IMG);
   }
 
+  // 文库封面上传（≤5MB，魔数校验 JPG/PNG/WebP；存 MEDIA 桶 book/b<id>/c- 前缀，
+  // 与该作品章节插图同前缀——删除作品按前缀级联清理；主站经 /media/<key> 代理展示）
+  // ?b= 作品 id 必填——带图新建时前端先建档拿到 id 再传图（同商户流程）
+  if (path === '/api/books/cover' && method === 'PUT') {
+    const bid = parseInt(new URL(request.url).searchParams.get('b') || '', 10);
+    if (!bid) return json({ ok: false, error: 'book_required' }, 400);
+    return uploadImageR2(env, request, `book/b${bid}/c-`, env.MEDIA);
+  }
+
   // 万载TV 视频管理（docs/万载TV方案.md）；DELETE 级联删除 R2 视频/封面
   if (path === '/api/tv' && method === 'GET') return listVideos(env, request);
   if (path === '/api/tv' && method === 'POST') return saveVideo(env, request);
@@ -2350,7 +2359,13 @@ ${BASE_CSS}
         </select>
       </label>
       <label>置顶权重（大者靠前）<input id="b-weight" type="number" value="0"></label>
-      <label class="wide">封面（R2 键 book/… 或站内路径 /assets/img/…，可空）<input id="b-cover"></label>
+      <label class="wide">封面（竖版 2:3 最佳，JPG/PNG/WebP ≤5MB；也可手填 R2 键 book/… 或站内路径 /…，都可空）<input id="b-cover" placeholder="留空 = 保持现有；上传图片后自动填入新地址"></label>
+      <div class="ops" style="margin:-4px 0 0;align-items:center">
+        <button type="button" id="b-coverpick">上传封面图</button>
+        <input id="b-coverfile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <img id="b-coverprev" class="bkthumb" alt="" style="display:none">
+        <span class="vhint" id="b-coverinfo"></span>
+      </div>
       <label class="wide">简介 *<textarea id="b-intro" rows="3"></textarea></label>
     </div>
     <div class="ops"><button class="primary" id="bsave" type="button">保存</button><button id="bcancel" type="button">取消</button></div>
@@ -3888,11 +3903,27 @@ function openBookForm(x) {
   el('b-weight').value = x ? x.sort_weight || 0 : 0;
   el('b-cover').value = x ? x.cover || '' : '';
   el('b-intro').value = x ? x.intro || '' : '';
+  el('b-coverfile').value = '';
+  setBookCoverPrev(x && x.cover ? SITE_HOME + (x.cover.indexOf('/') === 0 ? '' : '/media/') + x.cover : '');
+  el('b-coverinfo').textContent = '';
   el('bform').style.display = '';
   el('bform').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function closeBookForm() { el('bform').style.display = 'none'; editingBookId = null; }
+
+// 封面预览：/ 开头 = 主站静态图；否则为媒体桶 R2 键，走主站 /media/ 代理
+function setBookCoverPrev(src) {
+  var prev = el('b-coverprev');
+  if (src) { prev.src = src; prev.style.display = ''; }
+  else { prev.removeAttribute('src'); prev.style.display = 'none'; }
+}
+el('b-coverpick').addEventListener('click', function () { el('b-coverfile').click(); });
+el('b-coverfile').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  setBookCoverPrev(f ? URL.createObjectURL(f) : '');
+  el('b-coverinfo').textContent = f ? '已选择：' + f.name + '（保存后生效，覆盖上方地址）' : '';
+});
 
 el('badd').addEventListener('click', function () { openBookForm(null); });
 el('bcancel').addEventListener('click', closeBookForm);
@@ -3903,11 +3934,45 @@ el('bsave').addEventListener('click', function () {
     cover: val('b-cover'), intro: val('b-intro')
   };
   if (!payload.title || !payload.intro) { alert('请填写书名和简介'); return; }
-  api(editingBookId ? '/api/books/' + editingBookId : '/api/books', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload)
+  var coverfile = el('b-coverfile').files && el('b-coverfile').files[0];
+  if (coverfile && coverfile.size > 5 * 1048576) { alert('封面图超过 5MB。'); return; }
+
+  var btn = el('bsave');
+  btn.disabled = true;
+  // 带图新建：先建档拿 id（封面归 book/b<id>/ 前缀，删作品才能级联清理），再传图、补封面（同商户流程）
+  var createdId = null;
+  var seq = Promise.resolve();
+  if (coverfile && !editingBookId) {
+    seq = seq.then(function () {
+      return api('/api/books', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }).then(function (d) {
+      createdId = d.id; editingBookId = d.id;
+      el('bform-title').textContent = '编辑作品 #' + d.id;
+    });
+  }
+  if (coverfile) {
+    seq = seq.then(function () {
+      return putFile('/api/books/cover?b=' + editingBookId, coverfile);
+    }).then(function (d) { payload.cover = d.key; });
+  }
+  seq.then(function () {
+    if (createdId) {
+      // 建档已成功，此处只补封面字段
+      return api('/api/books/' + createdId, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cover: payload.cover })
+      });
+    }
+    return api(editingBookId ? '/api/books/' + editingBookId : '/api/books', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
   }).then(function () { closeBookForm(); loadBooks(true); })
-    .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); });
+    .catch(function (e) { if (e.message !== 'unauthorized') alert('保存失败：' + e.message); })
+    .then(function () { btn.disabled = false; });
 });
 el('bmore').addEventListener('click', function () { bState.offset += ${PAGE_SIZE}; loadBooks(false); });
 
