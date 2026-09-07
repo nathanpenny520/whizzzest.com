@@ -18,8 +18,31 @@
   var TYPE_SPEED = 25;          // 打字机 tick（ms）
   var TYPE_THRESHOLD = 40;      // 超过此长度才启用打字机
 
-  /* 焰形图标（与站点 favicon 同源意象） */
+  /* 焰形图标（与站点 favicon 同源意象；2026-09-07 起图标改用下方 NUO 娃娃，此常量留作备用） */
   var FLAME = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c.3 3.1-1 4.9-2.9 6.6C7 10.5 5 12.4 5 15.5 5 19.1 8.1 22 12 22s7-2.9 7-6.5c0-2.6-1.3-4.4-2.7-6-.5 1-1.2 1.8-2.1 2.3.4-3.5-.4-7.3-2.2-9.8zm.3 11c1.4 1.5 2.2 2.7 2.2 4.3 0 1.6-1.1 2.7-2.5 2.7s-2.5-1.1-2.5-2.7c0-1.8 1.4-2.9 2.8-4.3z"/></svg>';
+  /* 花傩娃娃（2026-09-07 由旧站 HuaNuoCharacter 纯 CSS 移植）：静态 idle 单一形态，
+     无 Live2D、无状态机；样式见 ai-chat.css，尺寸随容器 .hn-nuo 的 --s 变量缩放 */
+  var NUO =
+    '<span class="hn-nuo" aria-hidden="true">' +
+      '<span class="hn-nuo-body">' +
+        '<span class="hn-nuo-hair-back"></span>' +
+        '<span class="hn-nuo-hair-front"></span>' +
+        '<span class="hn-nuo-face">' +
+          '<span class="hn-nuo-mask">' +
+            '<span class="hn-nuo-orn hn-nuo-orn-l"></span>' +
+            '<span class="hn-nuo-orn hn-nuo-orn-r"></span>' +
+          '</span>' +
+          '<span class="hn-nuo-eyes">' +
+            '<span class="hn-nuo-eye"><span class="hn-nuo-pupil"></span></span>' +
+            '<span class="hn-nuo-eye"><span class="hn-nuo-pupil"></span></span>' +
+          '</span>' +
+          '<span class="hn-nuo-mouth"></span>' +
+        '</span>' +
+        '<span class="hn-nuo-ear hn-nuo-ear-l"></span>' +
+        '<span class="hn-nuo-ear hn-nuo-ear-r"></span>' +
+        '<span class="hn-nuo-shoulder"></span>' +
+      '</span>' +
+    '</span>';
   var ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   var ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m-9 0l1 13h8l1-13"/></svg>';
   var ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>';
@@ -68,7 +91,7 @@
     fab.type = 'button';
     fab.setAttribute('aria-label', '打开花傩智能问答');
     fab.setAttribute('aria-expanded', 'false');
-    fab.innerHTML = FLAME;
+    fab.innerHTML = NUO;
     fab.addEventListener('click', togglePanel);
     document.body.appendChild(fab);
   }
@@ -82,7 +105,7 @@
     p.hidden = true;
     p.innerHTML =
       '<div class="hn-head">' +
-        '<span class="hn-head-flame">' + FLAME + '</span>' +
+        '<span class="hn-head-flame">' + NUO + '</span>' +
         '<span class="hn-head-title">花傩 · 万载智能问答</span>' +
         '<button type="button" class="hn-head-btn" data-hn="list" aria-label="历史对话" title="历史对话">' + ICON_HISTORY + '</button>' +
         '<button type="button" class="hn-head-btn" data-hn="clear" aria-label="清空当前对话" title="清空当前对话">' + ICON_TRASH + '</button>' +
@@ -384,7 +407,7 @@
       var w = document.createElement('div');
       w.className = 'hn-welcome';
       w.innerHTML =
-        '<span class="hn-welcome-flame">' + FLAME + '</span>' +
+        '<span class="hn-welcome-flame">' + NUO + '</span>' +
         '<div class="hn-welcome-title">你好，我是花傩</div>' +
         '<div class="hn-welcome-desc">万载文旅智能问答助手，烟花、非遗、美食、行程都可以问我。</div>';
       var q = document.createElement('div');

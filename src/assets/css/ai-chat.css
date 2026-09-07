@@ -4,6 +4,9 @@
    组件 DOM 全部由 ai-chat.js 构建，无 JS 时页面零侵入。
    v1.1（2026-09-07）：面板层级 95→150（原被站点导航 z-100 盖住，
    移动端全屏时关闭按钮不可点）；移除招呼气泡；新增历史会话列表。
+   v1.2（2026-09-07）：图标换为旧站纯 CSS 花傩娃娃（静态 idle：呼吸+浮动，
+   无 Live2D、无状态机）——悬浮球红橙渐变底，面板头部与欢迎气泡同款；
+   娃娃内部尺寸一律用 em，随 .hn-nuo 的 --s 变量整体缩放。
    ============================================================ */
 
 .hn-fab {
@@ -14,22 +17,163 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #fff;
-  border: 1px solid var(--c-hairline);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, #dc2626 0%, #d97706 100%);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--c-accent);
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 .hn-fab:hover {
-  transform: scale(1.06);
-  box-shadow: 0 8px 24px rgba(214, 69, 36, 0.22);
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.45);
 }
-.hn-fab svg {
-  width: 26px;
-  height: 26px;
+
+/* ---------------- 花傩娃娃（旧站 HuaNuoCharacter 移植，静态 idle） ----------------
+   --s：娃娃像素尺寸；根 font-size 取其 1/10，内部尺寸一律用 em 随 --s 缩放 */
+
+.hn-nuo {
+  --s: 44;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--s) * 1px);
+  height: calc(var(--s) * 1px);
+  font-size: calc(var(--s) * 0.1px);
+}
+.hn-fab .hn-nuo { --s: 44; }      /* 52px 悬浮球内 44px 娃娃（旧站 56/48 同比例） */
+.hn-head-flame .hn-nuo { --s: 22; }
+.hn-welcome-flame .hn-nuo { --s: 40; }
+
+.hn-nuo-body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  animation: hn-breathe 3s ease-in-out infinite, hn-float 4s ease-in-out infinite;
+}
+.hn-nuo-hair-back {
+  position: absolute;
+  inset: 0 15% 30% 15%;
+  background: linear-gradient(180deg, #2c1810 0%, #1a0a05 70%, #c0392b 95%);
+  border-radius: 50% 50% 0 0;
+  z-index: 1;
+}
+.hn-nuo-hair-front {
+  position: absolute;
+  top: 2%;
+  left: 18%;
+  right: 18%;
+  height: 22%;
+  background: linear-gradient(180deg, #3d2012 0%, #2c1810 100%);
+  border-radius: 0 0 40% 40%;
+  z-index: 5;
+}
+.hn-nuo-face {
+  position: absolute;
+  inset: 15% 20% 25% 20%;
+  background: linear-gradient(170deg, #fce4cc 0%, #f5cba7 100%);
+  border-radius: 45% 45% 40% 40%;
+  overflow: hidden;
+}
+/* 金色半面具 */
+.hn-nuo-mask {
+  position: absolute;
+  top: 8%;
+  left: 10%;
+  right: 10%;
+  height: 35%;
+  background: linear-gradient(180deg, #d4a017 0%, #f0c75e 40%, #e6b422 100%);
+  border-radius: 10% 10% 0.625em 0.625em;
+  box-shadow: 0 2px 8px rgba(180, 120, 20, 0.5);
+  z-index: 3;
+}
+.hn-nuo-orn {
+  position: absolute;
+  top: 0.625em;
+  width: 0.75em;
+  height: 1.75em;
+  background: #c0392b;
+  border-radius: 0.375em;
+}
+.hn-nuo-orn-l { left: 1em; }
+.hn-nuo-orn-r { right: 1em; }
+.hn-nuo-eyes {
+  position: absolute;
+  top: 38%;
+  left: 15%;
+  right: 15%;
+  height: 18%;
+  display: flex;
+  justify-content: space-around;
+  z-index: 4;
+}
+.hn-nuo-eye {
+  width: 28%;
+  height: 100%;
+  background: #fff;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.hn-nuo-pupil {
+  position: absolute;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(circle, #1a1a2e 40%, #4a3728 100%);
+  border-radius: 50%;
+  top: 30%;
+  left: 20%;
+}
+.hn-nuo-pupil::after {
+  content: '';
+  position: absolute;
+  width: 20%;
+  height: 20%;
+  background: #fff;
+  border-radius: 50%;
+  top: 15%;
+  left: 20%;
+}
+.hn-nuo-mouth {
+  position: absolute;
+  bottom: 28%;
+  left: 35%;
+  right: 35%;
+  height: 8%;
+  border-bottom: 0.25em solid #c97a5a;
+  border-radius: 0 0 50% 50%;
+  z-index: 4;
+}
+.hn-nuo-ear {
+  position: absolute;
+  width: 0.625em;
+  height: 1.25em;
+  background: #f0c75e;
+  border-radius: 0.25em 0.25em 0.5em 0.5em;
+  top: 50%;
+  z-index: 1;
+}
+.hn-nuo-ear-l { left: 12%; }
+.hn-nuo-ear-r { right: 12%; }
+.hn-nuo-shoulder {
+  position: absolute;
+  bottom: 5%;
+  left: 10%;
+  right: 10%;
+  height: 18%;
+  background: linear-gradient(180deg, #c0392b 0%, #e74c3c 30%, #1a1a2e 100%);
+  border-radius: 50% 50% 20% 20%;
+  z-index: 0;
+}
+@keyframes hn-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes hn-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.375em); }
 }
 
 /* /music/ 页底部有固定播放条，悬浮球抬到其上方 */
@@ -67,10 +211,8 @@ body.music-body .hn-fab { bottom: 92px; }
   flex-shrink: 0;
 }
 .hn-head-flame {
-  color: var(--c-accent);
   display: flex;
 }
-.hn-head-flame svg { width: 20px; height: 20px; }
 .hn-head-title {
   flex: 1;
   font-size: 15px;
@@ -116,11 +258,9 @@ body.music-body .hn-fab { bottom: 92px; }
   padding: 12px 8px;
 }
 .hn-welcome-flame {
-  color: var(--c-accent);
   display: inline-flex;
   margin-bottom: 10px;
 }
-.hn-welcome-flame svg { width: 36px; height: 36px; }
 .hn-welcome-title { font-size: 16px; font-weight: 600; }
 .hn-welcome-desc {
   margin-top: 6px;
@@ -377,4 +517,5 @@ body.music-body .hn-fab { bottom: 92px; }
 @media (prefers-reduced-motion: reduce) {
   .hn-fab, .hn-panel { animation: none; transition: none; }
   .hn-typing i { animation: none; opacity: 0.6; }
+  .hn-nuo-body { animation: none; }
 }

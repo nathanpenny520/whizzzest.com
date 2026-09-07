@@ -44,8 +44,8 @@
 
 - 资产独立：`src/assets/js/ai-chat.js`（原生，无依赖）+ `src/assets/css/ai-chat.css`，由 **footer partial** 引入 → 静态页、5 个动态页（/tv /library /music /attractions /merchants 共用 dist/partials/footer.html）、404 全覆盖
 - build.js：两文件纳入指纹体系（`?v=hash`）+ ai-chat.css 随 style.css 一起压缩；组件 DOM 全由 JS 构建，零 HTML 侵入、不阻塞加载（defer + 末尾 link）
-- **样式**：站内 Apple 视觉语言（白底/焰色 #d64524 点缀/20px 圆角/系统字体/毛玻璃），无角色立绘、无动画人设
-- **入口**：左下角 52px 圆形悬浮球（焰形 SVG），hover 微放大；招呼气泡已移除（2026-09-07，用户打开面板即见欢迎态，外显提示词属打扰）
+- **样式**：站内 Apple 视觉语言（焰色 #d64524 点缀/20px 圆角/系统字体/毛玻璃）。图标（2026-09-07）由焰形 SVG 换为**旧站纯 CSS 花傩娃娃移植**：静态 idle 单一形态（呼吸+浮动动画，无 Live2D、无状态机）；悬浮球 52px 红橙渐变底（`linear-gradient(135deg,#dc2626→#d97706)`，旧站同款配色），面板头部与欢迎气泡用同款娃娃（`--s` 变量缩放）；原 FLAME 常量留作备用
+- **入口**：左下角 52px 圆形悬浮球（红橙渐变底 + CSS 花傩娃娃），hover 微放大；招呼气泡已移除（2026-09-07，用户打开面板即见欢迎态，外显提示词属打扰）
 - **面板**：桌面左下 380×560 白卡片；移动端（≤640px）全屏 bottom sheet。头部（花傩·智能问答 + 清空 + 关闭）、消息区、快捷问题 chips（来自 config）、输入行
 - **渲染**：轻量 Markdown（先全文转义，仅放行粗体/斜体/行内代码/列表/站内与 https 链接——文库方案同款白名单思路防 XSS）；>40 字打字机逐字（25ms/tick）；回复下可显示「知识来源」灰色小字；`open_page/open_merchant/open_attraction` 落地为站内链接按钮
 - **历史（v1.1，2026-09-07）**：多会话管理，全部存浏览器。key `hn_chat_sessions`（会话数组，上限 30 个，每会话消息上限 20 条；`hn_chat_current` 记当前会话；v1.0 旧 key `hn_chat_history` 首次加载自动迁移为单会话后删除）。头部「历史」按钮切换会话列表视图：置顶在前、按最近更新排序，支持新对话 / 切换 / 置顶 / 重命名（prompt）/ 删除（confirm）；标题默认取首问前 16 字；头部清空按钮只清当前会话。发送时附当前会话最近 6 条做上下文 + `location.pathname` 当前页语境
