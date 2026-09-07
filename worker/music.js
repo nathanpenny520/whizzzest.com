@@ -105,9 +105,11 @@ async function musicHome(env, url, ctx) {
       <div class="music-layout">
         <aside class="music-now">
           <div class="music-cover" id="music-cover">${nowCover ? `<img src="${esc(nowCover)}" alt="" loading="eager" fetchpriority="high">` : '<span class="tv-ph" aria-hidden="true">焰</span>'}</div>
-          <h2 id="music-now-title">${esc(first ? first.title : '万载音乐')}</h2>
-          <p id="music-now-artist">${esc(first ? first.artist || '佚名' : '等待第一首曲目')}</p>
-          <p class="music-now-meta" id="music-now-meta">点击右侧曲目开始播放</p>
+          <div class="music-now-info">
+            <h2 id="music-now-title">${esc(first ? first.title : '万载音乐')}</h2>
+            <p id="music-now-artist">${esc(first ? first.artist || '佚名' : '等待第一首曲目')}</p>
+            <p class="music-now-meta" id="music-now-meta">点击曲目开始播放</p>
+          </div>
         </aside>
         <div class="music-list-wrap">${listHtml}</div>
       </div>

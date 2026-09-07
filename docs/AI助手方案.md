@@ -45,14 +45,15 @@
 - 资产独立：`src/assets/js/ai-chat.js`（原生，无依赖）+ `src/assets/css/ai-chat.css`，由 **footer partial** 引入 → 静态页、5 个动态页（/tv /library /music /attractions /merchants 共用 dist/partials/footer.html）、404 全覆盖
 - build.js：两文件纳入指纹体系（`?v=hash`）+ ai-chat.css 随 style.css 一起压缩；组件 DOM 全由 JS 构建，零 HTML 侵入、不阻塞加载（defer + 末尾 link）
 - **样式**：站内 Apple 视觉语言（白底/焰色 #d64524 点缀/20px 圆角/系统字体/毛玻璃），无角色立绘、无动画人设
-- **入口**：左下角 52px 圆形悬浮球（焰形 SVG），hover 微放大；招呼气泡每会话最多一次（greeting 可后台清空停用）
+- **入口**：左下角 52px 圆形悬浮球（焰形 SVG），hover 微放大；招呼气泡已移除（2026-09-07，用户打开面板即见欢迎态，外显提示词属打扰）
 - **面板**：桌面左下 380×560 白卡片；移动端（≤640px）全屏 bottom sheet。头部（花傩·智能问答 + 清空 + 关闭）、消息区、快捷问题 chips（来自 config）、输入行
 - **渲染**：轻量 Markdown（先全文转义，仅放行粗体/斜体/行内代码/列表/站内与 https 链接——文库方案同款白名单思路防 XSS）；>40 字打字机逐字（25ms/tick）；回复下可显示「知识来源」灰色小字；`open_page/open_merchant/open_attraction` 落地为站内链接按钮
-- **历史**：localStorage 最近 20 条（key `hn_chat_history`），头部清空按钮；发送时附最近 6 条做上下文 + `location.pathname` 当前页语境
+- **历史（v1.1，2026-09-07）**：多会话管理，全部存浏览器。key `hn_chat_sessions`（会话数组，上限 30 个，每会话消息上限 20 条；`hn_chat_current` 记当前会话；v1.0 旧 key `hn_chat_history` 首次加载自动迁移为单会话后删除）。头部「历史」按钮切换会话列表视图：置顶在前、按最近更新排序，支持新对话 / 切换 / 置顶 / 重命名（prompt）/ 删除（confirm）；标题默认取首问前 16 字；头部清空按钮只清当前会话。发送时附当前会话最近 6 条做上下文 + `location.pathname` 当前页语境
+- **层级**：面板 z-index 150，必须高于站点导航（.nav z-100）——移动端全屏面板头部与导航重叠，层级不足时关闭按钮被遮、点关闭命中汉堡按钮（2026-09-07 实测修复）
 
 ## 四、后台（admin「AI 助手」Tab，`#/ai`）
 
-- **设置卡**：启用开关、模型下拉（白名单）、系统提示词 textarea、招呼语、快捷问题（每行一条）
+- **设置卡**：启用开关、模型下拉（白名单）、系统提示词 textarea、快捷问题（每行一条）；招呼语字段已随外显气泡一并移除（`ai_settings.greeting` 键保留但不再展示，config 接口字段保留兼容）
 - **知识库卡**：列表（分类/摘要/关键词/状态/排序）+ 新增/编辑/删除（删除二次确认）；上下线即从检索剔除
 - **用量卡**：今日/7 天/30 天对话数 + 最近 20 条问题（时间/问题/耗时/action）+ 清空日志
 - API：`GET/POST /api/ai/settings`、`GET/POST /api/ai/knowledge`、`POST/DELETE /api/ai/knowledge/:id`、`GET /api/ai/stats`、`DELETE /api/ai/log`（全部走既有会话鉴权 + Origin 校验）
@@ -64,7 +65,7 @@
 ## 六、分期
 
 - **M1（本次）**：以上全部
-- **M2 可选**：SSE 真流式（Workers AI `stream:true`）；多会话管理；招呼语 A/B；问题聚类报表
+- **M2 可选**：SSE 真流式（Workers AI `stream:true`）；问题聚类报表（多会话管理已于 v1.1 以浏览器存储实现，招呼语 A/B 随气泡移除作废）
 - **M3 远期**：Vectorize 语义检索（qwen3-embedding-0.6b，1075 neuron/百万 token）替换关键词匹配；用量图表
 
 ## 七、上线清单

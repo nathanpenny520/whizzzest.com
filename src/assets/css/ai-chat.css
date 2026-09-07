@@ -2,6 +2,8 @@
    AI 助手「花傩」— 全站悬浮入口（docs/AI助手方案.md）
    独立资产：由 footer partial 引入，样式沿用 style.css 设计变量；
    组件 DOM 全部由 ai-chat.js 构建，无 JS 时页面零侵入。
+   v1.1（2026-09-07）：面板层级 95→150（原被站点导航 z-100 盖住，
+   移动端全屏时关闭按钮不可点）；移除招呼气泡；新增历史会话列表。
    ============================================================ */
 
 .hn-fab {
@@ -30,24 +32,8 @@
   height: 26px;
 }
 
-/* 招呼气泡：每会话一次，点击即打开面板 */
-.hn-greet {
-  position: fixed;
-  left: 20px;
-  bottom: 84px;
-  z-index: 90;
-  max-width: min(260px, calc(100vw - 40px));
-  background: rgba(29, 29, 31, 0.92);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  color: #fff;
-  font-size: 13px;
-  line-height: 1.45;
-  padding: 10px 14px;
-  border-radius: 14px 14px 14px 4px;
-  cursor: pointer;
-  animation: hn-in 0.4s var(--ease);
-}
+/* /music/ 页底部有固定播放条，悬浮球抬到其上方 */
+body.music-body .hn-fab { bottom: 92px; }
 
 /* ---------------- 面板 ---------------- */
 
@@ -55,7 +41,9 @@
   position: fixed;
   left: 20px;
   bottom: 84px;
-  z-index: 95;
+  /* 必须盖过站点导航（.nav z-index 100）：移动端面板全屏时头部与导航重叠，
+     否则关闭/清空按钮被导航遮挡，点「关闭」会命中汉堡按钮——面板将无法关闭 */
+  z-index: 150;
   width: min(380px, calc(100vw - 40px));
   height: min(560px, calc(100dvh - 110px));
   display: flex;
@@ -99,7 +87,8 @@
   color: var(--c-text-3);
   transition: background 0.15s, color 0.15s;
 }
-.hn-head-btn:hover { background: var(--c-bg-alt); color: var(--c-text); }
+.hn-head-btn:hover,
+.hn-head-btn.on { background: var(--c-bg-alt); color: var(--c-text); }
 .hn-head-btn svg { width: 16px; height: 16px; }
 
 /* ---------------- 消息区 ---------------- */
@@ -114,6 +103,11 @@
   gap: 14px;
   background: var(--c-bg);
 }
+
+/* hidden 属性在 flex 容器上会被 display 覆盖：消息区/历史列表/输入区切换显隐必须显式压住 */
+.hn-body[hidden],
+.hn-history[hidden],
+.hn-input[hidden] { display: none; }
 
 /* 欢迎态 */
 .hn-welcome {
@@ -225,6 +219,91 @@
 .hn-act:hover { background: rgba(214, 69, 36, 0.06); }
 .hn-act svg { width: 12px; height: 12px; }
 
+/* ---------------- 历史会话列表 ---------------- */
+
+.hn-history {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--c-bg);
+}
+.hn-sess-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px dashed rgba(214, 69, 36, 0.45);
+  color: var(--c-accent);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.hn-sess-new:hover { background: rgba(214, 69, 36, 0.06); }
+.hn-sess-new svg { width: 16px; height: 16px; }
+.hn-sess-empty {
+  margin: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+.hn-sess {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--c-hairline);
+  border-radius: 12px;
+  padding: 4px 6px 4px 4px;
+  transition: background 0.15s;
+}
+.hn-sess:hover { background: var(--c-bg-alt); }
+.hn-sess.on {
+  background: rgba(214, 69, 36, 0.08);
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}
+.hn-sess-main {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 6px;
+  text-align: left;
+  background: none;
+  border: 0;
+}
+.hn-sess-main b {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hn-sess-main i {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--c-text-3);
+}
+.hn-sess-acts { display: flex; flex-shrink: 0; }
+.hn-sess-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-3);
+  transition: background 0.15s, color 0.15s;
+}
+.hn-sess-btn:hover { background: var(--c-bg); color: var(--c-text); }
+.hn-sess-btn.on { color: var(--c-accent); }
+.hn-sess-btn svg { width: 15px; height: 15px; }
+
 /* ---------------- 输入区 ---------------- */
 
 .hn-input {
@@ -282,7 +361,7 @@
 
 @media (max-width: 640px) {
   .hn-fab { left: 16px; bottom: 16px; }
-  .hn-greet { left: 16px; bottom: 78px; }
+  body.music-body .hn-fab { bottom: 80px; }
   .hn-panel {
     left: 0;
     bottom: 0;
@@ -296,6 +375,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hn-fab, .hn-greet, .hn-panel { animation: none; transition: none; }
+  .hn-fab, .hn-panel { animation: none; transition: none; }
   .hn-typing i { animation: none; opacity: 0.6; }
 }

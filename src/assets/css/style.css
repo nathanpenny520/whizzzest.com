@@ -3590,6 +3590,9 @@ body.music-body { padding-bottom: 78px; }
 }
 
 @media (max-width: 960px) {
+  /* 双栏网格降单列：正在播放在上、曲目列表在下（320px 定宽列在窄屏会挤爆列表） */
+  .music-layout { grid-template-columns: 1fr; gap: 28px; }
+
   .music-now {
     position: static;
     display: flex;
@@ -3598,6 +3601,7 @@ body.music-body { padding-bottom: 78px; }
     text-align: left;
   }
 
+  .music-now-info { flex: 1; min-width: 0; }
   .music-cover { width: 108px; flex: 0 0 auto; border-radius: 14px; }
   .music-cover .tv-ph { font-size: 34px; }
   .music-now h2 { margin-top: 0; font-size: 17px; }

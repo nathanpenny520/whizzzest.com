@@ -274,6 +274,11 @@ body.page-sim {
 	}
 }
 @media (max-width: 560px) {
+	/* 上游遗留的 margin-right: 80px（为桌面右上角关闭按钮让位）在窄屏会把表单挤出屏左缘
+	   （390px 视口左移出屏 40px，标签被裁），小屏回正居中 */
+	.fw-app .menu form {
+		margin-right: 0;
+	}
 	.fw-app .menu .form-option {
 		flex-direction: column;
 		align-items: stretch;

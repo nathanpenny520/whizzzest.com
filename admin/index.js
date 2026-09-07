@@ -2284,7 +2284,6 @@ ${BASE_CSS}
         </select>
       </label>
       <label>模型<select id="ai-model"></select></label>
-      <label class="wide">招呼气泡（留空 = 不弹；每个访客每会话最多一次）<input id="ai-greeting" maxlength="100"></label>
     </div>
     <label style="display:block;margin-top:10px">系统提示词（花傩人设、职责、回复格式；详见 docs/AI助手方案.md）<textarea id="ai-prompt" rows="9" style="width:100%"></textarea></label>
     <label style="display:block;margin-top:10px">欢迎页快捷问题（每行一条，最多 6 条，留空用内置默认）<textarea id="ai-quick" rows="4" style="width:100%"></textarea></label>
@@ -3797,7 +3796,6 @@ function loadAiSettings() {
   api('/api/ai/settings').then(function (d) {
     var s = d.settings || {};
     el('ai-enabled').value = s.enabled === '0' ? '0' : '1';
-    el('ai-greeting').value = s.greeting || '';
     el('ai-prompt').value = s.system_prompt || '';
     var quick = [];
     try { quick = JSON.parse(s.quick_questions || '[]'); } catch (e) { /* 后台配坏则留空 */ }
@@ -3824,7 +3822,7 @@ el('ai-savesettings').addEventListener('click', function () {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       enabled: el('ai-enabled').value, model: el('ai-model').value,
-      system_prompt: el('ai-prompt').value, greeting: el('ai-greeting').value, quick: quick
+      system_prompt: el('ai-prompt').value, quick: quick
     })
   }).then(function () {
     aiHint('已保存，主站最迟 1 分钟生效');
