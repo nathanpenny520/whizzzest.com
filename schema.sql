@@ -168,7 +168,8 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE INDEX IF NOT EXISTS idx_books_pub ON books(status, sort_weight DESC, updated_at DESC);
 
 -- 章节：body 为分段纯文本（[图] 占位行，渲染时按 images 顺序替换 <figure>）；
--- 章节级审核：已上线作品加新章/改章不影响上架，新章 approved 后才可读
+-- 章节级审核：已上线作品加新章/改章不影响上架，新章 approved 后才可读；
+-- draft = 作者草稿（v1.2）：不进审核队列、读者不可见，不计入作品章节数/字数冗余
 CREATE TABLE IF NOT EXISTS book_chapters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id INTEGER NOT NULL REFERENCES books(id),
@@ -176,7 +177,7 @@ CREATE TABLE IF NOT EXISTS book_chapters (
   title TEXT NOT NULL,
   body TEXT NOT NULL,
   images TEXT,                             -- JSON 数组：R2 键列表 book/b<bookId>/…
-  status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | rejected
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | rejected | draft
   reject_reason TEXT,
   word_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
