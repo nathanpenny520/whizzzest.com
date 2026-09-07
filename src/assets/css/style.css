@@ -3730,6 +3730,11 @@ body.music-body { padding-bottom: 78px; }
 /* 详情页 */
 .at-detail { padding: 40px 0 96px; }
 
+/* 阅读列整体居中：面包屑/标题/信息卡/正文共用约 720px 窄列
+   （对齐站内 .bk-reader / .section-head 的居中窄列惯例，
+   否则窄列在 1024 容器内整体贴左、右侧留大段空白） */
+.at-detail .container { max-width: 768px; }
+
 .at-crumb {
   margin-bottom: 24px;
   font-size: 13px;
