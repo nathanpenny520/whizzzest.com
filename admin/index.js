@@ -1665,9 +1665,10 @@ async function saveKnowledge(env, request, id = null) {
 
   if (id === null) {
     if (!patch.category || !patch.content) return json({ ok: false, error: 'invalid_fields' }, 400);
-    await env.DB.prepare(
+    const { meta } = await env.DB.prepare(
       'INSERT INTO ai_knowledge (category, content, keywords, sort, status) VALUES (?1, ?2, ?3, ?4, ?5)'
     ).bind(patch.category, patch.content, patch.keywords || '', patch.sort || 0, patch.status || 'published').run();
+    await maintainKnowledgeVector(env, meta.last_row_id);
   } else {
     const keys = Object.keys(patch);
     if (!keys.length) return json({ ok: false, error: 'invalid_fields' }, 400);
@@ -1675,13 +1676,63 @@ async function saveKnowledge(env, request, id = null) {
     await env.DB.prepare(
       `UPDATE ai_knowledge SET ${sets}, updated_at = datetime('now') WHERE id = ?${keys.length + 1}`
     ).bind(...keys.map((k) => patch[k]), id).run();
+    await maintainKnowledgeVector(env, id);
   }
   return json({ ok: true });
+}
+
+/**
+ * 知识向量即时维护（检索 v2）：published 重嵌入上架 / 非 published 下架；
+ * 失败置 ai_settings.vec_dirty 脏标记，主站问答时懒同步兜底全量重建。
+ * 本地 dev 的 AI binding 出站挂起 → 8s 超时后落脏标记，保存不受影响。
+ */
+const K_EMBED_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
+
+async function maintainKnowledgeVector(env, rowId) {
+  try {
+    if (!env.VEC || !env.AI) return;
+    const row = await env.DB.prepare(
+      'SELECT id, category, content, status FROM ai_knowledge WHERE id = ?1'
+    ).bind(rowId).first();
+    const vid = 'k' + rowId;
+    if (!row || row.status !== 'published') {
+      await env.VEC.deleteByIds([vid]);
+      return;
+    }
+    const text = `${row.category}\n${row.content}`.slice(0, 400);
+    const emb = await Promise.race([
+      env.AI.run(K_EMBED_MODEL, { text: [text] }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+    ]);
+    const values = emb?.data?.[0];
+    if (!values) throw new Error('embedding shape unexpected');
+    await env.VEC.upsert([{ id: vid, values, metadata: { status: 'published', kid: row.id } }]);
+  } catch (err) {
+    console.error('knowledge vector maintain failed:', err);
+    try {
+      await env.DB.prepare(
+        `INSERT INTO ai_settings (key, value) VALUES ('vec_dirty','1')
+         ON CONFLICT(key) DO UPDATE SET value='1', updated_at=datetime('now')`
+      ).run();
+    } catch { /* 连标记都失败则靠计数漂移触发全量同步 */ }
+  }
 }
 
 async function removeKnowledge(env, id) {
   const { meta } = await env.DB.prepare('DELETE FROM ai_knowledge WHERE id = ?1').bind(id).run();
   if (!meta.changes) return json({ ok: false, error: 'not_found' }, 404);
+  // 向量下架（删行后主站计数漂移也会触发全量同步，这里先即时清，防幽灵向量被检索）
+  try {
+    if (env.VEC) await env.VEC.deleteByIds(['k' + id]);
+  } catch (err) {
+    console.error('knowledge vector delete failed:', err);
+    try {
+      await env.DB.prepare(
+        `INSERT INTO ai_settings (key, value) VALUES ('vec_dirty','1')
+         ON CONFLICT(key) DO UPDATE SET value='1', updated_at=datetime('now')`
+      ).run();
+    } catch { /* ignore */ }
+  }
   return json({ ok: true });
 }
 
@@ -1699,7 +1750,19 @@ async function aiStats(env) {
   const { results } = await env.DB.prepare(
     `SELECT question, action, sources, duration_ms, created_at FROM ai_chats ORDER BY id DESC LIMIT 20`
   ).all();
-  return json({ ok: true, today, d7, d30, total, recent: results || [] });
+  // 知识缺口：7 天内有回答但既无知识来源也无 action 的问答（capped 降级/失败不记缺口）
+  const { n7, miss7 } = await env.DB.prepare(
+    `SELECT COUNT(*) AS n7,
+            SUM(CASE WHEN sources IS NULL AND action IS NULL AND answer_len > 0 THEN 1 ELSE 0 END) AS miss7
+     FROM ai_chats WHERE created_at >= datetime('now', '-7 days')`
+  ).first();
+  const { results: misses } = await env.DB.prepare(
+    `SELECT question, created_at FROM ai_chats
+     WHERE created_at >= datetime('now', '-7 days')
+       AND sources IS NULL AND action IS NULL AND answer_len > 0
+     ORDER BY id DESC LIMIT 20`
+  ).all();
+  return json({ ok: true, today, d7, d30, total, recent: results || [], n7, miss7, misses: misses || [] });
 }
 
 async function clearAiLog(env) {
@@ -2488,6 +2551,8 @@ ${BASE_CSS}
   <div class="panel" style="margin-top:18px">
     <h3>最近问答（20 条）<span class="updated" id="ai-usage" style="margin-left:10px"></span></h3>
     <div class="list" id="ai-log"><p class="empty">加载中…</p></div>
+    <h3 style="margin-top:18px">知识缺口（7 天 <span id="ai-miss-n">-</span>）<span style="font-weight:400;font-size:12px;color:#86868b">有回答但未命中任何知识的问题，按时间倒序</span></h3>
+    <div class="list" id="ai-miss"><p class="empty">加载中…</p></div>
   </div>
 </div>
 
@@ -4596,7 +4661,27 @@ function loadAiStats() {
         '<div class="time">' + esc(fmtTime(r.created_at)) + '</div>';
       box.appendChild(div);
     });
-  }).catch(function () { el('ai-log').innerHTML = '<p class="empty">加载失败</p>'; });
+
+    var mbox = el('ai-miss');
+    el('ai-miss-n').textContent = (d.miss7 || 0) + '/' + (d.n7 || 0);
+    var misses = d.misses || [];
+    if (!misses.length) {
+      mbox.innerHTML = '<p class="empty">7 天内没有未命中知识库的问题，覆盖良好。</p>';
+    } else {
+      mbox.innerHTML = '';
+      misses.forEach(function (r) {
+        var div = document.createElement('div');
+        div.className = 'msg read';
+        div.innerHTML =
+          '<div class="row1"><span class="name">' + esc(r.question) + '</span></div>' +
+          '<div class="time">' + esc(fmtTime(r.created_at)) + '</div>';
+        mbox.appendChild(div);
+      });
+    }
+  }).catch(function () {
+    el('ai-log').innerHTML = '<p class="empty">加载失败</p>';
+    el('ai-miss').innerHTML = '<p class="empty">加载失败</p>';
+  });
 }
 
 (function () {

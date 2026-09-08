@@ -13,6 +13,14 @@
       "database_id": "cdfc8884-e978-4a10-b45b-a3babdd9ae46"
     }
   ],
+  // 知识库向量即时维护（admin 增删改知识条目时同步 Vectorize，docs/AI助手方案.md §检索 v2）
+  "ai": { "binding": "AI" },
+  "vectorize": [
+    {
+      "binding": "VEC",
+      "index_name": "whizzzest-ai-knowledge"
+    }
+  ],
   // 商户图片桶（删除商户时级联清理 m<id>/ 前缀对象；与 merchant/ 根 worker 同桶）
   // 万载TV 媒体桶（视频/封面直传，tv/ 前缀；主站经 /media/* 代理公开读取，docs/万载TV方案.md）
   "r2_buckets": [
