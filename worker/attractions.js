@@ -149,14 +149,27 @@ async function attraDetail(env, url, ctx, slug, loc) {
     : '';
 
   const cover = aCover(a.cover);
+  // @graph = 主实体 + 面包屑（与页面可见 .at-crumb 一一对应，搜索结果出路径）
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'TouristAttraction',
-    name: a.name,
-    description: a.summary,
-    url: `${SITE_URL}${P}/attractions/${a.slug}/`,
-    ...(cover ? { image: `${SITE_URL}${cover}` } : {}),
-    ...(a.address ? { address: { '@type': 'PostalAddress', streetAddress: a.address, addressRegion: '江西', addressCountry: 'CN' } } : {}),
+    '@graph': [
+      {
+        '@type': 'TouristAttraction',
+        name: a.name,
+        description: a.summary,
+        url: `${SITE_URL}${P}/attractions/${a.slug}/`,
+        ...(cover ? { image: `${SITE_URL}${cover}` } : {}),
+        ...(a.address ? { address: { '@type': 'PostalAddress', streetAddress: a.address, addressRegion: '江西', addressCountry: 'CN' } } : {}),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: UI[loc].home, item: `${SITE_URL}${P}/` },
+          { '@type': 'ListItem', position: 2, name: t.crumbAttra, item: `${SITE_URL}${P}/attractions/` },
+          { '@type': 'ListItem', position: 3, name: a.name, item: `${SITE_URL}${P}/attractions/${a.slug}/` },
+        ],
+      },
+    ],
   };
 
   const body = `

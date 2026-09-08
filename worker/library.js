@@ -282,15 +282,29 @@ async function bookDetail(env, url, ctx, slug, loc) {
     ? `<p class="bk-pending">${t.pending.replace('{n}', pend.n)}</p>`
     : '';
 
+  // @graph = 主实体 + 面包屑（与页面可见 .bk-crumb 一一对应，搜索结果出路径）
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'Book',
-    name: b.title,
-    author: { '@type': 'Person', name: b.author_name || t.authorFallback },
-    inLanguage: 'zh-CN',
-    numberOfPages: b.chapter_count || undefined,
-    abstract: b.intro || undefined,
-    url: `${SITE_URL}${P}/library/${b.slug}/`,
+    '@graph': [
+      {
+        '@type': 'Book',
+        name: b.title,
+        author: { '@type': 'Person', name: b.author_name || t.authorFallback },
+        inLanguage: 'zh-CN',
+        numberOfPages: b.chapter_count || undefined,
+        abstract: b.intro || undefined,
+        url: `${SITE_URL}${P}/library/${b.slug}/`,
+        dateModified: b.updated_at ? `${b.updated_at.replace(' ', 'T')}Z` : undefined,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: UI[loc].home, item: `${SITE_URL}${P}/` },
+          { '@type': 'ListItem', position: 2, name: t.crumbLibrary, item: `${SITE_URL}${P}/library/` },
+          { '@type': 'ListItem', position: 3, name: b.title, item: `${SITE_URL}${P}/library/${b.slug}/` },
+        ],
+      },
+    ],
   };
 
   const body = `

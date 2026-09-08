@@ -115,6 +115,41 @@ const pageSlug = (loc, dirName) => {
   return `${localePrefix(loc)}${base}`;
 };
 
+/** BreadcrumbList：由该 locale 的 site.nav 推导（首页 → 祖先栏目 → 当前页）。
+ *  祖先标签取顶层导航或其菜单子项，当前页取 meta 标题去掉站名后缀；
+ *  任一祖先在 nav 中找不到 → 整体不输出（宁缺毋滥）。 */
+function breadcrumbList(loc, dirName, site, selfTitle) {
+  const home = localePrefix(loc);
+  const nav = site.nav || [];
+  const items = [{ name: site.name, href: `${SITE_URL}${home}` }];
+  const parts = dirName.split('/');
+  let acc = '';
+  for (let i = 0; i < parts.length; i++) {
+    acc += `${parts[i]}/`;
+    let label;
+    if (i === parts.length - 1) {
+      label = selfTitle.split(' — ')[0].trim();
+    } else {
+      const href = `${home}${acc}`;
+      const hit =
+        nav.find((n) => n.href === href) ||
+        nav.flatMap((n) => n.menu || []).find((m) => m.href === href);
+      if (!hit) return null;
+      label = hit.label;
+    }
+    items.push({ name: label, href: `${SITE_URL}${home}${acc}` });
+  }
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((it, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: it.name,
+      item: it.href,
+    })),
+  };
+}
+
 /** 按 a.b.c 路径取值；失败返回 undefined */
 function resolvePath(ctx, expr) {
   return expr
@@ -365,9 +400,10 @@ function buildPage(loc, dirName, site, strings, images, alternates, ogAlternates
 
   html = render(html, ctx);
 
-  // JSON-LD 结构化数据：每页 WebPage + 面包屑；首页附 Organization / WebSite（弊病 4 收尾项）
-  const jsonld = {
-    '@context': 'https://schema.org',
+  // JSON-LD 结构化数据（@graph）：WebPage / AboutPage / 首页 Organization+WebSite（弊病 4 收尾项）/
+  // BreadcrumbList（由 nav 推导）/ FAQPage（data.faq，须与页面可见 FAQ 一致）/ Event（data.event，
+  // 如「焰火之吻」每周六烟花秀）——搜索富结果
+  const webpage = {
     '@type': 'WebPage',
     name: meta.title,
     description: meta.description,
@@ -375,19 +411,19 @@ function buildPage(loc, dirName, site, strings, images, alternates, ogAlternates
     inLanguage: loc.htmlLang,
     isPartOf: { '@id': `${SITE_URL}/#website` },
   };
+  const graph = [webpage];
   if (dirName === 'about') {
     // 关于页：AboutPage + 挂载团队实体（与首页 Organization 同 @id 关联）
-    jsonld['@type'] = 'AboutPage';
-    jsonld.mainEntity = {
+    webpage['@type'] = 'AboutPage';
+    webpage.mainEntity = {
       '@type': 'Organization',
       '@id': `${SITE_URL}/#organization`,
       name: site.name,
       url: `${SITE_URL}${localePrefix(loc)}`,
       email: site.email,
     };
-  }
-  if (dirName === 'index') {
-    jsonld['@graph'] = [
+  } else if (dirName === 'index') {
+    graph.push(
       {
         '@type': 'Organization',
         '@id': `${SITE_URL}/#organization`,
@@ -402,12 +438,58 @@ function buildPage(loc, dirName, site, strings, images, alternates, ogAlternates
         url: `${SITE_URL}${localePrefix(loc)}`,
         inLanguage: loc.htmlLang,
         publisher: { '@id': `${SITE_URL}/#organization` },
+      }
+    );
+  } else if (dirName !== '404') {
+    const crumbs = breadcrumbList(loc, dirName, site, meta.title);
+    if (crumbs) graph.push(crumbs);
+  }
+  if (Array.isArray(data.faq) && data.faq.length) {
+    graph.push({
+      '@type': 'FAQPage',
+      '@id': `${ctx.page.url}#faq`,
+      mainEntity: data.faq.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    });
+  }
+  if (data.event) {
+    const ev = data.event;
+    graph.push({
+      '@type': 'Event',
+      name: ev.name,
+      description: ev.description,
+      url: ctx.page.url,
+      image: `${SITE_URL}${ctx.page.ogImage}`,
+      eventStatus: 'https://schema.org/EventScheduled',
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+      isAccessibleForFree: true,
+      location: {
+        '@type': 'Place',
+        name: ev.locationName,
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: ev.locationName,
+          addressLocality: ev.addressLocality,
+          addressRegion: ev.addressRegion,
+          addressCountry: 'CN',
+        },
       },
-    ];
+      organizer: { '@type': 'Organization', name: site.name, url: `${SITE_URL}${localePrefix(loc)}` },
+      eventSchedule: {
+        '@type': 'Schedule',
+        repeatFrequency: 'P1W',
+        byDay: 'https://schema.org/Saturday',
+        startTime: ev.startTime,
+      },
+      duration: ev.duration,
+    });
   }
   html = html.replace(
     '</head>',
-    `  <script type="application/ld+json">${JSON.stringify(jsonld)}</script>\n</head>`
+    `  <script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })}</script>\n</head>`
   );
 
   // 图片增强（WebP srcset / picture 回退）+ 首屏 hero preload；无 sharp 时 images 为空原样输出

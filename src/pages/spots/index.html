@@ -52,6 +52,24 @@
       </div>
     </section>
 
+    {{#if data.faq}}
+    <section class="section">
+      <div class="container">
+        <div class="section-head reveal">
+          <h2>{{data.faqTitle}}</h2>
+        </div>
+        <div class="grid grid-2">
+          {{#each data.faq as item}}
+          <div class="feature-card reveal">
+            <h3>{{item.q}}</h3>
+            <p>{{item.a}}</p>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+    </section>
+    {{/if}}
+
   </main>
   {{> footer}}
 </body>

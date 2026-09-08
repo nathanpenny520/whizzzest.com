@@ -273,17 +273,30 @@ async function tvDetail(env, url, ctx, id, loc) {
       : '';
   }
 
+  // @graph = 主实体 + 面包屑（与页面可见 .tv-crumb 一一对应，搜索结果出路径）
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'VideoObject',
-    name: v.title,
-    description: v.intro || t.ldDesc.replace('{title}', v.title),
-    thumbnailUrl: [`${SITE_URL}${vCover(v) || '/assets/img/longhu_yanhuowanhui.jpeg'}`],
-    uploadDate: v.created_at ? `${v.created_at.replace(' ', 'T')}Z` : undefined,
-    ...(v.duration ? { duration: isoDur(v.duration) } : {}),
-    ...(v.source === 'bilibili'
-      ? { embedUrl: biliEmbed(v, false) }
-      : { contentUrl: `${SITE_URL}${vMedia(v)}` }),
+    '@graph': [
+      {
+        '@type': 'VideoObject',
+        name: v.title,
+        description: v.intro || t.ldDesc.replace('{title}', v.title),
+        thumbnailUrl: [`${SITE_URL}${vCover(v) || '/assets/img/longhu_yanhuowanhui.jpeg'}`],
+        uploadDate: v.created_at ? `${v.created_at.replace(' ', 'T')}Z` : undefined,
+        ...(v.duration ? { duration: isoDur(v.duration) } : {}),
+        ...(v.source === 'bilibili'
+          ? { embedUrl: biliEmbed(v, false) }
+          : { contentUrl: `${SITE_URL}${vMedia(v)}` }),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: UI[loc].home, item: `${SITE_URL}${P}/` },
+          { '@type': 'ListItem', position: 2, name: t.crumbTv, item: `${SITE_URL}${P}/tv/` },
+          { '@type': 'ListItem', position: 3, name: v.title, item: `${SITE_URL}${P}/tv/${v.id}/` },
+        ],
+      },
+    ],
   };
 
   const ep = v.series ? ' · ' + esc(v.series) + (v.episode ? ' ' + t.ep.replace('{n}', v.episode) : '') : '';

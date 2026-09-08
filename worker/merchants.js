@@ -218,14 +218,27 @@ async function merchantDetail(env, url, slug, loc) {
     ? `<div class="md-gallery">${galleryExtra.map((k, i) => `<img src="${esc(simg(k))}" alt="${esc(item.name)} ${i + 2}" loading="lazy" decoding="async">`).join('')}</div>`
     : '';
 
+  // @graph = 主实体 + 面包屑（与页面可见 .md-crumb 一一对应，搜索结果出路径）
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: item.name,
-    description: item.intro,
-    ...(item.address ? { address: item.address } : {}),
-    ...(item.phone ? { telephone: item.phone } : {}),
-    url: `${SITE_URL}${P}/merchants/${item.slug}/`,
+    '@graph': [
+      {
+        '@type': 'LocalBusiness',
+        name: item.name,
+        description: item.intro,
+        ...(item.address ? { address: item.address } : {}),
+        ...(item.phone ? { telephone: item.phone } : {}),
+        url: `${SITE_URL}${P}/merchants/${item.slug}/`,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: UI[loc].home, item: `${SITE_URL}${P}/` },
+          { '@type': 'ListItem', position: 2, name: t.crumbMerchants, item: `${SITE_URL}${P}/merchants/` },
+          { '@type': 'ListItem', position: 3, name: item.name, item: `${SITE_URL}${P}/merchants/${item.slug}/` },
+        ],
+      },
+    ],
   };
 
   const html = pageShell(chrome, loc, {
