@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# 部署后冒烟检查（只读）——CI 用，也可本地手动跑：bash scripts/smoke.sh
+# 部署后冒烟检查（只读）——本地手动工具：bash scripts/smoke.sh
+#
+# 注：CI 自动冒烟已于 2026-09-08 移除——站点边缘机器人防护会质询数据中心 IP 的
+# 非浏览器请求（403 + cf-mitigated: challenge），GitHub Runner 无法穿透；
+# 浏览器访客与 /assets/* 静态资产不受影响。本地（住宅 IP）可正常全量检查。
 #
 # 安全边界（不阻碍/不污染线上）：
 #   - 全部为 GET 请求；页面请求显式带 Accept: */*，不满足 Worker 访客采集的
@@ -10,9 +14,9 @@
 #
 # 环境变量：
 #   BASE_URL           主站地址（默认 https://whizzzest.com）
-#   SMOKE_FINGERPRINT  为 true 时比对本地构建的 dist/build-meta.json 6 项资产指纹与
-#                      生产实际返回，校验「本次部署真的上线了」；部署被 token 缺失
-#                      跳过时由 deploy.yml 置 false，仅做可用性检查
+#   SMOKE_FINGERPRINT  为 true 时比对本地 dist/build-meta.json 的 6 项资产指纹与
+#                      生产实际返回，校验「本次部署真的上线了」
+#                      （dist 不进 git，需先跑 node build.js 取得本次构建指纹）
 #   DIST_DIR           本地构建产物目录（默认 dist）
 set -u
 
