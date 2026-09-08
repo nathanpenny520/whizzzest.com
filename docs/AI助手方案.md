@@ -82,7 +82,7 @@
    npx wrangler vectorize create-metadata-index whizzzest-ai-knowledge --property-name=status --type=string
    ```
    预置数据（可选，懒同步也会自动补）：D1 导出 published 知识 → OAuth token 打 REST `/ai/run/@cf/qwen/qwen3-embedding-0.6b` 批量嵌入（`{text:[...]}` → `{data:[[1024 维]]}`，32 条/批）→ NDJSON（id `k<知识id>`，metadata `{status:'published', kid}`）→ `wrangler vectorize insert`。2026-09-08 已执行，68 条就位
-1. 线上 D1 迁移：`wrangler d1 execute whizzzest --remote --file scripts/ai-migrate.sql`（纯 DDL 幂等；schema.sql 含不幂等 ALTER 仅适合全新库）+ 一次性 `--file scripts/ai-seed.sql`（固定 id INSERT OR IGNORE，重复执行不覆盖后台编辑）
+1. 线上 D1 迁移：`wrangler d1 execute whizzzest --remote --file scripts/migrations/001-20260907-ai-knowledge.sql`（纯 DDL 幂等；schema.sql 为全量图纸仅作参考，全新库可直接执行）+ 一次性 `--file scripts/ai-seed.sql`（固定 id INSERT OR IGNORE，重复执行不覆盖后台编辑）
 2. 部署双 Worker（主站 + admin，push → CI；dist 由 CI build）
 3. 后台检查：设置卡默认值、知识库 68 条、发几条真实问题验证 action 与来源；改检索逻辑先跑 `node scripts/ai-retrieval-test.mjs` 回归集
 

@@ -1,8 +1,8 @@
--- AI 助手「花傩」建表迁移（docs/AI助手方案.md）——纯 DDL，幂等，可对已有多表的线上库直接执行。
--- （schema.sql 是全量权威结构，但含不幂等的 ALTER，适合全新库；已有库用本文件增量迁移。）
---
--- 执行：wrangler d1 execute whizzzest --remote --file scripts/ai-migrate.sql
---       wrangler d1 execute whizzzest --local  --file scripts/ai-migrate.sql
+-- 迁移 001：AI 助手「花傩」建表（docs/AI助手方案.md）——纯 DDL，幂等，可安全重跑
+-- 执行：wrangler d1 execute whizzzest --remote --file scripts/migrations/001-20260907-ai-knowledge.sql
+--       wrangler d1 execute whizzzest --local  --file scripts/migrations/001-20260907-ai-knowledge.sql
+-- 执行记录：生产 ✅（2026-09-07 随 AI 助手上线上线）；本地 ✅（开发期应用）
+-- （收编自 scripts/ai-migrate.sql，2026-09-08 迁移纪律正式化，docs/全站优化方案.md W2）
 
 CREATE TABLE IF NOT EXISTS ai_knowledge (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

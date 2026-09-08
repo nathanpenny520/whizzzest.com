@@ -1,4 +1,8 @@
--- 焰境·万载 —— 官网留言表（联系表单）
+-- 焰境·万载 —— D1 全量图纸（仅供参考，勿直接对线上执行）
+-- 变更一律走 scripts/migrations/ 编号迁移（纪律见 scripts/migrations/README.md，docs/全站优化方案.md W2）；
+-- 每次迁移合入时同步更新本文件，保持图纸 = 线上最新结构。
+
+-- 官网留言表（联系表单）
 -- read_at：后台标记已读的时间（NULL = 未读），由 admin worker 写入（2026-09-06 迁移）
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +43,20 @@ CREATE INDEX IF NOT EXISTS idx_visits_vid ON visits(vid, created_at);
 CREATE INDEX IF NOT EXISTS idx_visits_created ON visits(created_at);
 CREATE INDEX IF NOT EXISTS idx_visits_sid ON visits(sid);
 CREATE INDEX IF NOT EXISTS idx_visits_pvid ON visits(pv_id);
+-- 访客治理（2026-09-08，迁移 003）：「排除爬虫 + 时间窗」组合查询走此索引，避免全表过滤
+CREATE INDEX IF NOT EXISTS idx_visits_bot_created ON visits(is_bot, created_at);
+
+-- 扫描器异常流量日计数（2026-09-08，迁移 003，docs/访客治理方案.md 阶段二）：
+-- 扫描/探测请求不再写 visits 明细，改为「天 × 特征分类」累加，保留宏观可见性
+CREATE TABLE IF NOT EXISTS scan_stats (
+  date TEXT NOT NULL,                      -- 北京时区日期（与 visits 展示口径一致）
+  category TEXT NOT NULL,                  -- scan-path 命中扫描特征路径 | 404 落点不存在路径
+  count INTEGER NOT NULL DEFAULT 0,
+  last_path TEXT,                          -- 最近一次样本
+  last_ua TEXT,
+  last_at TEXT,
+  PRIMARY KEY (date, category)
+);
 
 -- 商户展示与入驻（M1，docs/商户功能方案.md）
 -- tier: free 基础卡片 | verified 认证商户 | featured 置顶推荐
@@ -63,6 +81,8 @@ CREATE TABLE IF NOT EXISTS merchants (
   status TEXT NOT NULL DEFAULT 'pending',
   reject_reason TEXT,
   paid_until TEXT,
+  tier_request TEXT,                       -- M3（2026-09-06 增量迁移加入，见 scripts/migrations/）：申请目标等级 verified|featured，NULL = 无待核销申请
+  paid_requested_at TEXT,                  -- M3：申请时间（admin 排序/提醒用）
   sort_weight INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
@@ -84,14 +104,11 @@ CREATE TABLE IF NOT EXISTS merchant_users (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mu_email ON merchant_users(email);
 
 -- M3 变现闭环：商户自助申请升级/续费 → 站长核销
--- tier_request: 商户申请的目标等级（verified|featured，NULL = 无待核销申请）
--- paid_requested_at: 申请时间（admin 排序/提醒用）
-ALTER TABLE merchants ADD COLUMN tier_request TEXT;
-ALTER TABLE merchants ADD COLUMN paid_requested_at TEXT;
+-- （tier_request / paid_requested_at 两列为 2026-09-06 增量迁移加入，见 scripts/migrations/）
 
 -- M2.1 邮箱验证码登录（2026-09-06）：发往已绑定邮箱的 6 位验证码
 -- code_hash = SHA-256(6位码)，10 分钟有效，≤5 次尝试；purpose 区分 login / bind
--- （既有库迁移：ALTER TABLE merchant_users ADD COLUMN email TEXT; + 上面那条 UNIQUE 索引）
+-- （merchant_users.email 列与 UNIQUE 索引为 2026-09-06 增量迁移加入，见 scripts/migrations/）
 CREATE TABLE IF NOT EXISTS email_login_codes (
   email TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL,

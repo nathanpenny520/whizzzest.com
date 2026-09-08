@@ -535,6 +535,20 @@ const KIND_LABEL = {
 };
 
 /** 天数参数 → SQL since 表达式（含边界校验） */
+/** 实例内 60s 缓存（对齐主站 handleStats 模式，docs/访客治理方案.md 阶段一第 3 项）：
+ *  自动刷新与多人同开命中缓存不碰库；手动刷新带 &fresh=1 绕过缓存读、回写结果 */
+const apiCache = new Map();
+async function cached(key, fresh, fn) {
+  if (!fresh) {
+    const hit = apiCache.get(key);
+    if (hit && Date.now() - hit.at < 60 * 1000) return hit.data;
+  }
+  const data = await fn();
+  apiCache.set(key, { at: Date.now(), data });
+  if (apiCache.size > 100) apiCache.clear(); // 防 Map 无限膨胀
+  return data;
+}
+
 function sinceExpr(daysParam) {
   const days = [7, 30, 90, 180, 365].includes(daysParam) ? daysParam : 7;
   const back = days === 1 ? '' : `,'-${days - 1} days'`;
@@ -543,9 +557,14 @@ function sinceExpr(daysParam) {
 
 async function statsOverview(env, request) {
   const url = new URL(request.url);
+  const fresh = url.searchParams.get('fresh') === '1';
+  const key = 'stats:' + url.search.replace(/&?fresh=1/, ''); // 键剔除 fresh：手动刷新回写缓存供自动刷新命中
+  return json(await cached(key, fresh, async () => {
   const { days, sql: SINCE } = sinceExpr(url.searchParams.get('days'));
   const bots = url.searchParams.get('bots') === '1';
-  const T = bots ? 'visits' : '(SELECT * FROM visits WHERE is_bot = 0)';
+  // R3（docs/访客治理方案.md 阶段一）：排除爬虫改为内联条件——配合迁移 003 的 (is_bot, created_at)
+  // 复合索引走范围扫描；原 (SELECT * … WHERE is_bot = 0) 子查询每条查询都要物化全表（R3 放大器）
+  const W = bots ? '1=1' : 'is_bot = 0';
   const db = env.DB;
 
   const sincePrev = `datetime('now','+8 hours','start of day','-8 hours','-${days} days')`;
@@ -554,34 +573,34 @@ async function statsOverview(env, request) {
     await Promise.all([
       db.prepare(
         `SELECT COUNT(*) pv, COUNT(DISTINCT ${GID}) uv, COUNT(DISTINCT sid) sessions
-         FROM ${T} WHERE created_at >= ${SINCE}`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE}`
       ).first(),
       db.prepare(
         `SELECT COUNT(*) n FROM (
-           SELECT sid FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE}
+           SELECT sid FROM visits WHERE ${W} AND sid IS NOT NULL AND created_at >= ${SINCE}
            GROUP BY sid HAVING COUNT(*) = 1
          )`
       ).first(),
       db.prepare(
-        `SELECT AVG(engage_ms) t FROM ${T} WHERE engage_ms > 0 AND created_at >= ${SINCE}`
+        `SELECT AVG(engage_ms) t FROM visits WHERE ${W} AND engage_ms > 0 AND created_at >= ${SINCE}`
       ).first(),
       db.prepare(
         `SELECT COUNT(*) n FROM (
-           SELECT vid FROM ${T} WHERE vid IS NOT NULL AND created_at >= ${SINCE}
+           SELECT vid FROM visits WHERE ${W} AND vid IS NOT NULL AND created_at >= ${SINCE}
            GROUP BY vid HAVING MIN(created_at) >= ${SINCE}
          )`
       ).first(),
       db.prepare(
         `SELECT date(created_at, '+8 hours') d, COUNT(*) pv, COUNT(DISTINCT vid) uv, COUNT(DISTINCT sid) sessions
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY d ORDER BY d`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY d ORDER BY d`
       ).all(),
       db.prepare(
         `SELECT path, COUNT(*) pv, COUNT(DISTINCT vid) uv, AVG(engage_ms) avg_ms
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY path ORDER BY pv DESC LIMIT 10`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY path ORDER BY pv DESC LIMIT 10`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(kind,''),'other') kind, COUNT(DISTINCT sid) sessions, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY kind ORDER BY pv DESC`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY kind ORDER BY pv DESC`
       ).all(),
       // 来源站归一化在 SQL 侧完成：自有域折叠为「站内」、外部域剥 www. —— 一个显示标签一个分组
       db.prepare(
@@ -591,20 +610,20 @@ async function statsOverview(env, request) {
              WHEN ref_host = 'whizzzest.com' OR ref_host LIKE '%.whizzzest.com' THEN '站内'
              WHEN ref_host LIKE 'www.%' THEN SUBSTR(ref_host, 5)
              ELSE ref_host END AS src, sid
-           FROM ${T} WHERE created_at >= ${SINCE}
+           FROM visits WHERE ${W} AND created_at >= ${SINCE}
          ) GROUP BY src ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(device,''),'—') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY device ORDER BY pv DESC`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY device ORDER BY pv DESC`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(NULLIF(browser,''),'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 30`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY browser ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(NULLIF(os,''),'Other'),'Other') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 30`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY os ORDER BY pv DESC LIMIT 30`
       ).all(),
       // 语言归一化在 SQL 侧完成：按前缀映射到显示标签再分组，杜绝 en 与 en-US 各成一行、双双显示「英语」
       db.prepare(
@@ -617,28 +636,30 @@ async function statsOverview(env, request) {
              WHEN lang LIKE 'ja%' THEN '日语'
              WHEN lang LIKE 'ko%' THEN '韩语'
              ELSE lang END AS name, vid, ip
-           FROM ${T} WHERE created_at >= ${SINCE}
+           FROM visits WHERE ${W} AND created_at >= ${SINCE}
          ) GROUP BY name ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT COALESCE(NULLIF(country,''),'未知') name, COUNT(DISTINCT ${GID}) uv, COUNT(*) pv
-         FROM ${T} WHERE created_at >= ${SINCE} GROUP BY country ORDER BY pv DESC LIMIT 30`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} GROUP BY country ORDER BY pv DESC LIMIT 30`
       ).all(),
       db.prepare(
         `SELECT created_at, path, COALESCE(NULLIF(kind,''),'other') kind, ref_host, country, device, engage_ms
-         FROM ${T} WHERE created_at >= ${SINCE} ORDER BY created_at DESC LIMIT 30`
+         FROM visits WHERE ${W} AND created_at >= ${SINCE} ORDER BY created_at DESC LIMIT 30`
       ).all(),
       // 上一周期 PV（环比用）
-      db.prepare(`SELECT COUNT(*) n FROM ${T} WHERE created_at >= ${sincePrev} AND created_at < ${SINCE}`).first(),
+      db.prepare(`SELECT COUNT(*) n FROM visits WHERE ${W} AND created_at >= ${sincePrev} AND created_at < ${SINCE}`).first(),
       // 实时：近 5 分钟浏览
-      db.prepare(`SELECT COUNT(*) n FROM ${T} WHERE created_at >= datetime('now','-5 minutes')`).first(),
+      db.prepare(`SELECT COUNT(*) n FROM visits WHERE ${W} AND created_at >= datetime('now','-5 minutes')`).first(),
       // 每位访客的「首访日」分布（算每日新访客）
-      db.prepare(`SELECT date(MIN(created_at), '+8 hours') fd, COUNT(*) n FROM ${T} WHERE vid IS NOT NULL GROUP BY vid`).all(),
+      // R2：补时间窗下限（原为全表 GROUP BY vid）。口径注：窗口内的首次到访日——
+      // 跨窗回访客会在窗口内首现那天被计为「新」，精确口径待阶段三 visitors_first 表
+      db.prepare(`SELECT date(MIN(created_at), '+8 hours') fd, COUNT(*) n FROM visits WHERE ${W} AND vid IS NOT NULL AND created_at >= ${SINCE} GROUP BY vid`).all(),
       // 入口页 TOP（每会话的第一个页面）
       db.prepare(
         `SELECT path, COUNT(*) n FROM (
            SELECT sid, path, ROW_NUMBER() OVER (PARTITION BY sid ORDER BY created_at) rn
-           FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE}
+           FROM visits WHERE ${W} AND sid IS NOT NULL AND created_at >= ${SINCE}
          ) WHERE rn = 1 GROUP BY path ORDER BY n DESC LIMIT 30`
       ).all(),
       // 会话深度分布（1 页 / 2-3 页 / 4 页以上）
@@ -646,7 +667,7 @@ async function statsOverview(env, request) {
         `SELECT SUM(CASE WHEN d = 1 THEN 1 ELSE 0 END) d1,
                 SUM(CASE WHEN d BETWEEN 2 AND 3 THEN 1 ELSE 0 END) d23,
                 SUM(CASE WHEN d >= 4 THEN 1 ELSE 0 END) d4p
-         FROM (SELECT COUNT(*) d FROM ${T} WHERE sid IS NOT NULL AND created_at >= ${SINCE} GROUP BY sid)`
+         FROM (SELECT COUNT(*) d FROM visits WHERE ${W} AND sid IS NOT NULL AND created_at >= ${SINCE} GROUP BY sid)`
       ).first(),
     ]);
 
@@ -658,7 +679,7 @@ async function statsOverview(env, request) {
   const sessions = cards?.sessions || 0;
   const pv = cards?.pv || 0;
   const prev = prevPv?.n || 0;
-  return json({
+  return {
     ok: true,
     days,
     cards: {
@@ -684,47 +705,59 @@ async function statsOverview(env, request) {
     langs: langs.results || [],
     countries: countries.results || [],
     recent: (recent.results || []).map((r) => ({ ...r, kind: r.kind || 'other' })),
-  });
+  };
+  }));
 }
 
 async function listVisitors(env, request) {
   const url = new URL(request.url);
+  const fresh = url.searchParams.get('fresh') === '1';
+  const key = 'visitors:' + url.search.replace(/&?fresh=1/, '');
+  return json(await cached(key, fresh, async () => {
   const bots = url.searchParams.get('bots') === '1';
-  const T = bots ? 'visits' : '(SELECT * FROM visits WHERE is_bot = 0)';
+  const W = bots ? '1=1' : 'is_bot = 0'; // R3：内联排除爬虫，配合迁移 003 复合索引
   const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+  const { sql: SINCE } = sinceExpr(url.searchParams.get('days'));
 
+  // R2：列表限定所选时间窗内活跃的访客（原为全时间全表分组排序）
   const { results } = await env.DB
     .prepare(
       `SELECT ${GID} gid, COUNT(*) views, COUNT(DISTINCT sid) sessions,
               MIN(created_at) first, MAX(created_at) last,
               MAX(country) country, MAX(device) device, MAX(browser) browser, MAX(os) os
-       FROM ${T} GROUP BY gid ORDER BY last DESC LIMIT ?1 OFFSET ?2`
+       FROM visits WHERE ${W} AND created_at >= ${SINCE}
+       GROUP BY gid ORDER BY last DESC LIMIT ?1 OFFSET ?2`
     )
     .bind(PAGE_SIZE, offset)
     .all();
-  const total = (await env.DB.prepare(`SELECT COUNT(DISTINCT ${GID}) n FROM ${T}`).first())?.n || 0;
 
-  return json({ ok: true, total, visitors: results || [] });
+  // R2：总数改近似口径——整页满则报「至少还有一页」（offset+PAGE_SIZE+1），否则为精确值；
+  // 不再每次翻页对全表精确 COUNT(DISTINCT)。「加载更多」按 total > offset+PAGE_SIZE 判断，逻辑兼容
+  const rows = results || [];
+  const total = rows.length === PAGE_SIZE ? offset + PAGE_SIZE + 1 : offset + rows.length;
+
+  return { ok: true, total, visitors: rows };
+  }));
 }
 
 async function visitorDetail(env, gid) {
-  const T = '(SELECT * FROM visits WHERE is_bot = 0)';
+  const W = 'is_bot = 0'; // 内联排除爬虫（R3）
   const where = `${GID} = ?1`;
   const summary = await env.DB
-    .prepare(`SELECT COUNT(*) n, MIN(created_at) first, MAX(created_at) last FROM ${T} WHERE ${where}`)
+    .prepare(`SELECT COUNT(*) n, MIN(created_at) first, MAX(created_at) last FROM visits WHERE ${W} AND ${where}`)
     .bind(gid)
     .first();
   const { results: sessions } = await env.DB
     .prepare(
       `SELECT sid, MIN(created_at) start, MAX(created_at) end, COUNT(*) views
-       FROM ${T} WHERE ${where} AND sid IS NOT NULL GROUP BY sid ORDER BY start DESC LIMIT 50`
+       FROM visits WHERE ${W} AND ${where} AND sid IS NOT NULL GROUP BY sid ORDER BY start DESC LIMIT 50`
     )
     .bind(gid)
     .all();
   const { results: views } = await env.DB
     .prepare(
       `SELECT path, kind, ref_host, country, device, engage_ms, created_at
-       FROM ${T} WHERE ${where} ORDER BY created_at DESC LIMIT 300`
+       FROM visits WHERE ${W} AND ${where} ORDER BY created_at DESC LIMIT 300`
     )
     .bind(gid)
     .all();
@@ -2455,7 +2488,7 @@ ${BASE_CSS}
       <input id="include-bots" type="checkbox">包含扫描/机器人
     </label>
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73">
-      <input id="auto-refresh" type="checkbox">30s 自动刷新
+      <input id="auto-refresh" type="checkbox">2 分钟自动刷新
     </label>
     <span class="updated" id="updated"></span>
     <button id="vrefresh" type="button">刷新</button>
@@ -3022,9 +3055,9 @@ var barOpen = {};
 var barSingle = {};
 var BAR_IDS = ['kinds', 'sources', 'devices', 'browsers', 'os', 'langs', 'countries', 'entries', 'depth'];
 
-function loadStats() {
+function loadStats(fresh) {
   el('updated').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
-  api('/api/stats?days=' + visitDays + (includeBots ? '&bots=1' : '')).then(function (d) {
+  api('/api/stats?days=' + visitDays + (includeBots ? '&bots=1' : '') + (fresh ? '&fresh=1' : '')).then(function (d) {
     lastStats = d;
     renderCards(d);
     renderSparks(d);
@@ -3353,9 +3386,9 @@ function buildChartTable(daily) {
 }
 
 var vOffset = 0;
-function loadVisitors(reset) {
+function loadVisitors(reset, fresh) {
   if (reset) { vOffset = 0; el('vlist').innerHTML = '<tr><td colspan="7" class="empty">加载中…</td></tr>'; }
-  api('/api/visitors?offset=' + vOffset + (includeBots ? '&bots=1' : '')).then(function (d) {
+  api('/api/visitors?offset=' + vOffset + (includeBots ? '&bots=1' : '') + '&days=' + visitDays + (fresh ? '&fresh=1' : '')).then(function (d) {
     var box = el('vlist');
     if (reset) box.innerHTML = '';
     if (reset && (!d.visitors || d.visitors.length === 0)) {
@@ -3408,7 +3441,7 @@ function renderVisitor(v) {
   return tr;
 }
 
-el('vrefresh').addEventListener('click', function () { loadStats(); loadVisitors(true); });
+el('vrefresh').addEventListener('click', function () { loadStats(true); loadVisitors(true, true); });
 el('include-bots').addEventListener('change', function (e) { includeBots = e.target.checked; loadStats(); loadVisitors(true); });
 el('auto-refresh').addEventListener('change', function (e) { autoRefresh = e.target.checked; });
 // 维度条长指标切换（浏览/访客）——数据已缓存，切换只重绘不发请求
@@ -3445,7 +3478,7 @@ window.addEventListener('resize', function () {
 });
 setInterval(function () {
   if (currentView === 'visit' && autoRefresh && document.visibilityState === 'visible') { loadStats(); loadVisitors(false); }
-}, 30000);
+}, 120000); // 2 分钟（docs/访客治理方案.md R1：默认关 + 拉长间隔；命中服务端 60s 缓存则不碰库）
 document.querySelectorAll('#view-visit .panel').forEach(function (p) {
   p.classList.add('collapsible');
   p.querySelector('h3').addEventListener('click', function () { p.classList.toggle('collapsed'); });

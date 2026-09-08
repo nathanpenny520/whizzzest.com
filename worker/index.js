@@ -127,6 +127,22 @@ export default {
 
     return res;
   },
+
+  // 每日定时清理（docs/访客治理方案.md 阶段二 W3）：明细保留 90 天
+  // cron 20:17 UTC = 北京 04:17 低峰；删除量 ≈ 每日写入量（数千行），计入 rows written 配额
+  async scheduled(event, env, ctx) {
+    try {
+      const cutoff = new Date(Date.now() + 8 * 60 * 60 * 1000 - 90 * 24 * 60 * 60 * 1000)
+        .toISOString().slice(0, 10);
+      const [v, s] = await env.DB.batch([
+        env.DB.prepare(`DELETE FROM visits WHERE created_at < datetime('now', '-90 days')`),
+        env.DB.prepare('DELETE FROM scan_stats WHERE date < ?1').bind(cutoff),
+      ]);
+      console.log(`visits retention: visits -${v.meta?.changes ?? '?'} rows, scan_stats -${s.meta?.changes ?? '?'} rows`);
+    } catch (err) {
+      console.error('visits retention failed:', err);
+    }
+  },
 };
 
 /* ---------------- 访客采集 ---------------- */
@@ -155,6 +171,33 @@ function classifyRef(host) {
 
 function readCookie(cookieHeader, name) {
   return (cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([A-Za-z0-9-]{8,64})`)) || [])[1] || '';
+}
+
+/* ---------------- 访客治理辅助（docs/访客治理方案.md 阶段二） ---------------- */
+
+/** IP 截断脱敏：IPv4 保前三段（/24）、IPv6 保前 4 组（/48）——粗粒度归组够用，不存原文 */
+function truncIp(ip) {
+  if (!ip) return '';
+  const p4 = ip.split('.');
+  if (p4.length === 4) return `${p4[0]}.${p4[1]}.${p4[2]}.0/24`;
+  if (ip.includes(':')) return `${ip.split(':').slice(0, 4).join(':')}::/48`;
+  return ip.slice(0, 20);
+}
+
+/** 北京时区日期（scan_stats 按天分桶，与后台展示口径一致） */
+function bjDate() {
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** 访客写入熔断：同 IP 每分钟文档请求超过 30 次 → 停止写库（隔离实例内计数，best-effort） */
+const visitHits = new Map();
+function visitFlooded(ip) {
+  const now = Date.now();
+  const hits = (visitHits.get(ip) || []).filter((t) => now - t < 60 * 1000);
+  hits.push(now);
+  visitHits.set(ip, hits);
+  if (visitHits.size > 5000) visitHits.clear(); // 防 Map 无限膨胀
+  return hits.length > 30;
 }
 
 /**
@@ -186,17 +229,35 @@ async function trackVisit(request, env, ctx, url, ua, assetRes) {
   const SCAN_PATH_RE = /wp-admin|wp-login|phpmyadmin|\.env|\.git|\/open\/|cgi-bin|\.(php|asp|aspx|jsp|sql|bak)$/i;
   const isBot = assetRes.status >= 400 || SCAN_PATH_RE.test(url.pathname) ? 1 : 0;
 
-  ctx.waitUntil(
-    env.DB.prepare(
-      `INSERT INTO visits (vid, sid, pv_id, path, referrer, ref_host, kind, country, device, browser, os, lang, ua, ip, is_bot)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`
-    )
-      .bind(vid, sid, pvId, url.pathname, ref.slice(0, 300), refHost, kind,
-        request.cf?.country || '', device, browser, os, lang.slice(0, 20), ua.slice(0, 250),
-        request.headers.get('cf-connecting-ip') || '', isBot)
-      .run()
-      .catch((err) => console.error('visit log failed:', err))
-  );
+  // 访客治理（docs/访客治理方案.md 阶段二）：
+  //  - IP 脱敏：截断入库（IPv4 /24、IPv6 /48），无 Cookie 访客按截断 IP 粗粒度归组，不存原文
+  //  - 扫描器不入明细：扫描/探测请求累加到 scan_stats 日计数表（迁移 003），保留宏观可见性
+  //  - 频率熔断：同 IP 文档请求超阈值即停止写库（实例内 best-effort，防恶意刷量）
+  const rawIp = request.headers.get('cf-connecting-ip') || '';
+  const ip = truncIp(rawIp);
+  if (!rawIp || !visitFlooded(rawIp)) {
+    ctx.waitUntil(
+      isBot
+        ? env.DB.prepare(
+            `INSERT INTO scan_stats (date, category, count, last_path, last_ua, last_at)
+             VALUES (?1, ?2, 1, ?3, ?4, ?5)
+             ON CONFLICT (date, category) DO UPDATE SET
+               count = count + 1, last_path = ?3, last_ua = ?4, last_at = ?5`
+          )
+            .bind(bjDate(), SCAN_PATH_RE.test(url.pathname) ? 'scan-path' : '404',
+              url.pathname.slice(0, 200), ua.slice(0, 200), new Date().toISOString())
+            .run()
+            .catch((err) => console.error('scan_stats log failed:', err))
+        : env.DB.prepare(
+            `INSERT INTO visits (vid, sid, pv_id, path, referrer, ref_host, kind, country, device, browser, os, lang, ua, ip, is_bot)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`
+          )
+            .bind(vid, sid, pvId, url.pathname, ref.slice(0, 300), refHost, kind,
+              request.cf?.country || '', device, browser, os, lang.slice(0, 20), ua.slice(0, 250), ip, 0)
+            .run()
+            .catch((err) => console.error('visit log failed:', err))
+    );
+  }
 
   // HTML 才注入回报脚本；图片等非 HTML 文档直接透传
   const ct = assetRes.headers.get('content-type') || '';
