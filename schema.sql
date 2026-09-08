@@ -58,6 +58,15 @@ CREATE TABLE IF NOT EXISTS scan_stats (
   PRIMARY KEY (date, category)
 );
 
+-- 全站配置（key-value，2026-09-08 迁移 004）：visit_tracking 访客采集总开关（'1' 开 / '0' 关，
+-- 后台「访客」页切换，主站 Worker 60s 实例缓存读取）；后续全站级开关/配置统一放这里
+CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO site_settings (key, value) VALUES ('visit_tracking', '1');
+
 -- 商户展示与入驻（M1，docs/商户功能方案.md）
 -- tier: free 基础卡片 | verified 认证商户 | featured 置顶推荐
 -- status: pending 待审核 | approved 已上线 | rejected 已驳回 | expired 已过期
@@ -300,7 +309,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_chats_created ON ai_chats(created_at);
 -- credential_id / public_key 均为 base64url 字符串；transports 为 JSON 数组字符串
 CREATE TABLE IF NOT EXISTS webauthn_credentials (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  portal TEXT NOT NULL,                    -- 'merchant' | 'writer'
+  portal TEXT NOT NULL,                    -- 'merchant' | 'writer' | 'admin'
   user_id INTEGER NOT NULL,                -- merchant_users.id / writer_users.id
   credential_id TEXT NOT NULL UNIQUE,
   public_key TEXT NOT NULL,

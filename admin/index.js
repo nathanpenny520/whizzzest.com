@@ -240,6 +240,9 @@ async function handleApi(request, env, path) {
   if ((m = path.match(/^\/api\/visitors\/([A-Za-z0-9:%._-]+)$/)) && method === 'GET') {
     return visitorDetail(env, decodeURIComponent(m[1]));
   }
+  // 访客采集总开关（site_settings.visit_tracking；主站 Worker 60s 缓存，切换后最迟 1 分钟全网生效）
+  if (path === '/api/visitor-tracking' && method === 'GET') return getVisitTracking(env);
+  if (path === '/api/visitor-tracking' && method === 'POST') return setVisitTracking(env, request);
 
   // 商户管理（M1，docs/商户功能方案.md）；DELETE 级联删除门户账号 + R2 图片
   if (path === '/api/merchants' && method === 'GET') return listMerchants(env, request);
@@ -553,6 +556,25 @@ function sinceExpr(daysParam) {
   const days = [7, 30, 90, 180, 365].includes(daysParam) ? daysParam : 7;
   const back = days === 1 ? '' : `,'-${days - 1} days'`;
   return { days, sql: `datetime('now','+8 hours','start of day','-8 hours'${back})` };
+}
+
+/* ---------------- 访客采集总开关（site_settings.visit_tracking，docs/访客治理方案.md） ---------------- */
+
+async function getVisitTracking(env) {
+  const row = await env.DB
+    .prepare(`SELECT value, updated_at FROM site_settings WHERE key = 'visit_tracking'`)
+    .first();
+  return json({ ok: true, on: !row || row.value !== '0', updated_at: row?.updated_at || null });
+}
+
+async function setVisitTracking(env, request) {
+  const body = await request.json().catch(() => ({}));
+  const on = body.on === true || body.on === 1 || body.on === '1';
+  await env.DB.prepare(
+    `INSERT INTO site_settings (key, value, updated_at) VALUES ('visit_tracking', ?1, datetime('now'))
+     ON CONFLICT (key) DO UPDATE SET value = ?1, updated_at = datetime('now')`
+  ).bind(on ? '1' : '0').run();
+  return json({ ok: true, on });
 }
 
 async function statsOverview(env, request) {
@@ -2490,9 +2512,13 @@ ${BASE_CSS}
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73">
       <input id="auto-refresh" type="checkbox">2 分钟自动刷新
     </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73" title="关闭后主站停止记录访问明细（约 1 分钟内生效），历史数据仍可查询">
+      <input id="visit-tracking" type="checkbox" checked>访客采集
+    </label>
     <span class="updated" id="updated"></span>
     <button id="vrefresh" type="button">刷新</button>
   </div>
+  <div id="tracking-note" style="display:none;margin:10px 0 0;padding:8px 12px;border:1px solid #d64524;border-radius:8px;color:#d64524;font-size:13px">访客采集已关闭——主站已停止记录访问明细（约 1 分钟内全网生效）；历史数据仍可查询，90 天保留清理照常。</div>
   <div class="kpis">
     <div class="kpi">
       <div class="kpi-head"><span>浏览量</span><span class="delta" id="c-delta">–</span></div>
@@ -2954,7 +2980,7 @@ function showView(v, skipHash) {
   el('vtab-ai').classList.toggle('active', v === 'ai');
   el('vtab-acct').classList.toggle('active', v === 'acct');
   if (v === 'msg') load(true);
-  if (v === 'visit') { loadStats(); loadVisitors(true); }
+  if (v === 'visit') { loadStats(); loadVisitors(true); loadTrackingState(); }
   if (v === 'merch') loadMerchants(true);
   if (v === 'tv') loadTv(true);
   if (v === 'books') loadBooks(true);
@@ -3443,6 +3469,23 @@ function renderVisitor(v) {
 
 el('vrefresh').addEventListener('click', function () { loadStats(true); loadVisitors(true, true); });
 el('include-bots').addEventListener('change', function (e) { includeBots = e.target.checked; loadStats(); loadVisitors(true); });
+
+/* ---------- 访客采集总开关（site_settings.visit_tracking，docs/访客治理方案.md） ---------- */
+var trackingOn = true;
+function setTrackingUi(on) {
+  trackingOn = on;
+  el('visit-tracking').checked = on;
+  el('tracking-note').style.display = on ? 'none' : 'block';
+}
+function loadTrackingState() {
+  api('/api/visitor-tracking').then(function (d) { setTrackingUi(d.on); }).catch(function () {});
+}
+el('visit-tracking').addEventListener('change', function (e) {
+  var on = e.target.checked;
+  api('/api/visitor-tracking', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ on: on }) })
+    .then(function (d) { setTrackingUi(d.on); })
+    .catch(function () { e.target.checked = trackingOn; }); // 失败回滚开关显示
+});
 el('auto-refresh').addEventListener('change', function (e) { autoRefresh = e.target.checked; });
 // 维度条长指标切换（浏览/访客）——数据已缓存，切换只重绘不发请求
 document.querySelectorAll('#view-visit .dimm [data-metric]').forEach(function (b) {

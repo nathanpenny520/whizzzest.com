@@ -200,6 +200,24 @@ function visitFlooded(ip) {
   return hits.length > 30;
 }
 
+/* ---------------- 访客采集总开关（site_settings.visit_tracking，后台「访客」页切换） ---------------- */
+
+// 实例内 60s 缓存：每 isolate 每分钟至多 1 次配置读取；无表/无行/查询失败一律默认开
+// （fail-open：配置读失败不应影响采集，写库失败本身已有 catch；关闭是省额度手段，不是安全开关）
+let trackingCache = { at: 0, on: true };
+
+async function visitTrackingOn(env) {
+  if (Date.now() - trackingCache.at > 60 * 1000) {
+    try {
+      const row = await env.DB.prepare(`SELECT value FROM site_settings WHERE key = 'visit_tracking'`).first();
+      trackingCache = { at: Date.now(), on: !row || row.value !== '0' };
+    } catch {
+      trackingCache = { at: Date.now(), on: true };
+    }
+  }
+  return trackingCache.on;
+}
+
 /**
  * 记一次页面访问：读/发匿名 Cookie（vid 1 年、sid 30 分钟滑动），解析环境维度，
  * D1 插入走 ctx.waitUntil；HTML 响应注入回报脚本（页面关闭时上报停留时长）。
@@ -233,6 +251,10 @@ async function trackVisit(request, env, ctx, url, ua, assetRes) {
   //  - IP 脱敏：截断入库（IPv4 /24、IPv6 /48），无 Cookie 访客按截断 IP 粗粒度归组，不存原文
   //  - 扫描器不入明细：扫描/探测请求累加到 scan_stats 日计数表（迁移 003），保留宏观可见性
   //  - 频率熔断：同 IP 文档请求超阈值即停止写库（实例内 best-effort，防恶意刷量）
+  // 访客采集总开关：关闭时不写明细/计数、不注入回报脚本、不下发匿名 Cookie（60s 内全网生效）
+  const tracking = await visitTrackingOn(env);
+  if (!tracking) return new Response(assetRes.body, assetRes);
+
   const rawIp = request.headers.get('cf-connecting-ip') || '';
   const ip = truncIp(rawIp);
   if (!rawIp || !visitFlooded(rawIp)) {

@@ -19,3 +19,4 @@ schema.sql 只是**全量图纸**（不可直接执行，仅作最新结构参�
 | 001-20260907 | ai_knowledge / ai_settings / ai_chats 建表（收编自 scripts/ai-migrate.sql） | 生产/本地均已执行 |
 | 002-20260908 | webauthn_credentials 建表（收编自 scripts/webauthn-migrate.sql） | 生产/本地均已执行 |
 | 003-20260908 | 访客治理：idx_visits_bot_created 复合索引 + scan_stats 日计数表 | 生产/本地均已执行（2026-09-08） |
+| 004-20260908 | site_settings 全站配置表 + visit_tracking 采集总开关默认值 | 生产/本地均已执行（2026-09-08） |
