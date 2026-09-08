@@ -53,6 +53,13 @@
   "ai": {
     "binding": "AI"
   },
+  // 知识库语义检索索引（v1.2 混合检索；1024 维 = @cf/qwen/qwen3-embedding-0.6b，建后不可改）
+  "vectorize": [
+    {
+      "binding": "VEC",
+      "index_name": "whizzzest-ai-knowledge"
+    }
+  ],
   // 商户图片桶（merchant Worker 上传，本 Worker /assets-merchant/* 代理公开读取）
   // 万载TV 媒体桶（admin Worker 上传，本 Worker /media/* 代理公开读取，docs/万载TV方案.md）
   "r2_buckets": [
