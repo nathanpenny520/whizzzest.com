@@ -2032,6 +2032,7 @@ ${BASE_CSS}
     transition: border-color .2s, background .2s;
   }
   .mgrid input:focus, .mgrid select:focus, .mgrid textarea:focus { border-color: #d64524; background: #fff; }
+  .mgrid textarea { resize: vertical; line-height: 1.7; }
   .mst { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
   .mst-pending { background: #fdeee8; color: #d64524; }
   .mst-approved { background: #e5f3e8; color: #1a7f37; }
@@ -2459,9 +2460,9 @@ ${BASE_CSS}
         </select>
       </label>
       <label>模型<select id="ai-model"></select></label>
+      <label class="wide">系统提示词（花傩人设、职责、回复格式；详见 docs/AI助手方案.md）<textarea id="ai-prompt" rows="9"></textarea></label>
+      <label class="wide">欢迎页快捷问题（每行一条，最多 6 条，留空用内置默认）<textarea id="ai-quick" rows="4"></textarea></label>
     </div>
-    <label style="display:block;margin-top:10px">系统提示词（花傩人设、职责、回复格式；详见 docs/AI助手方案.md）<textarea id="ai-prompt" rows="9" style="width:100%"></textarea></label>
-    <label style="display:block;margin-top:10px">欢迎页快捷问题（每行一条，最多 6 条，留空用内置默认）<textarea id="ai-quick" rows="4" style="width:100%"></textarea></label>
     <p class="vhint" id="ai-hint" style="margin-top:8px;display:none"></p>
     <div class="ops" style="margin-top:12px"><button class="primary" id="ai-savesettings" type="button">保存设置</button></div>
   </div>
