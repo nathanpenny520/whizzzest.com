@@ -265,8 +265,8 @@ ${opts.script || ''}
 
 /* ---------------- 登录面板（双方式 + 通行密钥，两门户共用） ---------------- */
 
-/** WebAuthn 浏览器侧编解码（base64url ↔ ArrayBuffer）与响应序列化 */
-const WA_HELPERS = `
+/** WebAuthn 浏览器侧编解码（base64url ↔ ArrayBuffer）；loginPanel 与 admin 登录页共用 */
+export const WA_HELPERS = `
     function b64uToBuf(s) {
       s = s.replace(/-/g, '+').replace(/_/g, '/');
       while (s.length % 4) s += '=';

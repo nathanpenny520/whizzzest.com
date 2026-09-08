@@ -3,6 +3,8 @@
   // 注意：whizzzest.com zone 归属 nathanpenny@qq.com 账号，部署前 wrangler 需登录该账号。
   "name": "whizzzest",
   "compatibility_date": "2026-09-01",
+  // 可观测日志（对齐 admin/writer/merchant 三个子站；docs/全站优化方案.md W4）
+  "observability": { "enabled": true },
   "main": "worker/index.js",
   "assets": {
     "directory": "./dist",

@@ -5,6 +5,8 @@
  *  - GET  /login                 登录页（用户名选填：留空 = 主账号「站长」ADMIN_PASSWORD）
  *  - GET  /                      管理页（留言 / 访客 / 商户 / 视频 / 文库 / 音乐 / 景点 / 账号；视图记忆在 location.hash，刷新不丢）
  *  - POST /api/login             账号密码登录 → 签名会话 Cookie（HttpOnly/Secure/SameSite=Strict）
+ *  - POST /api/webauthn/*        通行密钥（Passkey，shared/webauthn.js portal='admin'）：login-options /
+ *                                login-verify 免密登录；reg-options/reg-verify 添加；delete 删除；GET list 面板用
  *  - POST /api/logout            退出登录
  *  - GET  /api/me                当前登录账号（导航右上角展示用）
  *  - GET  /api/accounts          运营账号列表（D1 admin_users，权限与站长相同）
@@ -51,9 +53,55 @@
  * 凭据：wrangler secret 配 ADMIN_PASSWORD / ADMIN_SESSION_SECRET，不进代码、不进仓库。
  */
 
+import { PASSKEY_DASH_JS, WA_HELPERS } from '../shared/portal-ui.js';
+import { createWebAuthn } from '../shared/webauthn.js';
+
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
 const COOKIE_NAME = 'wa_session';
+
+/* ---------------- 通行密钥（Passkey，shared/webauthn.js）----------------
+ * portal='admin'：站长（uid=0，密码在 secret ADMIN_PASSWORD，无 D1 行）与运营账号（admin_users.id）
+ * 共用 webauthn_credentials 表，凭据与其他子域互不可用。challenge 签名复用 ADMIN_SESSION_SECRET。 */
+function waUser(env, uid) {
+  if (uid === 0) return Promise.resolve({ uid: 0 });
+  return env.DB.prepare('SELECT id, username FROM admin_users WHERE id = ?1').bind(uid)
+    .first().then((row) => (row ? { uid: row.id, username: row.username } : null));
+}
+
+// webauthn 专用 IP 限流（登录验签用；结构与 loginLimited 同）
+const waHits = new Map();
+function waLimited(key, ms, max) {
+  const now = Date.now();
+  const arr = (waHits.get(key) || []).filter((t) => now - t < ms);
+  arr.push(now);
+  waHits.set(key, arr);
+  return arr.length > max;
+}
+
+const wa = createWebAuthn({
+  portal: 'admin',
+  rpName: '焰境·万载 · 管理后台',
+  secret: (env) => env.ADMIN_SESSION_SECRET || null,
+  limited: waLimited,
+  listCredentials: (env, uid) =>
+    env.DB.prepare('SELECT id, credential_id, public_key, counter, transports FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 ORDER BY id')
+      .bind('admin', uid).all().then((r) => r.results || []),
+  findCredential: (env, credId) =>
+    env.DB.prepare('SELECT id, user_id, credential_id, public_key, counter FROM webauthn_credentials WHERE portal = ?1 AND credential_id = ?2')
+      .bind('admin', credId).first(),
+  insertCredential: (env, uid, c, device) =>
+    env.DB.prepare('INSERT INTO webauthn_credentials (portal, user_id, credential_id, public_key, counter, transports, device) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)')
+      .bind('admin', uid, c.id, c.publicKey, c.counter, JSON.stringify(c.transports || []), device).run(),
+  deleteCredential: (env, uid, rowId) =>
+    env.DB.prepare('DELETE FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 AND id = ?3')
+      .bind('admin', uid, rowId).run(),
+  touchCounter: (env, rowId, counter) =>
+    env.DB.prepare('UPDATE webauthn_credentials SET counter = ?2 WHERE id = ?1').bind(rowId, counter).run(),
+  issueSession: (env, uid) => sessionJson(env, uid),
+  userName: (user) => user.username || '站长',
+});
+
 const PAGE_SIZE = 50;
 // 后台页内嵌 favicon（SVG data URI，与主站标签页同款）
 const FAVICON_URI = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB0PSIxNzcwNjM5ODE2OTM3IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTUxMi44IDQyMC44Yy0xNTYuOCAyMzQuNC0xNDEuNiA1NzYuOC00OCA1NzguNCA5Ni44IDIuNC0xNC40LTM5NC40IDQ4LTU3OC40ek00ODAuOCAzOTUuMmMtMjI3LjIgNzQuNC0zOTIgMzExLjItMzI4LjggMzYxLjYgNjQuOCA1MiAxOTEuMi0yNzIgMzI4LjgtMzYxLjZ6TTQ4Ny4yIDM3NkMyOTAuNCAyODggMjQgMzMyIDMxLjIgMzk5LjJjNy4yIDY4LjggMzA3LjItNDkuNiA0NTYtMjMuMnpNNTEyLjggMzU0LjRjLTg5LjYtMTY5LjYtMzAwLTMwMC44LTMzMS4yLTI1Ni0zMiA0Ni40IDI0MS42IDE1MiAzMzEuMiAyNTZ6TTUzMS4yIDM1NC40QzYyNi40IDIyOCA2MzIgMzQuNCA1ODAuOCAyOS42Yy01Mi44LTQuOC03LjIgMjIzLjItNDkuNiAzMjQuOHpNNTQ4IDM2Ni40YzE0NC44IDMuMiAyOTUuMi05NC40IDI3Mi0xMzUuMi0yNC00MS42LTE3My42IDExMi0yNzIgMTM1LjJ6TTU2MS42IDM5OS4yYzE2MCAxMTkuMiA0MjAgMTYwLjggNDMxLjIgMTA5LjYgMTEuMi01Mi44LTI5OS4yLTQ4LjgtNDMxLjItMTA5LjZ6TTUzOS4yIDQyNi40YzI5LjYgMjE2IDIxMS4yIDQxNy42IDI2NC44IDM3NS4yIDU1LjItNDMuMi0yMDcuMi0yMzMuNi0yNjQuOC0zNzUuMnoiIGZpbGw9IiNFODM1MTgiIHAtaWQ9Ijg1MzkiPjwvcGF0aD48cGF0aCBkPSJNOTE5LjIgNjIyLjRsMTYgMzIuOCAzNiA0LjgtMjUuNiAyNS42IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjUuNiAzNi00Ljh6IiBmaWxsPSIjRjREMzFGIiBwLWlkPSI4NTQwIj48L3BhdGg+PHBhdGggZD0iTTUyMCAzMzkuMmwxNiAzMi44IDM2IDUuNi0yNS42IDI0LjggNS42IDM2LTMyLTE2LjgtMzIgMTYuOCA2LjQtMzYtMjYuNC0yNC44IDM2LTUuNnpNMjM5LjIgNzkyLjhsMTQuNCAzMC40IDM0LjQgNC44LTI0LjggMjQgNS42IDMzLjYtMjkuNi0xNi0zMC40IDE2IDUuNi0zMy42LTI0LjgtMjQgMzQuNC00Ljh6TTE1MS4yIDE4OGgtMzJ2LTMyYzAtMi40LTEuNi00LTQtNHMtNCAxLjYtNCA0djMyaC0zMmMtMi40IDAtNCAxLjYtNCA0czEuNiA0IDQgNGgzMnYzMmMwIDIuNCAxLjYgNCA0IDRzNC0xLjYgNC00di0zMmgzMmMyLjQgMCA0LTEuNiA0LTRzLTEuNi00LTQtNHoiIGZpbGw9IiNGNUUzMjgiIHAtaWQ9Ijg1NDEiPjwvcGF0aD48L3N2Zz4=';
@@ -130,6 +178,21 @@ async function handleApi(request, env, path) {
     const res = json({ ok: true });
     res.headers.set('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
     return res;
+  }
+  // 通行密钥：login-options/login-verify 公开（本就在 Cloudflare Access 之后）；
+  // list（看板面板用）/ reg-options / reg-verify / delete 需登录会话
+  if (path === '/api/webauthn/list' && method === 'GET') {
+    const uid = await sessionUid(request, env);
+    if (uid === null) return json({ ok: false, error: 'unauthorized' }, 401);
+    const { results } = await env.DB.prepare(
+      'SELECT id, device, created_at FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 ORDER BY id'
+    ).bind('admin', uid).all();
+    return json({ ok: true, keys: results || [] });
+  }
+  if (path.startsWith('/api/webauthn/')) {
+    const uid = await sessionUid(request, env);
+    const user = uid === null ? null : await waUser(env, uid);
+    return wa.handle(request, env, path, user);
   }
 
   // 其余 API 一律先过会话
@@ -341,6 +404,11 @@ async function handleLogin(request, env) {
     }
   }
 
+  return sessionJson(env, uid);
+}
+
+/** 会话签发（密码登录与 Passkey 登录共用）：200 JSON + 签名会话 Cookie */
+async function sessionJson(env, uid) {
   const exp = String(Date.now() + SESSION_TTL_MS);
   const sig = await hmacHex(env.ADMIN_SESSION_SECRET, uid + '.' + exp);
   const res = json({ ok: true });
@@ -1931,6 +1999,7 @@ const BASE_CSS = `
   tr:last-child td { border-bottom: 0; }
 `;
 
+// 夜空烟花登录页（仅 Cloudflare Access 放行者可见，视觉可放心华丽）
 const LOGIN_HTML = `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -1941,66 +2010,242 @@ ${FAVICON_LINK}
 <title>登录 — 焰境·万载 后台</title>
 <style>
   * { box-sizing: border-box; margin: 0; }
+  html, body { min-height: 100%; }
   body {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: #f5f5f7; color: #1d1d1f;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 0;
+    color: #eef2f8;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(1200px 700px at 75% -10%, rgba(96,64,168,.38), transparent 60%),
+      radial-gradient(900px 600px at 10% 112%, rgba(214,69,36,.24), transparent 55%),
+      linear-gradient(165deg, #0b0e1a 0%, #101528 55%, #1a1030 100%);
   }
+  #fx { position: fixed; inset: 0; z-index: 0; display: block; }
   .card {
-    width: min(360px, calc(100vw - 48px)); padding: 40px 32px;
-    background: #fff; border-radius: 20px; box-shadow: 0 4px 24px rgba(0,0,0,.07);
+    position: relative; z-index: 1;
+    width: min(404px, calc(100vw - 44px)); padding: 36px 34px 30px;
+    background: rgba(255,255,255,.055);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 22px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.12);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
   }
-  h1 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
-  p.sub { color: #6e6e73; font-size: 13px; margin: 6px 0 28px; }
-  label { display: block; font-size: 13px; color: #6e6e73; margin-bottom: 8px; }
+  .mark { display: flex; align-items: center; gap: 11px; }
+  .mark img { width: 30px; height: 30px; filter: drop-shadow(0 0 12px rgba(255,157,60,.55)); }
+  h1 { font-size: 20px; font-weight: 700; letter-spacing: .01em; }
+  p.sub { color: rgba(238,242,248,.58); font-size: 13px; margin: 7px 0 20px; }
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid rgba(255,255,255,.12); margin-bottom: 20px; }
+  .tab { appearance: none; background: none; border: 0; padding: 0 2px 10px; font-size: 14.5px;
+    color: rgba(238,242,248,.55); cursor: pointer; position: relative; font-family: inherit; }
+  .tab:hover { color: rgba(238,242,248,.85); }
+  .tab.active { color: #ffd08a; font-weight: 600; }
+  .tab.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2.5px;
+    border-radius: 2px; background: linear-gradient(90deg,#ff7a45,#ffd166); box-shadow: 0 0 12px rgba(255,157,60,.8); }
+  label { display: block; font-size: 12.5px; color: rgba(238,242,248,.55); margin: 0 0 8px; }
+  .field { margin-bottom: 14px; }
   input {
-    width: 100%; padding: 12px 14px; font-size: 15px; color: #1d1d1f;
-    background: #f5f5f7; border: 1px solid transparent; border-radius: 12px; outline: none;
-    transition: border-color .2s;
+    width: 100%; padding: 12px 14px; font-size: 15px; color: #f4f7fc;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.16); border-radius: 12px; outline: none;
+    transition: border-color .2s, box-shadow .2s, background .2s; font-family: inherit;
   }
-  input:focus { border-color: #d64524; background: #fff; }
-  button {
-    width: 100%; margin-top: 20px; padding: 12px; font-size: 15px; font-weight: 600;
-    color: #fff; background: #d64524; border: 0; border-radius: 980px; cursor: pointer;
+  input::placeholder { color: rgba(238,242,248,.35); }
+  input:focus { border-color: rgba(255,157,60,.75); box-shadow: 0 0 0 3px rgba(255,157,60,.15); background: rgba(255,255,255,.09); }
+  .btn-primary {
+    width: 100%; margin-top: 8px; padding: 13px; font-size: 15px; font-weight: 600; font-family: inherit;
+    color: #fff; background: linear-gradient(135deg, #e0512e, #c93a1b 58%, #ff9d3c 150%);
+    border: 0; border-radius: 12px; cursor: pointer;
+    box-shadow: 0 8px 26px rgba(224,81,46,.38);
+    transition: filter .2s, transform .05s;
   }
-  button:hover { background: #b5371a; }
-  button:disabled { opacity: .5; cursor: default; }
-  .err { display: none; margin-top: 16px; color: #d64524; font-size: 13px; }
+  .btn-primary:hover { filter: brightness(1.12); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary[disabled] { opacity: .55; cursor: default; }
+  .err {
+    display: none; margin-top: 14px; padding: 10px 13px; border-radius: 10px;
+    background: rgba(255,92,61,.14); border: 1px solid rgba(255,92,61,.32);
+    color: #ffb3a3; font-size: 13px; line-height: 1.6;
+  }
+  .hint { margin-top: 14px; font-size: 12px; color: rgba(238,242,248,.42); line-height: 1.75; }
+  .foot { position: fixed; z-index: 1; bottom: 13px; left: 0; right: 0; text-align: center;
+    font-size: 11.5px; color: rgba(238,242,248,.28); pointer-events: none; }
+  [hidden] { display: none !important; }
+  @media (max-width: 480px) { .card { padding: 28px 22px 24px; } }
 </style>
 </head>
 <body>
-<form class="card" id="f">
-  <h1>焰境·万载 · 管理后台</h1>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="card">
+  <div class="mark"><img src="${FAVICON_URI}" alt=""><h1>焰境·万载 · 管理后台</h1></div>
   <p class="sub">whizzzest.com 站点数据管理</p>
-  <label for="user">用户名（选填，运营账号）</label>
-  <input id="user" autocomplete="username" placeholder="主账号「站长」留空即可">
-  <label for="pw">密码</label>
-  <input id="pw" type="password" autocomplete="current-password" required>
-  <button id="btn" type="submit">登 录</button>
-  <div class="err" id="err"></div>
-</form>
+  <div class="tabs" role="tablist">
+    <button type="button" class="tab active" id="t-pw">账密登录</button>
+    <button type="button" class="tab" id="t-pk">通行密钥</button>
+  </div>
+  <form id="f">
+    <div class="field">
+      <label for="user">用户名（选填，运营账号）</label>
+      <input id="user" autocomplete="username" placeholder="主账号「站长」留空即可">
+    </div>
+    <div class="field">
+      <label for="pw">密码</label>
+      <input id="pw" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn-primary" id="btn" type="submit">登 录</button>
+    <div class="err" id="err"></div>
+  </form>
+  <div id="pane-pk" hidden>
+    <p class="hint" style="margin:2px 0 16px">使用已绑定本后台的通行密钥，通过指纹 / 面容 / 设备密码一键登录，无需输入账号密码。</p>
+    <button class="btn-primary" id="pk-go" type="button">使用通行密钥登录</button>
+    <div class="err" id="errp"></div>
+    <p class="hint">还没有通行密钥？先用账密登录，在「账号 → 我的通行密钥」中添加。</p>
+  </div>
+</div>
+<p class="foot">焰境·万载 · 内部系统 · 仅限授权访问</p>
 <script>
-document.getElementById('user').value = new URLSearchParams(location.search).get('u') || '';
-var f = document.getElementById('f');
-f.addEventListener('submit', function (e) {
-  e.preventDefault();
-  var btn = document.getElementById('btn');
-  var err = document.getElementById('err');
-  btn.disabled = true; err.style.display = 'none';
-  fetch('/api/login', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: document.getElementById('user').value, password: document.getElementById('pw').value })
-  }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
-    .then(function (r) {
-      if (r.s === 200 && r.d.ok) { location.href = '/'; return; }
-      var msg = r.d.error === 'rate_limited' ? '尝试过于频繁，请 10 分钟后再试'
-        : r.d.error === 'config_missing' ? '服务端未配置凭据'
-        : r.d.error === 'invalid_credentials' ? '用户名或密码不正确' : '登录失败，请重试';
-      err.textContent = msg; err.style.display = 'block'; btn.disabled = false;
-    })
-    .catch(function () { err.textContent = '网络错误，请重试'; err.style.display = 'block'; btn.disabled = false; });
-});
+(function () {
+  var TABS = [['t-pw', 'f'], ['t-pk', 'pane-pk']];
+  function switchTab(i) {
+    TABS.forEach(function (pair, j) {
+      document.getElementById(pair[0]).classList.toggle('active', j === i);
+      document.getElementById(pair[1]).hidden = j !== i;
+    });
+  }
+  document.getElementById('t-pw').addEventListener('click', function () { switchTab(0); });
+  document.getElementById('t-pk').addEventListener('click', function () { switchTab(1); });
+
+  var ERR_TEXT = { invalid_credentials: '用户名或密码不正确', rate_limited: '尝试过于频繁，请 10 分钟后再试', config_missing: '服务端未配置完成', invalid_json: '提交格式有误' };
+  function showErr(id, t) { var e = document.getElementById(id); e.textContent = t; e.style.display = t ? 'block' : 'none'; }
+
+  document.getElementById('user').value = new URLSearchParams(location.search).get('u') || '';
+  var f = document.getElementById('f');
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('btn');
+    btn.disabled = true; showErr('err', '');
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('user').value, password: document.getElementById('pw').value })
+    }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+      .then(function (r) {
+        if (r.s === 200 && r.d.ok) { location.href = '/'; return; }
+        btn.disabled = false;
+        showErr('err', ERR_TEXT[r.d.error] || '登录失败，请重试');
+      })
+      .catch(function () { btn.disabled = false; showErr('err', '网络错误，请重试'); });
+  });
+
+  // 通行密钥登录（编解码与门户登录页同源：shared/portal-ui.js WA_HELPERS）
+  ${WA_HELPERS}
+  document.getElementById('pk-go').addEventListener('click', function () {
+    var btn = this;
+    if (btn.disabled) return;
+    if (!window.PublicKeyCredential || !navigator.credentials) { showErr('errp', '当前浏览器不支持通行密钥'); return; }
+    btn.disabled = true; showErr('errp', '');
+    fetch('/api/webauthn/login-options', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error('options');
+        var o = d.options;
+        o.challenge = b64uToBuf(o.challenge);
+        if (o.allowCredentials) o.allowCredentials = o.allowCredentials.map(function (c) { c.id = b64uToBuf(c.id); return c; });
+        return navigator.credentials.get({ publicKey: o });
+      })
+      .then(function (cred) {
+        var res = cred.response;
+        return fetch('/api/webauthn/login-verify', { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            id: cred.id, rawId: bufToB64u(cred.rawId), type: cred.type,
+            response: {
+              clientDataJSON: bufToB64u(res.clientDataJSON),
+              authenticatorData: bufToB64u(res.authenticatorData),
+              signature: bufToB64u(res.signature),
+              userHandle: res.userHandle ? bufToB64u(res.userHandle) : null,
+            },
+          }) });
+      })
+      .then(function (r) {
+        if (r.ok) { location.href = '/'; return; }
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          btn.disabled = false;
+          showErr('errp', d && d.error === 'rate' ? '尝试过于频繁，请 10 分钟后再试' : '通行密钥验证未通过，请重试');
+        });
+      })
+      .catch(function () {
+        btn.disabled = false;
+        showErr('errp', '已取消，或本机没有已绑定的通行密钥');
+      });
+  });
+
+  /* ---- 夜空烟花：星空低频自动绽放；prefers-reduced-motion 时退化为静态星空 ---- */
+  var cv = document.getElementById('fx'), cx = cv.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0, stars = [], parts = [], rockets = [], lastLaunch = 0;
+  var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var PALETTE = ['255,209,102', '255,122,69', '74,215,255', '196,146,255', '94,231,183'];
+  function fit() {
+    W = cv.width = Math.floor(innerWidth * DPR);
+    H = cv.height = Math.floor(innerHeight * DPR);
+    cv.style.width = innerWidth + 'px';
+    cv.style.height = innerHeight + 'px';
+    stars = [];
+    var n = Math.floor((innerWidth * innerHeight) / 9000);
+    for (var i = 0; i < n; i++) {
+      stars.push({ x: Math.random() * W, y: Math.random() * H * 0.92, r: (Math.random() * 1.1 + 0.3) * DPR, p: Math.random() * 6.283, s: Math.random() * 1.4 + 0.5 });
+    }
+  }
+  fit();
+  addEventListener('resize', fit);
+  function launch() {
+    rockets.push({ x: (0.15 + Math.random() * 0.7) * W, y: H, vy: -(7.5 + Math.random() * 2.5) * DPR,
+      hue: PALETTE[Math.floor(Math.random() * PALETTE.length)], ty: (0.16 + Math.random() * 0.3) * H });
+  }
+  function explode(x, y, hue) {
+    var n = 42 + Math.floor(Math.random() * 26);
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * 6.283, sp = (Math.random() * 3.4 + 0.6) * DPR;
+      parts.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, dec: Math.random() * 0.012 + 0.008, hue: hue });
+    }
+  }
+  function frame(ts) {
+    cx.clearRect(0, 0, W, H);
+    for (var i = 0; i < stars.length; i++) {
+      var st = stars[i];
+      cx.globalAlpha = 0.22 + 0.34 * (0.5 + 0.5 * Math.sin(st.p + (ts / 1000) * st.s));
+      cx.fillStyle = '#cdd8ee';
+      cx.beginPath(); cx.arc(st.x, st.y, st.r, 0, 6.283); cx.fill();
+    }
+    cx.globalAlpha = 1;
+    if (!REDUCED) {
+      if (ts - lastLaunch > 1100 && rockets.length < 3) { lastLaunch = ts; launch(); }
+      cx.globalCompositeOperation = 'lighter';
+      for (var r = rockets.length - 1; r >= 0; r--) {
+        var rk = rockets[r];
+        rk.y += rk.vy;
+        rk.vy *= 0.985;
+        cx.fillStyle = 'rgba(255,220,160,.85)';
+        cx.beginPath(); cx.arc(rk.x, rk.y, 1.6 * DPR, 0, 6.283); cx.fill();
+        if (rk.vy > -1.2 * DPR || rk.y <= rk.ty) { explode(rk.x, rk.y, rk.hue); rockets.splice(r, 1); }
+      }
+      for (var j = parts.length - 1; j >= 0; j--) {
+        var p = parts[j];
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.045 * DPR;
+        p.vx *= 0.985; p.vy *= 0.985;
+        p.life -= p.dec;
+        if (p.life <= 0) { parts.splice(j, 1); continue; }
+        cx.fillStyle = 'rgba(' + p.hue + ',' + (p.life * 0.9).toFixed(3) + ')';
+        cx.beginPath(); cx.arc(p.x, p.y, (p.life * 1.8 + 0.4) * DPR, 0, 6.283); cx.fill();
+      }
+      cx.globalCompositeOperation = 'source-over';
+      requestAnimationFrame(frame);
+    }
+  }
+  if (REDUCED) frame(0);
+  else requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>`;
@@ -2209,7 +2454,7 @@ ${BASE_CSS}
       <input id="include-bots" type="checkbox">包含扫描/机器人
     </label>
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e6e73">
-      <input id="auto-refresh" type="checkbox" checked>30s 自动刷新
+      <input id="auto-refresh" type="checkbox">30s 自动刷新
     </label>
     <span class="updated" id="updated"></span>
     <button id="vrefresh" type="button">刷新</button>
@@ -2563,6 +2808,15 @@ ${BASE_CSS}
     <p class="tip" style="margin-top:6px">主账号「站长」的密码由服务器密钥 ADMIN_PASSWORD 配置，此处不可修改；下方添加的运营账号与其权限相同。切换账号：右上角账号菜单，或列表中的「切换到此账号」。</p>
   </div>
   <div class="panel">
+    <h3>我的通行密钥</h3>
+    <div class="vwrap"><table>
+      <thead><tr><th>设备</th><th>添加时间</th><th style="width:8em">操作</th></tr></thead>
+      <tbody id="pk-list"><tr><td colspan="3" class="empty">加载中…</td></tr></tbody>
+    </table></div>
+    <div class="ops" style="margin-top:12px"><button class="primary" id="pk-add" type="button">添加通行密钥</button><span id="pk-line" style="margin-left:10px;font-size:13px"></span></div>
+    <p class="tip" style="margin-top:6px">通行密钥绑定当前账号（站长 / 运营账号各自独立），添加后在登录页「通行密钥」Tab 免密登录。注意：本门户在 Cloudflare Access 之后，通行密钥是第二道门内的免密方式，不能替代 Access。</p>
+  </div>
+  <div class="panel">
     <h3>添加账号</h3>
     <div class="mgrid" style="grid-template-columns:1fr 1fr;max-width:520px">
       <label>用户名（2-20 位字母/数字/_/-）<input id="a-user" maxlength="20" autocomplete="off"></label>
@@ -2758,7 +3012,7 @@ el('tab-all').addEventListener('click', function () {
 
 /* ---------- 访客分析 ---------- */
 var includeBots = false;
-var autoRefresh = true;
+var autoRefresh = false; // 默认关：30s×全表扫描烧 D1 读额度（docs/访客治理方案.md R1，阶段一将改造间隔口径）
 
 var lastStats = null;
 var dimMetric = 'pv';
@@ -4445,6 +4699,30 @@ el('alist').addEventListener('click', function (e) {
     api('/api/accounts/' + del, { method: 'DELETE' }).then(loadAccounts);
   }
 });
+
+/* ---------- 我的通行密钥（Passkey；添加流程见下方 PASSKEY_DASH_JS） ---------- */
+function loadPasskeys() {
+  api('/api/webauthn/list').then(function (d) {
+    var rows = (d.keys || []).map(function (k) {
+      return '<tr><td>' + esc(k.device || '通行密钥') + '</td><td>' + esc(fmtTime(k.created_at)) + '</td>' +
+        '<td><div class="ops" style="margin-top:0"><button type="button" class="pk-del" data-id="' + k.id + '">删除</button></div></td></tr>';
+    }).join('');
+    el('pk-list').innerHTML = rows || '<tr><td colspan="3" class="empty">还没有通行密钥，点下方「添加通行密钥」。</td></tr>';
+  }).catch(function (e) {
+    if (e.message !== 'unauthorized') el('pk-list').innerHTML = '<tr><td colspan="3" class="empty">加载失败：' + esc(e.message) + '</td></tr>';
+  });
+}
+loadPasskeys();
+el('pk-list').addEventListener('click', function (e) {
+  var btn = e.target.closest ? e.target.closest('.pk-del') : null;
+  if (!btn) return;
+  if (!confirm('确定删除该通行密钥？删除后将无法用它登录。')) return;
+  api('/api/webauthn/delete', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: Number(btn.getAttribute('data-id')) })
+  }).then(loadPasskeys).catch(function (m) { alert('删除失败：' + m.message); });
+});
+${PASSKEY_DASH_JS}
 
 /* ---------- 右上角账号菜单：切换 / 添加 / 退出 ---------- */
 var drop = el('acct-drop');
