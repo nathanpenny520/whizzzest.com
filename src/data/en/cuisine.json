@@ -1,0 +1,143 @@
+{
+  "meta": {
+    "title": "Local Flavors — Whizzzest",
+    "description": "The Six Bowls of Wanzai, local dishes and traditional specialties — lily bulbs, Luocheng rice noodles, sour jujube cake, Biaoxin paper… gifts of the western-Jiangxi mountains."
+  },
+  "hero": {
+    "title": "Local flavors",
+    "subtitle": "Taste the signature dishes of Wanzai",
+    "img": "liudawan.jpeg"
+  },
+  "groups": [
+    {
+      "title": "The Six Bowls of Wanzai",
+      "dishes": [
+        {
+          "key": "fuGuiYouJuan",
+          "title": "Fugui Oil Rolls",
+          "paras": [
+            "The opening dish of the Six Bowls, also called \"eight-treasure oil rolls\" — the highest courtesy Wanzai offers a guest. Eight ingredients including pork, pork caul fat, dried bamboo shoots and water chestnuts are wrapped in caul fat around a seasoned meat filling and steamed. The skin is soft with a hint of crispness, the filling savory and mellow — layered, generous flavors carrying wishes of prosperity and rising fortune, the dish that begins every proper Wanzai banquet."
+          ],
+          "img": "fuguiyoujuan.jpeg",
+          "ar": "1600/1302"
+        },
+        {
+          "key": "wanzaiZhaRou",
+          "title": "Wanzai Zharou",
+          "paras": [
+            "A traditional dish from the late Ming and early Qing, akin to Yichun's kourou but distinctively Wanzai. Well-marbled pork belly is cured, fried and steamed until glossy and ruby-bright. The meat is rich but never greasy, tender but never dry — it melts on the tongue with deep soy-and-lard aroma. Symbolizing abundance and good fortune, it is the must-have dish of a festive Wanzai table."
+          ],
+          "img": "wanzaizha1rou.jpeg",
+          "ar": "1600/1298"
+        },
+        {
+          "key": "wanzaiZhaRou2",
+          "title": "Wanzai Zharou ('mock' pork)",
+          "paras": [
+            "A signature Wanzai dish of \"rice standing in for meat\" that blurs the line between staple and centerpiece. Local rice flour and fresh pork are blended and steamed; though it holds little actual meat, every bite tastes of it — soft, springy, perfectly salted, soaked in meaty essence without heaviness. A dish of harvest wishes, carved from Wanzai's farming culture."
+          ],
+          "img": "wanzaizha4rou.jpeg",
+          "ar": "1600/1288"
+        },
+        {
+          "key": "wanzaiKuaiYu",
+          "title": "Wanzai Kuaiyu",
+          "paras": [
+            "Fresh local grass carp, cut into even chunks, marinated in rice wine lees and salt, fried golden and then steamed. The outside faintly crisp, the inside silky and tender, deeply savory — even the bones cook soft enough to eat. Golden and inviting on the plate, with the wine lees mellowing any fishiness: a classic festive fish dish that wishes you a smooth year of abundance."
+          ],
+          "img": "wanzaikuaiyu.jpeg",
+          "ar": "1600/1302"
+        },
+        {
+          "key": "kangLeSanHuangJi",
+          "title": "Kangle Three-Yellow Chicken",
+          "paras": [
+            "Free-range local chicken with its hallmark yellow feathers, feet and beak, slow-simmered plainly so the true taste of the bird comes through. The broth is clear and bright, the meat firm yet tender, the skin smooth — nourishing and aromatic. Served at banquets as a centerpiece and treasured as a restorative, it is Wanzai's own flavor at its purest."
+          ],
+          "img": "kanglesanhuangji.jpeg",
+          "ar": "1600/1306"
+        },
+        {
+          "key": "qingDunHeiShanYang",
+          "title": "Stewed Black Goat",
+          "paras": [
+            "The restorative of the Six Bowls: premium local black goat, slow-simmered clear. The broth runs transparent with not a trace of gaminess; the meat is tender, never tough, fragrant to the last bite. Rich in protein and minerals, it is Wanzai's traditional tonic at the winter solstice — every spoonful a gift of nature, warming body and heart alike."
+          ],
+          "img": "qingdunheishanyang.jpeg",
+          "ar": "1600/1302"
+        }
+      ]
+    },
+    {
+      "title": "More local dishes",
+      "dishes": [
+        {
+          "key": "luoChenZhaFen",
+          "title": "Luocheng Zhafen",
+          "paras": [
+            "A provincial-level intangible cultural heritage food of Wanzai, born on the banks of the Taixi River in the Ming dynasty. Made from local early-season rice through soaking, milling, pressing and sun-drying, the noodles are 2–3 mm thick, silver-white and silky, holding firm through long cooking. Flash-fried over a fierce flame, each strand stays distinct — coated in soy fragrance and fresh heat with a unique fermented tang. The classic staple of Wanzai banquets and home kitchens alike."
+          ],
+          "img": "luochenzhafen.jpeg",
+          "ar": "1600/990"
+        },
+        {
+          "key": "wanzaiDuoRou",
+          "title": "Wanzai Duorou",
+          "paras": [
+            "A century-old home-style stir-fry. Fresh local black pork from the shoulder is hand-chopped and seasoned, its fat-to-lean ratio just right, then seared hot with fresh local chilies and garlic sprouts until glossy red. Juicy and tender, the heat of the chili entwined with savory meat, garlic sweetness lingering — the ultimate companion to rice, and the taste of Wanzai nostalgia on every street corner."
+          ],
+          "img": "wanzaiduorou.jpeg",
+          "ar": "1600/914"
+        },
+        {
+          "key": "wanzaiFanYa",
+          "title": "Wanzai Muscovy Duck",
+          "paras": [
+            "A distinctive local poultry dish: free-range black Muscovy duck, lean and firm-fleshed. Braised, stewed clear or simmered with young ginger — braising suits it best, yielding deep aroma, tender meat without a trace of gaminess, and a long, rich broth. Seasoned with local ginger and garlic sprouts, it soaks up the sauce beautifully — the essential dish when Wanzai families host guests or celebrate."
+          ],
+          "img": "wanzaifanya.jpeg",
+          "ar": "1600/914"
+        }
+      ]
+    },
+    {
+      "title": "Traditional specialties",
+      "dishes": [
+        {
+          "key": "wanzaiBaiHe",
+          "title": "Wanzai Lily Bulbs",
+          "paras": [
+            "A food-and-medicine specialty grown locally for a thousand years: the Longya (dragon's tooth) lily. Plump, fiber-free bulbs are stir-fried, steamed or made into soups — milky white, sweet and crisp, with the lily's own fresh fragrance and never a trace of bitterness. Starch-rich and nourishing, it is both a refreshing dish and a natural tonic, carrying wishes of happiness and harmony."
+          ],
+          "img": "baiheshenkai.jpeg",
+          "ar": "1600/951"
+        },
+        {
+          "key": "biaoXinZhi",
+          "title": "Biaoxin Paper",
+          "paras": [
+            "One of Wanzai's three great specialties, a core production center since the Song and at its peak in the Qing. Handmade purely from local moso bamboo, the finished paper is pale yellow with long, fine fibers — tender yet strong, even in thickness, absorbent, durable and quick to catch flame. Once the foundation of Wanzai's wealth, it is still sold to Hunan, Hubei and Southeast Asia — a traditional paper of ritual and folk use."
+          ],
+          "img": "biaoxingzhi.jpeg",
+          "ar": "1600/1189"
+        },
+        {
+          "key": "nanSuanZaoGao",
+          "title": "Wild Sour Jujube Cake",
+          "paras": [
+            "A geographic-indication product of Wanzai, made from wild sour jujubes gathered in the local mountains — no added coloring or gelling agents, slow-cooked the traditional way with modern low-temperature crafting. Amber in color, chewy without sticking to the teeth, sweet-sour with dense fruit aroma and rich in plant flavonoids and natural pectin — a naturally healthy gift for young and old."
+          ],
+          "img": "nansuanzaogao.jpeg",
+          "ar": "764/707"
+        }
+      ]
+    }
+  ],
+  "cta": {
+    "title": "Taste and take home",
+    "desc": "In Wanzai you can taste authentic local dishes, shop for traditional specialties, and bring home a beautiful memory.",
+    "cta": "See food & travel routes",
+    "btn": "See food & travel routes",
+    "href": "/en/tourism/"
+  }
+}

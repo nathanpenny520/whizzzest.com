@@ -29,7 +29,7 @@
       <div class="hero-content">
         <h1>{{data.hero.title}}</h1>
         <p class="hero-sub">{{data.hero.subtitle}}</p>
-        <p class="hero-cta"><a class="btn btn-light" href="/tourism/">{{data.hero.cta}}</a></p>
+        <p class="hero-cta"><a class="btn btn-light" href="{{data.hero.ctaHref}}">{{data.hero.cta}}</a></p>
       </div>
     </section>
 
@@ -160,7 +160,7 @@
       <div class="reveal">
         <h2>{{data.cta.title}}</h2>
         <p>{{data.cta.desc}}</p>
-        <a class="btn" href="/tourism/">{{data.cta.viewRoutes}}</a>
+        <a class="btn" href="{{data.hero.ctaHref}}">{{data.cta.viewRoutes}}</a>
       </div>
     </section>
 

@@ -1,17 +1,18 @@
 {
   "meta": {
-    "title": "Whizzzest — One glimpse, a thousand years of fire",
+    "title": "Whizzzest — One encounter, ten thousand years endure",
     "description": "Explore a thousand years of fireworks culture, living heritage, local flavors and the scenery of Wanzai. The home of Chinese fireworks · Jiangxi, China."
   },
   "hero": {
-    "title": "One glimpse, a thousand years of fire",
+    "title": "One encounter, ten thousand years endure",
     "subtitle": "A thousand years of fireworks, living heritage, distinctive flavors and the scenery of Wanzai",
-    "cta": "See tour routes"
+    "cta": "See tour routes",
+    "ctaHref": "/en/tourism/"
   },
   "carousel": [
     {
       "img": "yzxf_bswz.jpeg",
-      "alt": "One glimpse, a thousand years of fire",
+      "alt": "One encounter, ten thousand years endure",
       "ar": "1600/1116"
     },
     {
@@ -53,21 +54,21 @@
         "title": "Living heritage",
         "desc": "Fireworks, Desheng Drum, Kaikou Nuo and Xiabu weaving — millennium-old traditions alive in the city's daily glow.",
         "learnMore": "Learn more",
-        "href": "/heritage/",
+        "href": "/en/heritage/",
         "img": "nuowu.jpeg"
       },
       {
         "title": "Local flavors",
         "desc": "The Six Bowls, Luocheng rice noodles, lily starch — Wanzai on the tip of your tongue.",
         "learnMore": "Learn more",
-        "href": "/cuisine/",
+        "href": "/en/cuisine/",
         "img": "liudawan.jpeg"
       },
       {
         "title": "Fireworks industry",
         "desc": "One of China's four major fireworks production regions — from family workshops to skies around the globe.",
         "learnMore": "Learn more",
-        "href": "/industry/",
+        "href": "/en/industry/",
         "img": "longhu_yanhuowanhui.jpeg"
       }
     ]
@@ -82,7 +83,7 @@
         "title": "Launch a Wanzai firework in your browser",
         "desc": "A free fireworks simulator — pick your shells, set the rhythm, light up your own night sky.",
         "cta": "Start the show",
-        "href": "/digital-fireworks/"
+        "href": "/en/digital-fireworks/"
       },
       {
         "key": "library",

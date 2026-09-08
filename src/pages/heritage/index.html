@@ -24,7 +24,7 @@
         </div>
         <div class="grid grid-3">
           {{#each data.items as item}}
-          <a class="feature-card reveal" href="/heritage/{{item.key}}/">
+          <a class="feature-card reveal" href="{{page.urlPrefix}}heritage/{{item.key}}/">
             <span class="feature-no">{{item.badge}}</span>
             <h3>{{item.title}}</h3>
             <p>{{item.summary}}</p>

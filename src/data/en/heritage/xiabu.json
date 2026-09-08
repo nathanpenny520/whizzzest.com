@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "title": "Xiabu Weaving — Whizzzest",
+    "description": "Wanzai's Xiabu (ramie grass cloth) weaving joined the national intangible cultural heritage list in 2009 — 1,600 years of history, woven from ramie into a light, breathable summer fabric."
+  },
+  "hero": {
+    "title": "Xiabu weaving",
+    "subtitle": "Sixteen centuries of ramie warp and weft, woven into summer cloth as light as cicada wings",
+    "img": "xiabu.jpg"
+  },
+  "badge": "National ICH · inscribed 2009",
+  "video": "BV1tLL86BEwB",
+  "videoHint": "Video playback may use significant data — Wi-Fi recommended",
+  "paras": [
+    "Xiabu weaving is the traditional handcraft of Wanzai County, its production traceable to the late Eastern Jin — some 1,600 years of history. In 2009, Wanzai's Xiabu weaving craftsmanship was inscribed on the third batch of China's national intangible cultural heritage list.",
+    "Wanzai Xiabu — ramie grass cloth — is woven from ramie fiber through four steps: warping, sizing, mounting the loom and weaving. Light and thin, breathable and absorbent, it is the ideal fabric for summer wear.",
+    "Today Wanzai Xiabu is a specialty product of Jiangxi Province, sold far beyond China's borders and prized by customers at home and abroad."
+  ],
+  "prev": { "href": "/en/heritage/deshenggu/", "label": "Desheng Drum" },
+  "next": { "href": "/en/heritage/kaikounuo/", "label": "Kaikou Nuo" },
+  "cta": {
+    "title": "Experience the heritage",
+    "desc": "Come to Wanzai and experience these living traditions first-hand — a millennium of culture, carried forward and reinvented.",
+    "btn": "See tour routes",
+    "href": "/en/tourism/"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "title": "Zhipeng Folk Songs — Whizzzest",
+    "description": "Zhipeng folk songs are work ballads created by Biaoxin papermakers, listed as Jiangxi provincial intangible cultural heritage in 2007 — over 500 years of melody and local flavor."
+  },
+  "hero": {
+    "title": "Zhipeng folk songs",
+    "subtitle": "Songs sung from the paper sheds — five hundred years of labor and longing",
+    "img": "zhipengshange.jpg"
+  },
+  "badge": "Jiangxi provincial ICH · inscribed 2007",
+  "video": "BV127L86TE2o",
+  "videoHint": "Video playback may use significant data — Wi-Fi recommended",
+  "paras": [
+    "Zhipeng folk songs are the traditional folk music of Wanzai County, born in the Ming dynasty with over 500 years of history. They are mountain songs created by workers making Biaoxin paper as they labored — rich in content and varied in form.",
+    "The songs follow the papermaking steps — cutting bamboo, retting it, drying the paper — and weave together themes of hard work, love between men and women and hopes for the harvest. Melodic and brisk in rhythm, they carry a strong local flavor.",
+    "In March 2007, Zhipeng folk songs were inscribed on the Jiangxi provincial intangible cultural heritage list, becoming one of Wanzai County's most important cultural treasures."
+  ],
+  "prev": { "href": "/en/heritage/kaikounuo/", "label": "Kaikou Nuo" },
+  "next": { "href": "/en/heritage/experience/", "label": "Heritage experiences" },
+  "cta": {
+    "title": "Experience the heritage",
+    "desc": "Come to Wanzai and experience these living traditions first-hand — a millennium of culture, carried forward and reinvented.",
+    "btn": "See tour routes",
+    "href": "/en/tourism/"
+  }
+}

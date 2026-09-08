@@ -1,0 +1,101 @@
+{
+  "meta": {
+    "title": "Tour Routes — Whizzzest",
+    "description": "Ancient City cultural route, mountain-and-water route, red culture route — Wanzai Ancient City, Zhushan Cave and the Jiulong primeval forest, stop by stop."
+  },
+  "hero": {
+    "title": "Tour routes",
+    "subtitle": "Hand-picked itineraries in Wanzai",
+    "img": "wanzai_travelling.jpeg"
+  },
+  "routesTitle": "Itineraries",
+  "routes": [
+    {
+      "name": "Ancient City Cultural Tour",
+      "nameEn": "Ancient City Cultural Tour",
+      "description": "Morning: Wanzai Ancient City → Noon: lunch at Wanzai Kitchen → Afternoon: Xiabu weaving and Desheng Drum → Evening: the Kiss of Flames fireworks show",
+      "img": "guc_wenhua_tra.jpg",
+      "stops": [
+        {
+          "order": 1,
+          "name": "Wanzai Ancient City",
+          "desc": "Tour the ancient ancestral halls and the history & culture museum"
+        },
+        {
+          "order": 2,
+          "name": "Wanzai Kitchen",
+          "desc": "Taste Wanzai's signature dishes"
+        },
+        {
+          "order": 3,
+          "name": "Xiabu weaving experience",
+          "desc": "Try the ramie grass cloth craft yourself"
+        },
+        {
+          "order": 4,
+          "name": "Kiss of Flames fireworks show",
+          "desc": "Watch the fireworks over the ancient city"
+        }
+      ],
+      "ar": "1600/872"
+    },
+    {
+      "name": "Mountain & Water Cultural Tour",
+      "nameEn": "Mountain & Water Cultural Tour",
+      "description": "Morning: Zhushan Cave and Henghui Art Agriculture → Noon: farm-to-table lunch → Afternoon: rafting on the Jiulong primeval forest → Evening: fireworks at Longhu Park",
+      "img": "shans_wenhua_tra.jpeg",
+      "stops": [
+        {
+          "order": 1,
+          "name": "Zhushan Cave",
+          "desc": "Marvel at the karst caverns"
+        },
+        {
+          "order": 2,
+          "name": "Henghui Art Agriculture",
+          "desc": "Tour the art-farm scenery"
+        },
+        {
+          "order": 3,
+          "name": "Jiulong primeval forest",
+          "desc": "Whitewater rafting in the forest"
+        },
+        {
+          "order": 4,
+          "name": "Longhu Park",
+          "desc": "Catch the fireworks festival"
+        }
+      ],
+      "ar": "1600/898"
+    },
+    {
+      "name": "Red Culture Tour",
+      "nameEn": "Red Culture Tour",
+      "description": "Morning: revolutionary memorial halls → Noon: Red Army meal → Afternoon: Xianyuan revolutionary sites → Evening: heritage performances and fireworks",
+      "img": "hongs_wenhua_tra.jpg",
+      "stops": [
+        {
+          "order": 1,
+          "name": "Hunan-Hubei-Jiangxi Revolutionary Memorial Hall",
+          "desc": "Visit the revolutionary memorial hall"
+        },
+        {
+          "order": 2,
+          "name": "Martyrs' Memorial Hall",
+          "desc": "Pay respects to the revolutionary martyrs"
+        },
+        {
+          "order": 3,
+          "name": "Xianyuan revolutionary base sites",
+          "desc": "Walk the Red Army trail"
+        },
+        {
+          "order": 4,
+          "name": "Wanzai Ancient City",
+          "desc": "Heritage performances and the fireworks show"
+        }
+      ],
+      "ar": "1600/892"
+    }
+  ]
+}

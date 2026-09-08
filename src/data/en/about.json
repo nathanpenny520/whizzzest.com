@@ -1,0 +1,208 @@
+{
+  "meta": {
+    "title": "About — Whizzzest",
+    "description": "The Whizzzest team — our story, mission and vision, journey, partners and every way to reach us."
+  },
+  "hero": {
+    "title": "About us",
+    "subtitle": "The team behind Whizzzest",
+    "img": "student-team.jpg"
+  },
+  "team": {
+    "title": "Our team",
+    "members": [
+      {
+        "name": "Long Ziqin",
+        "role": "Project Lead",
+        "description": "Steers overall strategy and team collaboration, coordinating resources to keep the project moving fast and hitting its core goals.",
+        "initial": "L",
+        "icon": "assets/img/team-longziqin.jpeg"
+      },
+      {
+        "name": "Nie Pan",
+        "role": "Technical Architect",
+        "description": "Leads full-stack development and system architecture, building a high-performance platform with a modern stack and a smooth user experience.",
+        "initial": "N",
+        "icon": "assets/img/team-niepan.jpeg"
+      },
+      {
+        "name": "Huang Jingyao",
+        "role": "Brand & Operations Director",
+        "description": "Runs the social media matrix and brand communication strategy, planning creative content campaigns to grow the platform's reach and influence.",
+        "initial": "H",
+        "icon": "assets/img/team-huangjingyao.jpeg"
+      },
+      {
+        "name": "Long Zixuan",
+        "role": "Video Creative Director",
+        "description": "Leads visual content planning and production, using the language of film to bring out the unique charm of Wanzai's fireworks culture.",
+        "initial": "L",
+        "icon": "assets/img/team-longzixuan.jpeg"
+      },
+      {
+        "name": "Wen Kejia",
+        "role": "Content Strategy Director",
+        "description": "Shapes the platform's content planning and project briefs, digging into the cultural stories behind Wanzai to craft the brand's narrative voice.",
+        "initial": "W",
+        "icon": "assets/img/team-wenkejia.jpeg"
+      },
+      {
+        "name": "Claude AI",
+        "role": "AI Teammate",
+        "description": "Powers the site-wide \"Huanuo\" Q&A assistant (Workers AI + a RAG knowledge base) and pitches in on copywriting, code review and visual work — the team's always-on AI teammate.",
+        "initial": "C",
+        "icon": "icons/claude.svg"
+      }
+    ]
+  },
+  "background": {
+    "title": "Our story",
+    "originTitle": "Why we started",
+    "originDesc": "Whizzzest was founded by university students in Beijing who love their hometown's culture. We wanted to use modern technology to help more people discover Wanzai — a small city with a millennium of fireworks history.",
+    "goalTitle": "What we aim to do",
+    "goalDesc": "Our goal is to put AI to work for Wanzai's culture and tourism: share the city's unique charm with the world, welcome more visitors to the hometown of fireworks, and support high-quality growth for the local tourism industry."
+  },
+  "mission": {
+    "title": "Mission & vision",
+    "missionTitle": "Our mission",
+    "missionDesc": "To carry forward Wanzai's millennium-old fireworks culture so that every visitor can feel the warmth and charm of this city. We are building the most complete Wanzai travel and culture platform — making trip planning effortless and local culture easy to experience deeply.",
+    "visionTitle": "Our vision",
+    "visionDesc": "To become a model for digital transformation of county-level tourism and new-media operations. Working closely with local businesses and government, we want Whizzzest to be the front door through which visitors in China and abroad get to know Wanzai — and, in time, to turn this path into a blueprint other counties can follow."
+  },
+  "tech": {
+    "title": "Under the hood",
+    "edgeTitle": "Global edge computing",
+    "edgeDesc": "The whole site runs on Cloudflare's global edge network: static builds are served from 300+ edge locations worldwide, while merchants, the library, Wanzai TV, music and attractions render dynamically on Workers at the edge, with D1 and R2 close by. Even on slow connections, first paint takes about 1.5 seconds.",
+    "zeroTitle": "Zero-dependency engineering",
+    "zeroDesc": "No frontend frameworks — the entire site is native HTML/CSS/JavaScript with our own zero-dependency build pipeline. Images are auto-optimized into responsive WebP variants, and AI inference (Workers AI) and email stay closed-loop on the same domain. Fast, secure, and fully under our control."
+  },
+  "stats": {
+    "title": "The platform at a glance",
+    "items": [
+      { "key": "heritage", "value": 6, "label": "Heritage items", "unit": "" },
+      { "key": "videos", "value": "–", "label": "Video episodes", "unit": "" },
+      { "key": "tracks", "value": "–", "label": "Music tracks", "unit": "" },
+      { "key": "attractions", "value": "–", "label": "Attractions", "unit": "" },
+      { "key": "books", "value": "–", "label": "Library works", "unit": "" },
+      { "key": "merchants", "value": "–", "label": "Merchants", "unit": "" }
+    ]
+  },
+  "timeline": {
+    "title": "Our journey",
+    "events": [
+      {
+        "date": "December 2025",
+        "title": "Project kickoff",
+        "description": "The team formed, completed feasibility analysis and market research, defined the platform's positioning and strategy, and started technical preparation."
+      },
+      {
+        "date": "January–February 2026",
+        "title": "Product development",
+        "description": "Prototype and core features built on Vue 3 + Tailwind CSS, launching the heritage and cuisine modules with a high-performance user experience."
+      },
+      {
+        "date": "Late February 2026",
+        "title": "Public launch",
+        "description": "The platform went live to the public, with a first round of user testing and optimization, establishing the brand and its market position."
+      },
+      {
+        "date": "April 2026",
+        "title": "Brand building",
+        "description": "Launched the new-media strategy with WeChat, Douyin and other channels, steadily widening the platform's reach and influence."
+      },
+      {
+        "date": "September 2026",
+        "title": "Rebrand & rebuild",
+        "description": "Switched to the whizzzest.com domain and rebuilt the entire site on zero-dependency native web technology, hosted on Cloudflare's global edge — a full upgrade in speed and experience."
+      },
+      {
+        "date": "September 2026",
+        "title": "Merchant ecosystem",
+        "description": "The \"Whizzzest Picks\" merchant system went end-to-end: listings, self-service onboarding, email-code sign-in and a paid verified-prominence loop, with merchant data managed authoritatively at the edge."
+      },
+      {
+        "date": "September 2026",
+        "title": "Wanzai TV on air",
+        "description": "The video channel launched with streaming uploads from the admin console and Bilibili integration — the full web series \"One Encounter, Ten Thousand Years\" and the city film \"Meet Wanzai\" are now in the library."
+      },
+      {
+        "date": "September 2026",
+        "title": "Library & media",
+        "description": "The Whizzzest Library and its author portal (writer.whizzzest.com) went live with two-level review for works and chapters; the Wanzai music player and the attractions gallery arrived in the same wave — the content matrix was complete."
+      },
+      {
+        "date": "September 2026",
+        "title": "AI & interactive experiences",
+        "description": "The site-wide AI assistant \"Huanuo\" launched (Workers AI + RAG knowledge base) to answer anything Wanzai; the digital fireworks simulator opened for visitors to light a Wanzai firework with their own hands."
+      },
+      {
+        "date": "September 2026",
+        "title": "Data-driven operations",
+        "description": "Multi-account admin console and visitor analytics dashboards came online, connecting content review and data insight end to end; GitHub Actions now ships every iteration to production in minutes."
+      }
+    ]
+  },
+  "partners": {
+    "title": "Partners",
+    "list": [
+      {
+        "name": "Wanzai Culture & Tourism Bureau",
+        "href": "",
+        "qr": "wanzai_wenlv_QR.png",
+        "cap": "Wanzai Culture & Tourism Bureau · WeChat official account"
+      },
+      {
+        "name": "Wanzai Ancient City",
+        "href": "http://zgwzgc.com/",
+        "qr": ""
+      },
+      {
+        "name": "Caitian Art Fireworks",
+        "href": "https://wwbnn.lanzouu.com/i5Esy3j90hcb",
+        "qr": ""
+      },
+      {
+        "name": "Tailin Fireworks",
+        "href": "http://www.wztlhp.com/",
+        "qr": ""
+      }
+    ]
+  },
+  "contact": {
+    "title": "Contact us",
+    "qrs": [
+      {
+        "label": "WeChat official account",
+        "value": "云上万载-焰遇乡旅",
+        "qr": "wxofficial.jpg"
+      },
+      {
+        "label": "WeChat Channels",
+        "value": "焰境·万载",
+        "qr": "videoaccount.jpeg"
+      }
+    ],
+    "links": [
+      {
+        "label": "Email",
+        "value": "contact@whizzzest.com",
+        "href": "mailto:contact@whizzzest.com"
+      },
+      {
+        "label": "Douyin",
+        "value": "焰境·万载",
+        "href": "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8"
+      },
+      {
+        "label": "Live chat",
+        "value": "WeChat customer service",
+        "href": "https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8"
+      },
+      {
+        "label": "Xiaohongshu (RED)",
+        "value": "焰境·万载",
+        "href": "https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4"
+      }
+    ]
+  }
+}

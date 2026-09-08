@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "title": "Viewing Spots — Whizzzest",
+    "description": "Wanzai Ancient City and Longhu Park — the best spots and transport tips for watching fireworks. Every Saturday at 8 pm, the Kiss of Flames lights up the sky."
+  },
+  "hero": {
+    "title": "Fireworks viewing spots",
+    "subtitle": "The best places to watch the fireworks",
+    "img": "viewingspots_hero.jpeg"
+  },
+  "viewingLabel": "Best viewing spots",
+  "transportLabel": "Getting there",
+  "spots": [
+    {
+      "name": "Wanzai Ancient City",
+      "desc": "Wanzai Ancient City is one of the best places to watch the fireworks: every Saturday at 8:00 pm the free \"Kiss of Flames\" show lights up the sky for 30 minutes. Stone-paved lanes, horse-head gables and brilliant fireworks mirror one another in a picture-perfect scene.",
+      "viewing": "Lüyin Square, the riverside promenade and the ancient city viewing terrace",
+      "transport": "In the heart of Wanzai's county seat — reachable by bus or taxi",
+      "img": "guchen_niaokan.jpeg",
+      "ar": "1600/897"
+    },
+    {
+      "name": "Longhu Park",
+      "desc": "Longhu Park is Wanzai's urban park, with a broad lake and open sightlines — an ideal fireworks vantage point. The bursts reflected in the water make for a double visual treat.",
+      "viewing": "The lakeside boardwalk, the mid-lake pavilion and the lakeside lawns",
+      "transport": "In the southwest of the county seat — reachable by bus or taxi",
+      "img": "longhu_niaokan.jpeg",
+      "ar": "1600/898"
+    }
+  ],
+  "tipsTitle": "Viewing tips",
+  "tips": [
+    {
+      "title": "Best times to watch",
+      "items": [
+        "Every Saturday, 8:00–8:30 pm (Wanzai Ancient City fireworks show)",
+        "Major holidays (Spring Festival, Lantern Festival, National Day) and the Wanzai Fireworks Festival",
+        "Summer evenings — cooler air, perfect for the outdoors",
+        "Spring and autumn — mild weather and lovely scenery",
+        "Snowy winter nights — fireworks dancing with falling snow"
+      ]
+    },
+    {
+      "title": "Good to know",
+      "items": [
+        "Arrive early to claim a good vantage point",
+        "Stay safe: keep clear of launch sites and choose open ground",
+        "Protect the environment — take your litter with you",
+        "Follow on-site staff instructions",
+        "Bring a camera or phone to capture the moment"
+      ]
+    }
+  ]
+}

@@ -1,12 +1,48 @@
 {
   "name": "Whizzzest",
-  "tagline": "One glimpse, a thousand years of fire",
+  "tagline": "One encounter, ten thousand years endure",
   "email": "contact@whizzzest.com",
   "navHome": "/en/",
   "nav": [
     {
-      "href": "/en/",
-      "label": "Home"
+      "href": "/en/heritage/",
+      "label": "Heritage",
+      "menu": [
+        { "href": "/en/heritage/", "label": "Heritage overview" },
+        { "href": "/en/heritage/fireworks/", "label": "Wanzai fireworks" },
+        { "href": "/en/heritage/deshenggu/", "label": "Desheng Drum" },
+        { "href": "/en/heritage/xiabu/", "label": "Xiabu weaving" },
+        { "href": "/en/heritage/kaikounuo/", "label": "Kaikou Nuo" },
+        { "href": "/en/heritage/zhipeng/", "label": "Zhipeng folk songs" },
+        { "href": "/en/heritage/experience/", "label": "Heritage experiences" }
+      ]
+    },
+    {
+      "href": "/en/cuisine/",
+      "label": "Cuisine",
+      "menu": [
+        { "href": "/en/cuisine/", "label": "Cuisine overview" }
+      ]
+    },
+    {
+      "href": "/en/industry/",
+      "label": "Fireworks",
+      "menu": [
+        { "href": "/en/industry/", "label": "Fireworks industry" },
+        { "href": "/en/spots/", "label": "Viewing spots" },
+        { "href": "/en/digital-fireworks/", "label": "Digital fireworks" }
+      ]
+    },
+    {
+      "href": "/en/tourism/",
+      "label": "Travel",
+      "menu": [
+        { "href": "/en/tourism/", "label": "Tour routes" }
+      ]
+    },
+    {
+      "href": "/en/about/",
+      "label": "About"
     }
   ],
   "footer": {
@@ -27,8 +63,34 @@
       "赣ICP备2026003337号-1"
     ],
     "beianHref": "https://beian.miit.gov.cn/",
-    "socials": [],
-    "aboutHref": "/about/"
+    "socials": [
+      {
+        "icon": "x",
+        "label": "X (Twitter)",
+        "href": "https://x.com/NathanPenny520"
+      },
+      {
+        "icon": "discord",
+        "label": "Discord",
+        "href": "https://discord.gg/2BkpXgYNQ"
+      },
+      {
+        "icon": "facebook",
+        "label": "Facebook",
+        "href": "https://www.facebook.com/profile.php?id=61590685587340"
+      },
+      {
+        "icon": "instagram",
+        "label": "Instagram",
+        "href": "https://www.instagram.com/nathanpenny520/"
+      },
+      {
+        "icon": "youtube",
+        "label": "YouTube",
+        "href": "https://www.youtube.com/channel/UC_MydWjbYuZ5Z9Aa4EltDWw"
+      }
+    ],
+    "aboutHref": "/en/about/"
   },
   "manifest": {
     "name": "Whizzzest",
