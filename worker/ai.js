@@ -12,12 +12,14 @@
  *    OpenAI 兼容 REST 兜底；AI_PROVIDER=rest 直走 REST（本地联调用，.dev.vars 配置）
  *  - 检索 v2（2026-09-08）：关键词计分（keywords + 类目滑窗 + 正问滑窗互证）∪ 向量语义
  *    （@cf/qwen/qwen3-embedding-0.6b → Vectorize whizzzest-ai-knowledge）∪ 实体名直配
- *    （全部上线景点/认证商户，修实时数据只注入 Top8 的盲区）；语义通道失败自动退纯关键词
+ *    （全部上线景点/认证商户，修实时数据只注入 Top8 的盲区）；语义通道失败自动退纯关键词；
+ *    语义嵌入只依赖问题文本，与 D1 检索并行点火（不串行排队）
  *  - 向量懒同步：每问后台比对 describe().vectorCount 与 D1 published 数（60s 缓存），
  *    不一致或 admin 置 vec_dirty 脏标记时全量重嵌入（admin 增删改知识时也即时维护单条）
  *  - 日额度熔断：当日 ai_chats 超过 AI_DAILY_CAP（默认 500，免费额度 ≈450 问）后降级
  *    纯检索模式——直接返回命中的知识库原文，不再调模型，功能不断、成本归零
- *  - 设置/知识库 60s 隔离内存缓存：后台改动最迟 1 分钟生效，换取每次问答少两次 D1 读
+ *  - 设置/知识库 60s、实时数据 30s 隔离内存缓存：后台改动最迟 1 分钟生效，
+ *    换取每次问答少三到五次 D1 读
  *  - 模型名只认白名单，设置被改坏也兜底回默认模型
  */
 
@@ -28,6 +30,7 @@ const HISTORY_TURNS = 6;                 // 带给模型的最近轮数（含 us
 const HISTORY_ITEM_MAX = 500;
 const AI_TIMEOUT_MS = 30_000;
 const CACHE_TTL_MS = 60_000;
+const LIVE_TTL_MS = 30_000;              // 实时数据短缓存：景点/商户/计数改动最迟 30s 进问答
 
 const MODEL_ALLOW = new Set([
   '@cf/qwen/qwen3-30b-a3b-fp8',          // 默认：MoE 快、中文强、便宜（≈22 neuron/轮）
@@ -115,17 +118,20 @@ export async function handleAiChat(request, env, ctx) {
   const t0 = Date.now();
   try {
     const capped = await overDailyCap(env);
+
+    // 语义通道提前点火：嵌入/向量查询只依赖问题文本，与下面的 D1 检索并行跑
+    const semPromise = (!capped && env.VEC)
+      ? semanticHits(env, question).catch((err) => {
+          console.error('ai semantic query failed:', err?.message || err);
+          return [];
+        })
+      : Promise.resolve([]);
+
     const [knowledge, live] = await Promise.all([
       loadKnowledge(env),
       capped ? Promise.resolve(null) : loadLiveData(env),
     ]);
-
-    // 语义通道：失败不挡问答（退纯关键词）；熔断时跳过省嵌入开销
-    let semHits = [];
-    if (!capped && env.VEC) {
-      try { semHits = await semanticHits(env, question); }
-      catch (err) { console.error('ai semantic query failed:', err?.message || err); }
-    }
+    const semHits = capped ? [] : await semPromise;
 
     const matched = retrieveKnowledge(question, knowledge, semHits, live ? live.entities : null);
     const sources = [...new Set(matched.map((k) => k.category))];
@@ -469,6 +475,8 @@ export function retrieveKnowledge(question, rows, semHits = [], entities = null)
  * 同时产出实体池（name+info）供检索直配——问第 9 个之后的景点也能命中。
  */
 async function loadLiveData(env) {
+  const cache = ((globalThis.__aiCache ??= {}).__live ??= { at: 0, data: { block: '', entities: [] } });
+  if (Date.now() - cache.at < LIVE_TTL_MS) return cache.data;
   try {
     const [attractions, merchants, counts] = await Promise.all([
       env.DB.prepare(
@@ -515,13 +523,15 @@ async function loadLiveData(env) {
       })),
     ].filter((e) => e.name && e.name.length >= 2);
 
-    return {
+    cache.data = {
       block: lines.length ? '[站内实时数据]\n' + lines.join('\n') : '',
       entities,
     };
+    cache.at = Date.now();
+    return cache.data;
   } catch (err) {
     console.error('ai live data failed:', err);
-    return { block: '', entities: [] }; // 实时数据是增强项，失败不挡问答
+    return { block: '', entities: [] }; // 实时数据是增强项，失败不挡问答（失败态不缓存）
   }
 }
 
