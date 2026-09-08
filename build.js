@@ -39,7 +39,9 @@ const LOCALES = [
   { code: 'en', urlPrefix: 'en', htmlLang: 'en', hreflang: 'en', ogLocale: 'en_US', label: 'English' },
 ];
 const DEFAULT_LOCALE = LOCALES[0];
-// 已知 Worker 动态板块（zh-only，二期出 EN）：EN 页链接到它们降级为中文页，计入报告不拦截
+// 已知 Worker 动态板块：/en/<section> 已由 Worker 渲染（Phase 3），链接视为存在；
+// 其余 zh-only 动态路由（/pay /api）从 EN 页抵达视为降级，计入报告不拦截
+const EN_DYNAMIC_PREFIXES = ['/en/tv', '/en/library', '/en/music', '/en/attractions', '/en/merchants'];
 const DYNAMIC_ZH_ROUTES = ['/merchants', '/tv', '/library', '/music', '/attractions', '/pay', '/api'];
 const LOOSE = process.argv.includes('--loose');
 
@@ -462,6 +464,8 @@ function validateBuilt(built, producedDirs) {
           // 本语言内部链接：剥离 locale 前缀后按资产/页面判断
           const inner = target === `/${loc.urlPrefix}` ? '/' : target.slice(`/${loc.urlPrefix}`.length);
           if (ASSET_PREFIXES.some((p) => inner.startsWith(p) || inner === p)) continue;
+          // Worker 渲染的动态板块（/en/tv 等）运行时必然存在，视为有效
+          if (EN_DYNAMIC_PREFIXES.some((p) => target === p || target.startsWith(`${p}/`))) continue;
           if (!producedSet.has(target)) {
             problems.push(`[${loc.code}] ${b.slug} → ${raw}（${loc.code} 未产出）`);
           }
@@ -683,14 +687,22 @@ ${zhPages
     '/assets/css/ai-chat.css': hashFile(path.join(DIST, 'assets/css/ai-chat.css')),
     '/assets/js/ai-chat.js': hashFile(path.join(DIST, 'assets/js/ai-chat.js')),
   };
-  // 供主 Worker 渲染 /tv /library /music /attractions /merchants 时复用全站页头/页脚
-  // （编译产物，导航改了随构建同步）。须在指纹回写前生成，页脚里的 ai-chat 引用才能拿到 ?v=。
-  // 动态页暂为 zh-only：用默认语言的 site 与 strings 编译（切换器 page.locales 无上下文 → 不渲染）
-  const siteCtx = { site: sites[DEFAULT_LOCALE.code], t: stringsByLocale[DEFAULT_LOCALE.code] };
-  fs.mkdirSync(path.join(DIST, 'partials'), { recursive: true });
-  for (const name of ['header', 'footer']) {
-    const compiled = render(read(path.join(PARTIALS_DIR, `${name}.html`)), siteCtx);
-    fs.writeFileSync(path.join(DIST, 'partials', `${name}.html`), compiled);
+  // 供主 Worker 渲染动态板块（/tv /library /music /attractions /merchants 及其 /en 子树）
+  // 复用的页头/页脚：按 locale 各编译一份到 dist/partials/<code>/（须在指纹回写前生成，
+  // 页脚里的 ai-chat 引用才能拿到 ?v=）。切换器 page.locales 给「对应语言首页」的兜底 href——
+  // 动态页无构建期当前页上下文，main.js 按 data-locale-switch 在运行时重写为前缀+当前路径。
+  for (const loc of LOCALES) {
+    const other = LOCALES.find((l) => l.code !== loc.code);
+    const workerCtx = {
+      site: sites[loc.code],
+      t: stringsByLocale[loc.code],
+      page: { locales: [{ label: other.label, hreflang: other.hreflang, href: localePrefix(other) }] },
+    };
+    fs.mkdirSync(path.join(DIST, 'partials', loc.code), { recursive: true });
+    for (const name of ['header', 'footer']) {
+      const compiled = render(read(path.join(PARTIALS_DIR, `${name}.html`)), workerCtx);
+      fs.writeFileSync(path.join(DIST, 'partials', loc.code, `${name}.html`), compiled);
+    }
   }
 
   const bumpAssetUrls = (file) => {
@@ -708,8 +720,11 @@ ${zhPages
     }
   })(DIST);
 
-  // Worker 页面引用带指纹的 CSS/JS 用
-  fs.writeFileSync(path.join(DIST, 'build-meta.json'), JSON.stringify(versions));
+  // Worker 页面引用带指纹的 CSS/JS 用；i18n 为动态页注入 main.js 的 per-locale JS 文案表
+  fs.writeFileSync(
+    path.join(DIST, 'build-meta.json'),
+    JSON.stringify({ ...versions, i18n: { zh: stringsByLocale.zh.js, en: stringsByLocale.en.js } })
+  );
 
   // PWA Service Worker（docs/PWA应用方案.md §3.2）：public/sw.js 是模板，预缓存清单与脏戳
   // 由构建注入 → dist/sw.js。清单带 ?v= 指纹、脏戳取指纹哈希——任一资产内容变化 SW 字节即变，

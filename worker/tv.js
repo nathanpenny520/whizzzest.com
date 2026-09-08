@@ -1,43 +1,37 @@
 /**
- * /tv/* 万载TV 视频频道 + /media/* R2 媒体代理（docs/万载TV方案.md）
+ * /tv/* + /en/tv/* 万载TV 视频频道 + /media/* R2 媒体代理（docs/万载TV方案.md，双语 docs/英文版方案.md Phase 3）
  *  - GET /tv/                 频道页（焦点位 + 短剧货架 + 分类 Tab + 视频网格，深色影院模式）
  *  - GET /tv/<id>/            详情页（大播放器 + 本剧选集/相关视频，VideoObject 结构化数据）
- *  - GET /tv/sitemap.xml      已上线视频 sitemap 片段
+ *  - GET /tv/sitemap.xml      已上线视频 sitemap 片段（zh-only，EN 动态页暂不入 sitemap）
  *  - GET /media/<key>         R2 对象代理（admin Worker 上传，支持 Range 视频拖动）
  *
  * 内容以 D1 为权威：admin 发布即时生效，不依赖构建（对标 /merchants/*，2026-09-06）。
- * 页头/页脚复用构建产物 dist/partials/*.html（build.js 每次构建同步），样式走带指纹的 style.css。
+ * D1 内容暂无双语字段 → EN 页界面英文、内容回退中文原文（admin 双语录入后替换）。
+ * 页头/页脚复用构建产物 dist/partials/<locale>/*.html（build.js 每次构建按 locale 同步）。
  * B站播放器重（iframe 数 MB），一律「lite facade」：先渲染封面，点击才插入 iframe（autoplay=1）。
  */
-
-const CATEGORIES = {
-  drama: '短剧',
-  fireworks: '烟花',
-  heritage: '非遗',
-  food: '美食',
-  tourism: '文旅',
-  other: '其他',
-};
+import { UI, LOCALES } from './strings.js';
 
 const SITE_URL = 'https://whizzzest.com';
 
 const PUB_WHERE = "status = 'published'";
 
-export async function handleTv(request, env, url, ctx) {
+export async function handleTv(request, env, url, ctx, loc = 'zh') {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response(null, { status: 405, headers: { allow: 'GET' } });
   }
 
-  const path = url.pathname.replace(/\/+$/, '') || '/';
+  const P = LOCALES[loc].prefix;
+  const path = url.pathname.replace(/\/+$/, '').slice(P.length) || '/';
 
   if (path === '/tv/sitemap.xml') return tvSitemap(env);
 
-  if (path === '/tv') return tvHome(env, url, ctx);
+  if (path === '/tv') return tvHome(env, url, ctx, loc);
 
   const m = path.match(/^\/tv\/(\d+)$/);
-  if (m) return tvDetail(env, url, ctx, Number(m[1]));
+  if (m) return tvDetail(env, url, ctx, Number(m[1]), loc);
 
-  return notFound(env, url);
+  return notFound(env, url, loc);
 }
 
 /* ---------------- /media/ R2 代理（视频拖动需 Range 支持） ---------------- */
@@ -107,16 +101,18 @@ function fmtDur(sec) {
 function isoDur(sec) {
   sec = Number(sec) || 0;
   const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
+  const m = Math.floor(sec / 60) % 60;
   const s = sec % 60;
   return 'PT' + (h ? h + 'H' : '') + (m ? m + 'M' : '') + (s ? s + 'S' : sec ? '' : 'S');
 }
 
 /* ---------------- 频道页 ---------------- */
 
-async function tvHome(env, url, ctx) {
-  const chrome = await getChrome(env);
-  const cat = CATEGORIES[url.searchParams.get('cat')] ? url.searchParams.get('cat') : '';
+async function tvHome(env, url, ctx, loc) {
+  const t = UI[loc].tv;
+  const P = LOCALES[loc].prefix;
+  const chrome = await getChrome(env, loc);
+  const cat = t.cats[url.searchParams.get('cat')] ? url.searchParams.get('cat') : '';
 
   const [featured, list, scovers] = await Promise.all([
     env.DB.prepare(`SELECT * FROM videos WHERE ${PUB_WHERE} AND featured = 1 ORDER BY id DESC LIMIT 1`).first(),
@@ -147,49 +143,48 @@ async function tvHome(env, url, ctx) {
       const media = sc
         ? `<img src="${esc(sc.startsWith('/') ? sc : '/media/' + sc)}" alt="${esc(name)}" loading="eager" decoding="async">`
         : cardMedia(latest, true);
-      return `<a class="tv-dcard" href="/tv/${latest.id}/">
-        <div class="tv-dmedia">${media}<span class="tv-dbadge">更新至 ${latest.episode || eps} 集</span></div>
-        <h3>${esc(name)}</h3><p>${esc(CATEGORIES[latest.category] || '短剧')} · 共 ${eps} 集</p>
+      return `<a class="tv-dcard" href="${P}/tv/${latest.id}/">
+        <div class="tv-dmedia">${media}<span class="tv-dbadge">${t.epBadge.replace('{n}', latest.episode || eps)}</span></div>
+        <h3>${esc(name)}</h3><p>${esc(t.cats[latest.category] || t.video)} · ${t.epsTotal.replace('{n}', eps)}</p>
       </a>`;
     })
     .join('');
 
   const tabs = [
-    `<a class="tv-tab${cat === '' ? ' on' : ''}" href="/tv/">全部</a>`,
-    ...Object.entries(CATEGORIES)
+    `<a class="tv-tab${cat === '' ? ' on' : ''}" href="${P}/tv/">${t.all}</a>`,
+    ...Object.entries(t.cats)
       .filter(([k]) => k !== 'other' || cat === 'other')
-      .map(([k, label]) => `<a class="tv-tab${k === cat ? ' on' : ''}" href="/tv/?cat=${k}">${label}</a>`),
+      .map(([k, label]) => `<a class="tv-tab${k === cat ? ' on' : ''}" href="${P}/tv/?cat=${k}">${label}</a>`),
   ].join('');
 
   const grid = items.length
-    ? `<div class="tv-grid">${items.map(card).join('')}</div>`
-    : `<div class="tv-empty"><p>节目筹备中，敬请期待。</p><p class="sub">视频素材持续更新中 —— 短剧、烟花、非遗、美食，一屏看尽焰火人间。</p></div>`;
+    ? `<div class="tv-grid">${items.map((v) => card(v, loc)).join('')}</div>`
+    : `<div class="tv-empty"><p>${t.empty}</p><p class="sub">${t.emptySub}</p></div>`;
 
   const body = `
     <div class="tv-page">
     <section class="tv-hero">
       <div class="container-wide">
-        <p class="tv-kicker">万载TV · WANZHAI TV</p>
-        <h1>看万载 · 一屏看尽焰火人间</h1>
-        ${featured ? featureBlock(featured) : ''}
+        <p class="tv-kicker">${t.kicker}</p>
+        <h1>${t.heroTitle}</h1>
+        ${featured ? featureBlock(featured, loc) : ''}
       </div>
     </section>
     ${seriesCards ? `<section class="tv-shelf"><div class="container-wide">
-      <div class="tv-shelf-head"><h2>短剧剧场</h2><a class="tv-more" href="/tv/?cat=drama">全部短剧 →</a></div>
+      <div class="tv-shelf-head"><h2>${t.shelfTitle}</h2><a class="tv-more" href="${P}/tv/?cat=drama">${t.allDrama}</a></div>
       <div class="tv-shelf-row">${seriesCards}</div>
     </div></section>` : ''}
     <section class="tv-main"><div class="container-wide">
-      <nav class="tv-tabs" aria-label="视频分类">${tabs}</nav>
+      <nav class="tv-tabs" aria-label="${t.tabsAria}">${tabs}</nav>
       ${grid}
     </div></section>
     </div>`;
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: '万载TV — 万载视频频道：短剧 / 烟花 / 非遗 / 美食 | 焰境·万载',
-      description:
-        '万载TV 在线看：《一朝相逢便是万载》系列短剧、烟花晚会、非遗技艺、美食风物视频——一朝相逢，便是万载。',
-      url: `${SITE_URL}/tv/${cat ? `?cat=${cat}` : ''}`,
+    pageShell(chrome, loc, {
+      title: t.homeTitle,
+      description: t.homeDesc,
+      url: `${SITE_URL}${P}/tv/${cat ? `?cat=${cat}` : ''}`,
       body,
       needPlayerScript: true,
     })
@@ -197,15 +192,17 @@ async function tvHome(env, url, ctx) {
 }
 
 /** 焦点位：左播放器右信息（播放器点击才加载，首图 eager 保 LCP） */
-function featureBlock(v) {
+function featureBlock(v, loc) {
+  const t = UI[loc].tv;
+  const P = LOCALES[loc].prefix;
   return `<div class="tv-feature">
-    <div class="tv-feature-media">${playerHtml(v, true)}</div>
+    <div class="tv-feature-media">${playerHtml(v, true, loc)}</div>
     <div class="tv-feature-info">
-      <span class="tv-badge">本期焦点</span>
-      <h2><a href="/tv/${v.id}/">${esc(v.title)}</a></h2>
+      <span class="tv-badge">${t.featured}</span>
+      <h2><a href="${P}/tv/${v.id}/">${esc(v.title)}</a></h2>
       ${v.intro ? `<p>${esc(v.intro)}</p>` : ''}
-      <p class="tv-meta">${esc(CATEGORIES[v.category] || '视频')}${v.duration ? ' · ' + fmtDur(v.duration) : ''} · ${fmtDate(v.created_at)}</p>
-      <a class="tv-more" href="/tv/${v.id}/">观看页面 →</a>
+      <p class="tv-meta">${esc(t.cats[v.category] || t.video)}${v.duration ? ' · ' + fmtDur(v.duration) : ''} · ${fmtDate(v.created_at)}</p>
+      <a class="tv-more" href="${P}/tv/${v.id}/">${t.watchPage}</a>
     </div>
   </div>`;
 }
@@ -220,21 +217,26 @@ function cardMedia(v, eager) {
   return `${img}${dur}`;
 }
 
-function card(v) {
-  return `<a class="tv-card" href="/tv/${v.id}/">
+function card(v, loc) {
+  const t = UI[loc].tv;
+  const P = LOCALES[loc].prefix;
+  const ep = v.series ? ' · ' + esc(v.series) + (v.episode ? ' ' + t.ep.replace('{n}', v.episode) : '') : '';
+  return `<a class="tv-card" href="${P}/tv/${v.id}/">
     <div class="tv-media">${cardMedia(v, false)}</div>
     <h3>${esc(v.title)}</h3>
-    <p class="tv-meta">${esc(CATEGORIES[v.category] || '视频')}${v.series ? ' · ' + esc(v.series) + (v.episode ? ' 第' + v.episode + '集' : '') : ''} · ${fmtDate(v.created_at)} · ${v.views || 0} 次播放</p>
+    <p class="tv-meta">${esc(t.cats[v.category] || t.video)}${ep} · ${fmtDate(v.created_at)} · ${t.plays.replace('{n}', v.views || 0)}</p>
   </a>`;
 }
 
 /* ---------------- 详情页 ---------------- */
 
-async function tvDetail(env, url, ctx, id) {
+async function tvDetail(env, url, ctx, id, loc) {
+  const t = UI[loc].tv;
+  const P = LOCALES[loc].prefix;
   const v = await env.DB.prepare(`SELECT * FROM videos WHERE id = ?1 AND ${PUB_WHERE}`).bind(id).first();
-  if (!v) return notFound(env, url);
+  if (!v) return notFound(env, url, loc);
 
-  const chrome = await getChrome(env);
+  const chrome = await getChrome(env, loc);
 
   // 侧栏：短剧 → 本剧选集；单集 → 同分类相关视频
   let sideHtml = '';
@@ -244,14 +246,14 @@ async function tvDetail(env, url, ctx, id) {
                 WHERE ${PUB_WHERE} AND series = ?1 ORDER BY episode IS NULL, episode, id`)
       .bind(v.series)
       .all();
-    sideHtml = `<h2>本剧选集 · ${esc(v.series)}</h2><div class="tv-side-list">${(eps || [])
+    sideHtml = `<h2>${t.seriesEps.replace('{name}', esc(v.series))}</h2><div class="tv-side-list">${(eps || [])
       .map((x) => {
         const on = x.id === v.id;
         const inner = `<span class="tv-side-media">${cardMedia(x, false)}</span>
-          <span class="tv-side-body"><b>${esc(x.episode ? '第' + x.episode + '集' : x.title)}</b><i>${esc(x.title)}</i></span>`;
+          <span class="tv-side-body"><b>${esc(x.episode ? t.ep.replace('{n}', x.episode) : x.title)}</b><i>${esc(x.title)}</i></span>`;
         return on
           ? `<span class="tv-side-item on">${inner}</span>`
-          : `<a class="tv-side-item" href="/tv/${x.id}/">${inner}</a>`;
+          : `<a class="tv-side-item" href="${P}/tv/${x.id}/">${inner}</a>`;
       })
       .join('')}</div>`;
   } else {
@@ -260,11 +262,11 @@ async function tvDetail(env, url, ctx, id) {
       .bind(v.category, v.id)
       .all();
     sideHtml = rel && rel.length
-      ? `<h2>相关视频</h2><div class="tv-side-list">${rel
+      ? `<h2>${t.related}</h2><div class="tv-side-list">${rel
           .map(
-            (x) => `<a class="tv-side-item" href="/tv/${x.id}/">
+            (x) => `<a class="tv-side-item" href="${P}/tv/${x.id}/">
               <span class="tv-side-media">${cardMedia(x, false)}</span>
-              <span class="tv-side-body"><b>${esc(x.title)}</b><i>${esc(CATEGORIES[x.category] || '视频')} · ${fmtDur(x.duration) || fmtDate(x.created_at)}</i></span>
+              <span class="tv-side-body"><b>${esc(x.title)}</b><i>${esc(t.cats[x.category] || t.video)} · ${fmtDur(x.duration) || fmtDate(x.created_at)}</i></span>
             </a>`
           )
           .join('')}</div>`
@@ -275,7 +277,7 @@ async function tvDetail(env, url, ctx, id) {
     '@context': 'https://schema.org',
     '@type': 'VideoObject',
     name: v.title,
-    description: v.intro || `${v.title} — 万载TV 视频`,
+    description: v.intro || t.ldDesc.replace('{title}', v.title),
     thumbnailUrl: [`${SITE_URL}${vCover(v) || '/assets/img/longhu_yanhuowanhui.jpeg'}`],
     uploadDate: v.created_at ? `${v.created_at.replace(' ', 'T')}Z` : undefined,
     ...(v.duration ? { duration: isoDur(v.duration) } : {}),
@@ -284,15 +286,16 @@ async function tvDetail(env, url, ctx, id) {
       : { contentUrl: `${SITE_URL}${vMedia(v)}` }),
   };
 
+  const ep = v.series ? ' · ' + esc(v.series) + (v.episode ? ' ' + t.ep.replace('{n}', v.episode) : '') : '';
   const body = `
     <div class="tv-page">
     <section class="tv-detail"><div class="container-wide">
-      <nav class="tv-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/tv/">万载TV</a><span>/</span><b>${esc(v.title)}</b></nav>
+      <nav class="tv-crumb" aria-label="${UI[loc].crumbAria}"><a href="${P}/">${UI[loc].home}</a><span>/</span><a href="${P}/tv/">${t.crumbTv}</a><span>/</span><b>${esc(v.title)}</b></nav>
       <div class="tv-detail-grid">
         <div class="tv-col-main">
-          <div class="tv-player-wrap">${playerHtml(v, false)}</div>
+          <div class="tv-player-wrap">${playerHtml(v, false, loc)}</div>
           <h1>${esc(v.title)}</h1>
-          <p class="tv-meta">${esc(CATEGORIES[v.category] || '视频')}${v.series ? ' · ' + esc(v.series) + (v.episode ? ' 第' + v.episode + '集' : '') : ''} · ${fmtDate(v.created_at)} · ${v.views || 0} 次播放${v.source === 'bilibili' ? ' · <a class="tv-src" href="https://www.bilibili.com/video/' + esc(v.bvid) + '" target="_blank" rel="noopener">B站观看 ↗</a>' : ''}</p>
+          <p class="tv-meta">${esc(t.cats[v.category] || t.video)}${ep} · ${fmtDate(v.created_at)} · ${t.plays.replace('{n}', v.views || 0)}${v.source === 'bilibili' ? ' · <a class="tv-src" href="https://www.bilibili.com/video/' + esc(v.bvid) + '" target="_blank" rel="noopener">' + t.bilibili + '</a>' : ''}</p>
           ${v.intro ? `<p class="tv-intro">${esc(v.intro)}</p>` : ''}
         </div>
         <aside class="tv-col-side">${sideHtml}</aside>
@@ -308,10 +311,10 @@ async function tvDetail(env, url, ctx, id) {
   }
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: `${v.title} — 万载TV | 焰境·万载`,
-      description: v.intro || `${v.title} —— 万载TV 视频在线观看。`,
-      url: `${SITE_URL}/tv/${v.id}/`,
+    pageShell(chrome, loc, {
+      title: t.detailTitle.replace('{title}', v.title),
+      description: v.intro || t.detailDesc.replace('{title}', v.title),
+      url: `${SITE_URL}${P}/tv/${v.id}/`,
       jsonLd,
       body,
       needPlayerScript: true,
@@ -320,13 +323,13 @@ async function tvDetail(env, url, ctx, id) {
 }
 
 /** 播放器：B站走 facade（点击插 iframe，autoplay=1 免二次点击）；上传视频原生 <video> */
-function playerHtml(v, eager) {
+function playerHtml(v, eager, loc) {
   if (v.source === 'bilibili') {
     const cover = vCover(v);
     const inner = cover
       ? `<img src="${esc(cover)}" alt="" loading="${eager ? 'eager' : 'lazy'}" ${eager ? 'fetchpriority="high"' : 'decoding="async"'}>`
       : `<span class="tv-ph" aria-hidden="true">焰</span>`;
-    return `<div class="tv-facade" data-embed="${esc(biliEmbed(v, true))}" role="button" tabindex="0" aria-label="播放：${esc(v.title)}">
+    return `<div class="tv-facade" data-embed="${esc(biliEmbed(v, true))}" role="button" tabindex="0" aria-label="${esc(UI[loc].tv.playAria.replace('{title}', v.title))}">
       ${inner}<span class="tv-play" aria-hidden="true">▶</span>
     </div>`;
   }
@@ -348,7 +351,7 @@ const PLAYER_SCRIPT = `(function () {
       f.setAttribute('frameborder', 'no');
       f.setAttribute('allowfullscreen', 'true');
       f.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
-      f.title = box.getAttribute('aria-label') || '视频播放器';
+      f.title = box.getAttribute('aria-label') || 'video player';
       box.classList.add('playing');
       box.innerHTML = '';
       box.appendChild(f);
@@ -361,7 +364,7 @@ const PLAYER_SCRIPT = `(function () {
   document.querySelectorAll('.tv-facade').forEach(arm);
 })();`;
 
-/* ---------------- sitemap 片段 ---------------- */
+/* ---------------- sitemap 片段（zh-only：EN 动态页暂不入 sitemap） ---------------- */
 
 async function tvSitemap(env) {
   const { results } = await env.DB
@@ -382,7 +385,7 @@ async function tvSitemap(env) {
   );
 }
 
-/* ---------------- /api/tv/latest（首页「焰境影像」条数据源，公开 JSON） ---------------- */
+/* ---------------- /api/tv/latest（首页「焰境影像」条数据源，公开 JSON；zh-only 条，文案保持中文） ---------------- */
 
 // 60s 实例内缓存：首页每次浏览都会带一次该请求，量级小但没必要每次查 D1
 let tvLatestCache = { at: 0, items: [] };
@@ -397,7 +400,7 @@ export async function handleTvLatest(env) {
       items: (results || []).map((v) => ({
         id: v.id,
         title: v.title,
-        cat: CATEGORIES[v.category] || '视频',
+        cat: UI.zh.tv.cats[v.category] || UI.zh.tv.video,
         dur: Number(v.duration) || 0,
         cover: v.cover ? (v.cover.startsWith('/') ? v.cover : '/media/' + v.cover) : '',
       })),
@@ -417,30 +420,35 @@ function fmtDate(d) {
   return String(d || '').slice(0, 10);
 }
 
-async function getChrome(env) {
-  if (getChrome.c) return getChrome.c;
+/** 页头/页脚/指纹表：按 locale 取构建产物 dist/partials/<locale>/*.html（实例内缓存） */
+async function getChrome(env, loc) {
+  getChrome.c = getChrome.c || {};
+  if (getChrome.c[loc]) return getChrome.c[loc];
   const asset = (p) => env.ASSETS.fetch(new Request('https://assets.whizzzest.local' + p));
   const [header, footer, meta] = await Promise.all([
-    asset('/partials/header.html').then((r) => r.text()),
-    asset('/partials/footer.html').then((r) => r.text()),
+    asset(`/partials/${loc}/header.html`).then((r) => r.text()),
+    asset(`/partials/${loc}/footer.html`).then((r) => r.text()),
     asset('/build-meta.json').then((r) => r.json()),
   ]);
-  getChrome.c = { header, footer, meta };
-  return getChrome.c;
+  getChrome.c[loc] = { header, footer, meta };
+  return getChrome.c[loc];
 }
 
-function pageShell(chrome, { title, description, url, body, jsonLd, needPlayerScript }) {
+function pageShell(chrome, loc, { title, description, url, body, jsonLd, needPlayerScript }) {
+  const L = LOCALES[loc];
   const cssV = chrome.meta['/assets/css/style.css'] || '';
   const jsV = chrome.meta['/assets/js/main.js'] || '';
   const ogImage = '/assets/img/longhu_yanhuowanhui.jpeg';
   const ld = jsonLd
     ? `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n`
     : '';
+  // main.js 的 UI 文案表：构建产物 build-meta.json 携带 per-locale js 串（与静态页 head 注入同源）
+  const i18nJs = `  <script>window.__I18N=${JSON.stringify(chrome.meta.i18n?.[loc] || {})}</script>\n`;
   const playerJs = needPlayerScript
     ? `  <script>${PLAYER_SCRIPT}</script>\n`
     : '';
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${L.htmlLang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -448,7 +456,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd, needPlayerSc
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${esc(url)}">
   <meta name="theme-color" content="#2b1208">
-  <meta property="og:site_name" content="焰境·万载">
+  <meta property="og:site_name" content="${L.siteName}">
   <meta property="og:type" content="video.other">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
@@ -456,7 +464,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd, needPlayerSc
   <meta property="og:image" content="${SITE_URL}${ogImage}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="manifest" href="${L.manifest}">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css?v=${esc(cssV)}">
 ${ld}</head>
@@ -466,13 +474,13 @@ ${ld}</head>
 ${body}
   </main>
   ${chrome.footer}
-  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
+${i18nJs}  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
 ${playerJs}</body>
 </html>`;
 }
 
-async function notFound(env, url) {
-  const r = await env.ASSETS.fetch(new Request(new URL('/404.html', url.origin)));
+async function notFound(env, url, loc = 'zh') {
+  const r = await env.ASSETS.fetch(new Request(new URL(`${LOCALES[loc].prefix}/404.html`, url.origin)));
   return new Response(r.body, { status: 404, headers: r.headers });
 }
 

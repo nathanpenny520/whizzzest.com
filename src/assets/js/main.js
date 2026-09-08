@@ -15,6 +15,17 @@ const t = (path, fallback) => {
   return v == null ? fallback : v;
 };
 
+/* 语言切换 href 运行时重写：Worker 动态页的页头来自构建期编译 partial（无当前页上下文），
+   构建期只写对应语言首页的兜底 href；此处按「前缀 + 当前路径」重写为逐页互指
+   （静态页构建期 href 与重写结果一致，重写幂等）。 */
+const langIsZh = (document.documentElement.lang || 'zh-CN').toLowerCase().startsWith('zh');
+for (const a of document.querySelectorAll('a[data-locale-switch]')) {
+  const here = location.pathname + location.search;
+  a.href = langIsZh
+    ? (here === '/' ? '/en/' : `/en${here}`)
+    : here.replace(/^\/en(?=\/|$)/, '') || '/';
+}
+
 /* 导航：汉堡菜单开合（抽屉在 header 外层，见 header.html 注释） */
 const burger = document.querySelector('.nav-burger');
 const drawer = document.getElementById('nav-drawer');

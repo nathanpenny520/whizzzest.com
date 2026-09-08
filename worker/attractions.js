@@ -1,33 +1,36 @@
 /**
- * /attractions/* 旅游景点（2026-09-06）
+ * /attractions/* + /en/attractions/* 旅游景点（2026-09-06；双语 docs/英文版方案.md Phase 3）
  *  - GET /attractions/               瀑布流推荐栏（封面原比例卡片，CSS columns；标签 + 一句话简介）
  *  - GET /attractions/<slug>/        详情页（大封面 + 信息行 + 分段正文 + 周边线路/相关视频轻关联）
- *  - GET /attractions/sitemap.xml    已上线景点 sitemap 片段
+ *  - GET /attractions/sitemap.xml    已上线景点 sitemap 片段（zh-only，EN 动态页暂不入 sitemap）
  *
  * 内容以 D1 为权威（attractions，admin「景点」Tab 维护）：后台发布即时生效，对标 /tv/* /library/*。
+ * D1 内容（景点名/简介/正文）暂无双语字段 → EN 页界面英文、内容回退中文原文（admin 双语录入后替换）。
  * 正文为空行分段纯文本，渲染时 esc 包 <p>——白名单结构，天然免疫 XSS（同文库）。
  * 封面：R2 whizzzest-media（attra/ 前缀）经 /media/* 代理，或站内路径 /assets/img/…。
  */
+import { UI, LOCALES } from './strings.js';
 
 const SITE_URL = 'https://whizzzest.com';
 
 const PUB_WHERE = "status = 'published'";
 
-export async function handleAttractions(request, env, url, ctx) {
+export async function handleAttractions(request, env, url, ctx, loc = 'zh') {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response(null, { status: 405, headers: { allow: 'GET' } });
   }
 
-  const path = url.pathname.replace(/\/+$/, '') || '/';
+  const P = LOCALES[loc].prefix;
+  const path = url.pathname.replace(/\/+$/, '').slice(P.length) || '/';
 
   if (path === '/attractions/sitemap.xml') return attraSitemap(env);
 
-  if (path === '/attractions') return attraHome(env, url, ctx);
+  if (path === '/attractions') return attraHome(env, url, ctx, loc);
 
   const m = path.match(/^\/attractions\/([a-z0-9-]+)$/);
-  if (m) return attraDetail(env, url, ctx, m[1]);
+  if (m) return attraDetail(env, url, ctx, m[1], loc);
 
-  return notFound(env, url);
+  return notFound(env, url, loc);
 }
 
 /* ---------------- 数据 ---------------- */
@@ -55,8 +58,10 @@ function bodyHtml(body) {
 
 /* ---------------- 瀑布流列表页 ---------------- */
 
-async function attraHome(env, url, ctx) {
-  const chrome = await getChrome(env);
+async function attraHome(env, url, ctx, loc) {
+  const t = UI[loc].attractions;
+  const P = LOCALES[loc].prefix;
+  const chrome = await getChrome(env, loc);
   const { results } = await env.DB
     .prepare(`SELECT slug, name, summary, tags, cover FROM attractions WHERE ${PUB_WHERE} ORDER BY sort, id DESC LIMIT 120`)
     .all();
@@ -66,9 +71,9 @@ async function attraHome(env, url, ctx) {
     .map((a) => {
       const cover = aCover(a.cover);
       const tags = parseTags(a.tags)
-        .map((t) => `<span>${esc(t)}</span>`)
+        .map((tag) => `<span>${esc(tag)}</span>`)
         .join('');
-      return `<a class="at-card" href="/attractions/${esc(a.slug)}/">
+      return `<a class="at-card" href="${P}/attractions/${esc(a.slug)}/">
         <div class="at-media">${cover ? `<img src="${esc(cover)}" alt="${esc(a.name)}" loading="lazy" decoding="async">` : '<span class="at-ph" aria-hidden="true">游</span>'}</div>
         <div class="at-body">
           <h2>${esc(a.name)}</h2>
@@ -83,22 +88,21 @@ async function attraHome(env, url, ctx) {
     <div class="at-page">
     <section class="at-hero">
       <div class="container-wide">
-        <p class="at-kicker">旅游景点 · WANZHAI SCENERY</p>
-        <h1>游万载 · 古城山水焰火间</h1>
-        <p class="at-sub">${list.length ? `${list.length} 处景点 · 万载古城、竹山洞、九龙原始森林……一城焰火，满目山水` : '景点整理中，敬请期待'}</p>
+        <p class="at-kicker">${t.kicker}</p>
+        <h1>${t.heroTitle}</h1>
+        <p class="at-sub">${list.length ? t.heroSub.replace('{n}', list.length) : t.heroEmpty}</p>
       </div>
     </section>
     <section class="at-main"><div class="container-wide">
-      ${list.length ? `<div class="masonry at-grid">${cards}</div>` : '<div class="at-empty"><p>景点整理中，敬请期待。</p><p class="sub">万载古城、竹山洞、九龙原始森林……正在逐一上新。</p></div>'}
+      ${list.length ? `<div class="masonry at-grid">${cards}</div>` : `<div class="at-empty"><p>${t.empty}</p><p class="sub">${t.emptySub}</p></div>`}
     </div></section>
     </div>`;
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: '旅游景点 — 万载古城 / 竹山洞 / 九龙原始森林 | 焰境·万载',
-      description:
-        '万载旅游景点推荐：万载古城、竹山洞、九龙原始森林、恒晖艺术农业、龙湖公园——古城山水焰火间，一朝相逢，便是万载。',
-      url: `${SITE_URL}/attractions/`,
+    pageShell(chrome, loc, {
+      title: t.homeTitle,
+      description: t.homeDesc,
+      url: `${SITE_URL}${P}/attractions/`,
       body,
     })
   );
@@ -106,13 +110,15 @@ async function attraHome(env, url, ctx) {
 
 /* ---------------- 详情页 ---------------- */
 
-async function attraDetail(env, url, ctx, slug) {
+async function attraDetail(env, url, ctx, slug, loc) {
+  const t = UI[loc].attractions;
+  const P = LOCALES[loc].prefix;
   const a = await env.DB.prepare(`SELECT * FROM attractions WHERE ${PUB_WHERE} AND slug = ?1`)
     .bind(slug)
     .first();
-  if (!a) return notFound(env, url);
+  if (!a) return notFound(env, url, loc);
 
-  const chrome = await getChrome(env);
+  const chrome = await getChrome(env, loc);
 
   // 上一篇/下一篇：全量取已上线 (slug, name) 按展示序排，量级小（数十）一次查完
   const { results: order } = await env.DB
@@ -123,18 +129,18 @@ async function attraDetail(env, url, ctx, slug) {
   const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
   const pager = (x, cls, label) =>
     x
-      ? `<a class="${cls}" href="/attractions/${esc(x.slug)}/"><i>${label}</i><b>${esc(x.name)}</b></a>`
+      ? `<a class="${cls}" href="${P}/attractions/${esc(x.slug)}/"><i>${label}</i><b>${esc(x.name)}</b></a>`
       : `<span class="${cls} off"><i>${label}</i><b>—</b></span>`;
 
   const tags = parseTags(a.tags)
-    .map((t) => `<span>${esc(t)}</span>`)
+    .map((tag) => `<span>${esc(tag)}</span>`)
     .join('');
 
   const infoRows = [
-    ['地址', a.address],
-    ['开放时间', a.hours],
-    ['门票', a.tickets],
-    ['交通', a.transport],
+    [t.infoAddress, a.address],
+    [t.infoHours, a.hours],
+    [t.infoTickets, a.tickets],
+    [t.infoTransport, a.transport],
   ].filter(([, v]) => v);
   const infoHtml = infoRows.length
     ? `<div class="at-info">${infoRows
@@ -148,7 +154,7 @@ async function attraDetail(env, url, ctx, slug) {
     '@type': 'TouristAttraction',
     name: a.name,
     description: a.summary,
-    url: `${SITE_URL}/attractions/${a.slug}/`,
+    url: `${SITE_URL}${P}/attractions/${a.slug}/`,
     ...(cover ? { image: `${SITE_URL}${cover}` } : {}),
     ...(a.address ? { address: { '@type': 'PostalAddress', streetAddress: a.address, addressRegion: '江西', addressCountry: 'CN' } } : {}),
   };
@@ -156,7 +162,7 @@ async function attraDetail(env, url, ctx, slug) {
   const body = `
     <div class="at-page">
     <section class="at-detail"><div class="container">
-      <nav class="at-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/attractions/">旅游景点</a><span>/</span><b>${esc(a.name)}</b></nav>
+      <nav class="at-crumb" aria-label="${UI[loc].crumbAria}"><a href="${P}/">${UI[loc].home}</a><span>/</span><a href="${P}/attractions/">${t.crumbAttra}</a><span>/</span><b>${esc(a.name)}</b></nav>
       <figure class="at-heroimg">${cover ? `<img src="${esc(cover)}" alt="${esc(a.name)}" loading="eager" fetchpriority="high">` : '<span class="at-ph" aria-hidden="true">游</span>'}</figure>
       <div class="at-head">
         <h1>${esc(a.name)}</h1>
@@ -166,29 +172,29 @@ async function attraDetail(env, url, ctx, slug) {
       ${infoHtml}
       ${a.body ? `<div class="at-article">${bodyHtml(a.body)}</div>` : ''}
       <div class="at-links">
-        <a class="at-link" href="/tourism/">周边线路 · 旅游线路 →</a>
-        <a class="at-link" href="/tv/?cat=tourism">万载视频 · 相关视频 →</a>
+        <a class="at-link" href="${P}/tourism/">${t.nearbyRoutes}</a>
+        <a class="at-link" href="${P}/tv/?cat=tourism">${t.relatedVideos}</a>
       </div>
-      <nav class="at-pager" aria-label="景点翻页">
-        ${pager(prev, 'at-pager-item at-prev', '上一处')}
-        <a class="at-all" href="/attractions/">全部景点</a>
-        ${pager(next, 'at-pager-item at-next', '下一处')}
+      <nav class="at-pager" aria-label="${t.pagerAria}">
+        ${pager(prev, 'at-pager-item at-prev', t.prevItem)}
+        <a class="at-all" href="${P}/attractions/">${t.allItems}</a>
+        ${pager(next, 'at-pager-item at-next', t.nextItem)}
       </nav>
     </div></section>
     </div>`;
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: `${a.name} — 万载旅游景点 | 焰境·万载`,
-      description: `${a.summary}——${a.name}旅游攻略、地址与交通，尽在焰境·万载。`,
-      url: `${SITE_URL}/attractions/${a.slug}/`,
+    pageShell(chrome, loc, {
+      title: t.detailTitle.replace('{name}', a.name),
+      description: t.detailDesc.replace('{summary}', a.summary).replace('{name}', a.name),
+      url: `${SITE_URL}${P}/attractions/${a.slug}/`,
       jsonLd,
       body,
     })
   );
 }
 
-/* ---------------- sitemap 片段 ---------------- */
+/* ---------------- sitemap 片段（zh-only：EN 动态页暂不入 sitemap） ---------------- */
 
 async function attraSitemap(env) {
   const { results } = await env.DB
@@ -211,27 +217,31 @@ async function attraSitemap(env) {
 
 /* ---------------- 页面骨架（对标 tv.js） ---------------- */
 
-async function getChrome(env) {
-  if (getChrome.c) return getChrome.c;
+async function getChrome(env, loc) {
+  getChrome.c = getChrome.c || {};
+  if (getChrome.c[loc]) return getChrome.c[loc];
   const asset = (p) => env.ASSETS.fetch(new Request('https://assets.whizzzest.local' + p));
   const [header, footer, meta] = await Promise.all([
-    asset('/partials/header.html').then((r) => r.text()),
-    asset('/partials/footer.html').then((r) => r.text()),
+    asset(`/partials/${loc}/header.html`).then((r) => r.text()),
+    asset(`/partials/${loc}/footer.html`).then((r) => r.text()),
     asset('/build-meta.json').then((r) => r.json()),
   ]);
-  getChrome.c = { header, footer, meta };
-  return getChrome.c;
+  getChrome.c[loc] = { header, footer, meta };
+  return getChrome.c[loc];
 }
 
-function pageShell(chrome, { title, description, url, body, jsonLd }) {
+function pageShell(chrome, loc, { title, description, url, body, jsonLd }) {
+  const L = LOCALES[loc];
   const cssV = chrome.meta['/assets/css/style.css'] || '';
   const jsV = chrome.meta['/assets/js/main.js'] || '';
   const ogImage = '/assets/img/longhu_yanhuowanhui.jpeg';
   const ld = jsonLd
     ? `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n`
     : '';
+  // main.js 的 UI 文案表：构建产物 build-meta.json 携带 per-locale js 串（与静态页 head 注入同源）
+  const i18nJs = `  <script>window.__I18N=${JSON.stringify(chrome.meta.i18n?.[loc] || {})}</script>\n`;
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${L.htmlLang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -239,7 +249,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd }) {
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${esc(url)}">
   <meta name="theme-color" content="#fbfbfd">
-  <meta property="og:site_name" content="焰境·万载">
+  <meta property="og:site_name" content="${L.siteName}">
   <meta property="og:type" content="article">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
@@ -247,7 +257,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd }) {
   <meta property="og:image" content="${SITE_URL}${ogImage}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="manifest" href="${L.manifest}">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css?v=${esc(cssV)}">
 ${ld}</head>
@@ -257,13 +267,13 @@ ${ld}</head>
 ${body}
   </main>
   ${chrome.footer}
-  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
+${i18nJs}  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
 </body>
 </html>`;
 }
 
-async function notFound(env, url) {
-  const r = await env.ASSETS.fetch(new Request(new URL('/404.html', url.origin)));
+async function notFound(env, url, loc = 'zh') {
+  const r = await env.ASSETS.fetch(new Request(new URL(`${LOCALES[loc].prefix}/404.html`, url.origin)));
   return new Response(r.body, { status: 404, headers: r.headers });
 }
 
@@ -282,7 +292,7 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
-/* ---------------- /api/attractions/latest（首页「景点精选」条数据源，公开 JSON） ---------------- */
+/* ---------------- /api/attractions/latest（首页「景点精选」条数据源，公开 JSON；zh-only 条） ---------------- */
 
 // 60s 实例内缓存（同 handleTvLatest 模式）；排序同列表页（编辑 sort 优先），取前 6 条
 let attraLatestCache = { at: 0, items: [] };

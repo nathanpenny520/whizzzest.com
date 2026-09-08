@@ -1,50 +1,46 @@
 /**
- * /library/* 焰境文库（docs/文库方案.md，2026-09-06）
+ * /library/* + /en/library/* 焰境文库（docs/文库方案.md，2026-09-06；双语 docs/英文版方案.md Phase 3）
  *  - GET /library/                  书架页（封面网格 + 分类 Tab + 搜索，最近更新排序）
  *  - GET /library/<slug>/           作品详情页（封面/信息/简介/章节目录，JSON-LD）
  *  - GET /library/<slug>/<n>/       章节阅读页（限宽排版 + 章内插图 + 上一章/目录/下一章）
- *  - GET /library/sitemap.xml       已上线作品 sitemap 片段
+ *  - GET /library/sitemap.xml       已上线作品 sitemap 片段（zh-only，EN 动态页暂不入 sitemap）
  *
  * 内容以 D1 为权威：作者投稿经 admin 审核通过即时上线（对标 /merchants/* 与 /tv/*）。
+ * D1 内容（书名/简介/章节正文）暂无双语字段 → EN 页界面英文、内容回退中文原文（admin 双语录入后替换）。
  * 章节正文为分段纯文本（[图] 占位行），渲染时按 images 顺序替换 <figure>——白名单结构，天然免疫 XSS。
  * 封面/插图：R2 桶 whizzzest-media（book/ 前缀），经 /media/<key> 代理公开读取。
  */
-
-const CATEGORIES = {
-  novel: '小说',
-  story: '故事',
-  essay: '随笔',
-  other: '其他',
-};
+import { UI, LOCALES } from './strings.js';
 
 const SITE_URL = 'https://whizzzest.com';
 
 const PUB_WHERE = "status = 'approved'";
 
-export async function handleLibrary(request, env, url, ctx) {
+export async function handleLibrary(request, env, url, ctx, loc = 'zh') {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response(null, { status: 405, headers: { allow: 'GET' } });
   }
 
-  const path = url.pathname.replace(/\/+$/, '') || '/';
+  const P = LOCALES[loc].prefix;
+  const path = url.pathname.replace(/\/+$/, '').slice(P.length) || '/';
 
   if (path === '/library/sitemap.xml') return librarySitemap(env);
 
-  if (path === '/library') return shelfPage(env, url, ctx);
+  if (path === '/library') return shelfPage(env, url, ctx, loc);
 
   let m = path.match(/^\/library\/([a-z0-9-]+)$/);
-  if (m) return bookDetail(env, url, ctx, m[1]);
+  if (m) return bookDetail(env, url, ctx, m[1], loc);
 
   m = path.match(/^\/library\/([a-z0-9-]+)\/(\d{1,4})$/);
-  if (m) return chapterPage(env, url, ctx, m[1], Number(m[2]));
+  if (m) return chapterPage(env, url, ctx, m[1], Number(m[2]), loc);
 
-  return notFound(env, url);
+  return notFound(env, url, loc);
 }
 
 /* ---------------- 数据 ---------------- */
 
 const bCover = (b) => (b.cover ? (b.cover.startsWith('/') ? b.cover : '/media/' + b.cover) : '');
-const fmtCount = (n) => (Number(n) || 0).toLocaleString('zh-CN');
+const fmtCount = (n) => (Number(n) || 0).toLocaleString('en-US');
 const fmtDate = (d) => String(d || '').slice(0, 10);
 
 function safeImages(json) {
@@ -156,9 +152,11 @@ function chapterBodyHtml(ch) {
 
 /* ---------------- 书架页 ---------------- */
 
-async function shelfPage(env, url, ctx) {
-  const chrome = await getChrome(env);
-  const cat = CATEGORIES[url.searchParams.get('cat')] ? url.searchParams.get('cat') : '';
+async function shelfPage(env, url, ctx, loc) {
+  const t = UI[loc].library;
+  const P = LOCALES[loc].prefix;
+  const chrome = await getChrome(env, loc);
+  const cat = t.cats[url.searchParams.get('cat')] ? url.searchParams.get('cat') : '';
   const q = (url.searchParams.get('q') || '').trim().slice(0, 30);
 
   const conds = [PUB_WHERE];
@@ -179,18 +177,18 @@ async function shelfPage(env, url, ctx) {
 
   const keepQ = (q ? `q=${encodeURIComponent(q)}` : '');
   const tabs = [
-    `<a class="bk-tab${cat === '' ? ' on' : ''}" href="/library/${keepQ ? '?' + keepQ : ''}">全部</a>`,
-    ...Object.entries(CATEGORIES).map(
+    `<a class="bk-tab${cat === '' ? ' on' : ''}" href="${P}/library/${keepQ ? '?' + keepQ : ''}">${t.all}</a>`,
+    ...Object.entries(t.cats).map(
       ([k, label]) =>
-        `<a class="bk-tab${k === cat ? ' on' : ''}" href="/library/?cat=${k}${q ? `&q=${encodeURIComponent(q)}` : ''}">${label}</a>`
+        `<a class="bk-tab${k === cat ? ' on' : ''}" href="${P}/library/?cat=${k}${q ? `&q=${encodeURIComponent(q)}` : ''}">${label}</a>`
     ),
   ].join('');
 
   const searchBox = `
-      <form class="bk-search" action="/library/" method="get" role="search">
+      <form class="bk-search" action="${P}/library/" method="get" role="search">
         ${cat ? `<input type="hidden" name="cat" value="${esc(cat)}">` : ''}
-        <input type="search" name="q" value="${esc(q)}" maxlength="30" placeholder="搜索书名、简介、笔名…" aria-label="搜索文库">
-        <button type="submit">搜索</button>
+        <input type="search" name="q" value="${esc(q)}" maxlength="30" placeholder="${t.searchPlaceholder}" aria-label="${t.searchAria}">
+        <button type="submit">${UI[loc].search}</button>
       </form>`;
 
   const cards = (books || [])
@@ -199,10 +197,10 @@ async function shelfPage(env, url, ctx) {
       const media = cover
         ? `<img src="${esc(cover)}" alt="${esc(b.title)}" loading="lazy" decoding="async">`
         : `<span class="bk-ph" aria-hidden="true">${esc(b.title.slice(0, 1))}</span>`;
-      return `<a class="bk-card" href="/library/${esc(b.slug)}/">
-        <div class="bk-media">${media}<span class="bk-cat">${esc(CATEGORIES[b.category] || '其他')}</span></div>
+      return `<a class="bk-card" href="${P}/library/${esc(b.slug)}/">
+        <div class="bk-media">${media}<span class="bk-cat">${esc(t.cats[b.category] || t.cats.other)}</span></div>
         <h3>${esc(b.title)}</h3>
-        <p class="bk-meta">${esc(b.author_name || '佚名')} · ${b.chapter_count || 0} 章 · ${fmtCount(b.word_count)} 字</p>
+        <p class="bk-meta">${esc(b.author_name || t.unknown)} · ${t.chapters.replace('{n}', b.chapter_count || 0)} · ${t.words.replace('{n}', fmtCount(b.word_count))}</p>
         <p class="bk-intro">${esc(b.intro)}</p>
       </a>`;
     })
@@ -210,34 +208,33 @@ async function shelfPage(env, url, ctx) {
 
   const grid = (books || []).length
     ? `<div class="bk-grid">${cards}</div>`
-    : `<div class="bk-empty"><p>${q ? `没有找到含「${esc(q)}」的作品，换个关键词试试。` : '文库开荒中，首部作品即将上架。'}</p>
-       <p class="sub">${q ? '' : '你也可以在万载TV 看视频。'}</p></div>`;
+    : `<div class="bk-empty"><p>${q ? t.emptyQ.replace('{q}', esc(q)) : t.empty}</p>
+       <p class="sub">${q ? '' : t.emptySub}</p></div>`;
 
   const body = `
     <section class="bk-hero">
       <div class="container-wide">
-        <p class="bk-kicker">焰境文库 · LIBRARY</p>
-        <h1>读万载的故事</h1>
-        <p class="bk-sub">本地作者笔下的烟花、古城与人间烟火——连载与图文，慢慢读。</p>
+        <p class="bk-kicker">${t.kicker}</p>
+        <h1>${t.heroTitle}</h1>
+        <p class="bk-sub">${t.heroSub}</p>
       </div>
     </section>
     <section class="bk-main"><div class="container-wide">
       ${searchBox}
-      <nav class="bk-tabs" aria-label="作品分类">${tabs}</nav>
+      <nav class="bk-tabs" aria-label="${t.tabsAria}">${tabs}</nav>
       ${grid}
       <div class="bk-cta">
-        <h2>你也想写万载的故事？</h2>
-        <p>焰境文库向所有作者开放：注册作者账号，投稿你的小说、故事与随笔，审核通过即上线展示。</p>
-        <a class="btn" href="https://writer.whizzzest.com/register" target="_blank" rel="noopener">成为作者</a>
+        <h2>${t.ctaTitle}</h2>
+        <p>${t.ctaDesc}</p>
+        <a class="btn" href="https://writer.whizzzest.com/register" target="_blank" rel="noopener">${t.becomeAuthor}</a>
       </div>
     </div></section>`;
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: '焰境文库 — 万载本地小说与图文连载 | 焰境·万载',
-      description:
-        '焰境文库：万载本地作者的小说、故事、随笔连载在线阅读——烟花、古城与人间烟火，慢慢读。',
-      url: `${SITE_URL}/library/${cat || q ? `?${cat ? 'cat=' + cat : ''}${cat && q ? '&' : ''}${keepQ}` : ''}`,
+    pageShell(chrome, loc, {
+      title: t.homeTitle,
+      description: t.homeDesc,
+      url: `${SITE_URL}${P}/library/${cat || q ? `?${cat ? 'cat=' + cat : ''}${cat && q ? '&' : ''}${keepQ}` : ''}`,
       body,
     })
   );
@@ -245,14 +242,16 @@ async function shelfPage(env, url, ctx) {
 
 /* ---------------- 详情页 ---------------- */
 
-async function bookDetail(env, url, ctx, slug) {
+async function bookDetail(env, url, ctx, slug, loc) {
+  const t = UI[loc].library;
+  const P = LOCALES[loc].prefix;
   const b = await env.DB
     .prepare(`SELECT * FROM books WHERE slug = ?1 AND ${PUB_WHERE}`)
     .bind(slug)
     .first();
-  if (!b) return notFound(env, url);
+  if (!b) return notFound(env, url, loc);
 
-  const chrome = await getChrome(env);
+  const chrome = await getChrome(env, loc);
 
   const [{ results: chapters }, pend] = await Promise.all([
     env.DB.prepare(
@@ -271,43 +270,43 @@ async function bookDetail(env, url, ctx, slug) {
   const toc = (chapters || []).length
     ? (chapters || [])
         .map(
-          (c) => `<a class="bk-toc-item" href="/library/${esc(b.slug)}/${c.idx}/">
-            <span class="idx">第${c.idx}章</span><span class="t">${esc(c.title)}</span>
-            <span class="w">${fmtCount(c.word_count)} 字</span>
+          (c) => `<a class="bk-toc-item" href="${P}/library/${esc(b.slug)}/${c.idx}/">
+            <span class="idx">${t.chapter.replace('{n}', c.idx)}</span><span class="t">${esc(c.title)}</span>
+            <span class="w">${t.words.replace('{n}', fmtCount(c.word_count))}</span>
           </a>`
         )
         .join('')
-    : '<p class="bk-toc-empty">章节即将上线，敬请期待。</p>';
+    : `<p class="bk-toc-empty">${t.tocEmpty}</p>`;
 
   const pendingNote = pend && pend.n > 0
-    ? `<p class="bk-pending">另有 ${pend.n} 章更新审核中，通过后即可阅读。</p>`
+    ? `<p class="bk-pending">${t.pending.replace('{n}', pend.n)}</p>`
     : '';
 
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Book',
     name: b.title,
-    author: { '@type': 'Person', name: b.author_name || '焰境文库作者' },
+    author: { '@type': 'Person', name: b.author_name || t.authorFallback },
     inLanguage: 'zh-CN',
     numberOfPages: b.chapter_count || undefined,
     abstract: b.intro || undefined,
-    url: `${SITE_URL}/library/${b.slug}/`,
+    url: `${SITE_URL}${P}/library/${b.slug}/`,
   };
 
   const body = `
     <section class="bk-detail"><div class="container-wide">
-      <nav class="bk-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/library/">文库</a><span>/</span><b>${esc(b.title)}</b></nav>
+      <nav class="bk-crumb" aria-label="${UI[loc].crumbAria}"><a href="${P}/">${UI[loc].home}</a><span>/</span><a href="${P}/library/">${t.crumbLibrary}</a><span>/</span><b>${esc(b.title)}</b></nav>
       <div class="bk-head">
         ${coverHtml}
         <div class="bk-head-info">
           <h1>${esc(b.title)}</h1>
-          <p class="bk-meta">${esc(b.author_name || '佚名')} · ${esc(CATEGORIES[b.category] || '其他')} · ${b.chapter_count || 0} 章 · ${fmtCount(b.word_count)} 字 · ${fmtDate(b.updated_at)} 更新 · ${fmtCount(b.views)} 次阅读</p>
+          <p class="bk-meta">${esc(b.author_name || t.unknown)} · ${esc(t.cats[b.category] || t.cats.other)} · ${t.chapters.replace('{n}', b.chapter_count || 0)} · ${t.words.replace('{n}', fmtCount(b.word_count))} · ${t.updated.replace('{date}', fmtDate(b.updated_at))} · ${t.reads.replace('{n}', fmtCount(b.views))}</p>
           ${b.intro ? `<p class="bk-intro-full">${esc(b.intro)}</p>` : ''}
-          ${(chapters || []).length ? `<a class="btn bk-readbtn" href="/library/${esc(b.slug)}/${(chapters || [])[0].idx}/">开始阅读</a>` : ''}
+          ${(chapters || []).length ? `<a class="btn bk-readbtn" href="${P}/library/${esc(b.slug)}/${(chapters || [])[0].idx}/">${t.startReading}</a>` : ''}
         </div>
       </div>
       ${pendingNote}
-      <div class="bk-toc"><h2>目录（共 ${(chapters || []).length} 章）</h2>${toc}</div>
+      <div class="bk-toc"><h2>${t.tocTitle.replace('{n}', (chapters || []).length)}</h2>${toc}</div>
     </div></section>`;
 
   if (ctx) {
@@ -317,10 +316,10 @@ async function bookDetail(env, url, ctx, slug) {
   }
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: `${b.title} — 焰境文库 | 焰境·万载`,
-      description: b.intro || `${b.title} —— 焰境文库在线阅读。`,
-      url: `${SITE_URL}/library/${b.slug}/`,
+    pageShell(chrome, loc, {
+      title: t.detailTitle.replace('{title}', b.title),
+      description: b.intro || t.detailDesc.replace('{title}', b.title),
+      url: `${SITE_URL}${P}/library/${b.slug}/`,
       jsonLd,
       body,
     })
@@ -329,20 +328,22 @@ async function bookDetail(env, url, ctx, slug) {
 
 /* ---------------- 阅读页 ---------------- */
 
-async function chapterPage(env, url, ctx, slug, idx) {
+async function chapterPage(env, url, ctx, slug, idx, loc) {
+  const t = UI[loc].library;
+  const P = LOCALES[loc].prefix;
   const b = await env.DB
     .prepare(`SELECT * FROM books WHERE slug = ?1 AND ${PUB_WHERE}`)
     .bind(slug)
     .first();
-  if (!b) return notFound(env, url);
+  if (!b) return notFound(env, url, loc);
 
   const ch = await env.DB
     .prepare(`SELECT * FROM book_chapters WHERE book_id = ?1 AND idx = ?2 AND status = 'approved'`)
     .bind(b.id, idx)
     .first();
-  if (!ch) return notFound(env, url);
+  if (!ch) return notFound(env, url, loc);
 
-  const chrome = await getChrome(env);
+  const chrome = await getChrome(env, loc);
 
   const [{ results: prev }, { results: next }] = await Promise.all([
     env.DB.prepare(
@@ -353,23 +354,23 @@ async function chapterPage(env, url, ctx, slug, idx) {
     ).bind(b.id, idx).all(),
   ]);
 
-  const nav = (items, cls, label) =>
+  const nav = (items, cls, label, off) =>
     items && items.length
-      ? `<a class="${cls}" href="/library/${esc(b.slug)}/${items[0].idx}/">${label}${esc(items[0].title)}</a>`
-      : `<span class="${cls} off">${label}${cls.includes('prev') ? '已是最新' : '暂无'}</span>`;
+      ? `<a class="${cls}" href="${P}/library/${esc(b.slug)}/${items[0].idx}/">${label}${esc(items[0].title)}</a>`
+      : `<span class="${cls} off">${label}${off}</span>`;
 
   const body = `
     <section class="bk-read"><div class="bk-reader">
-      <nav class="bk-crumb" aria-label="面包屑"><a href="/">首页</a><span>/</span><a href="/library/">文库</a><span>/</span><a href="/library/${esc(b.slug)}/">${esc(b.title)}</a><span>/</span><b>第${ch.idx}章</b></nav>
+      <nav class="bk-crumb" aria-label="${UI[loc].crumbAria}"><a href="${P}/">${UI[loc].home}</a><span>/</span><a href="${P}/library/">${t.crumbLibrary}</a><span>/</span><a href="${P}/library/${esc(b.slug)}/">${esc(b.title)}</a><span>/</span><b>${t.chapter.replace('{n}', ch.idx)}</b></nav>
       <article class="bk-chapter">
-        <p class="bk-ch-meta">${esc(b.title)} · ${esc(b.author_name || '佚名')}</p>
-        <h1>第${ch.idx}章 · ${esc(ch.title)}</h1>
+        <p class="bk-ch-meta">${esc(b.title)} · ${esc(b.author_name || t.unknown)}</p>
+        <h1>${t.chapter.replace('{n}', ch.idx)} · ${esc(ch.title)}</h1>
         <div class="bk-body">${chapterBodyHtml(ch)}</div>
       </article>
-      <nav class="bk-ch-nav" aria-label="章节切换">
-        ${nav(prev, 'bk-ch-prev', '上一章 ')}
-        <a class="bk-ch-toc" href="/library/${esc(b.slug)}/">目录</a>
-        ${nav(next, 'bk-ch-next', '下一章 ')}
+      <nav class="bk-ch-nav" aria-label="${t.navAria}">
+        ${nav(prev, 'bk-ch-prev', t.prevChapter, t.noPrev)}
+        <a class="bk-ch-toc" href="${P}/library/${esc(b.slug)}/">${t.toc}</a>
+        ${nav(next, 'bk-ch-next', t.nextChapter, t.noNext)}
       </nav>
     </div></section>`;
 
@@ -380,16 +381,16 @@ async function chapterPage(env, url, ctx, slug, idx) {
   }
 
   return htmlResponse(
-    pageShell(chrome, {
-      title: `第${ch.idx}章 · ${ch.title} — ${b.title} | 焰境文库`,
-      description: `${b.title} 第${ch.idx}章在线阅读：${ch.title}。`,
-      url: `${SITE_URL}/library/${b.slug}/${idx}/`,
+    pageShell(chrome, loc, {
+      title: t.chTitle.replace('{n}', ch.idx).replace('{title}', ch.title).replace('{book}', b.title),
+      description: t.chDesc.replace('{book}', b.title).replace('{n}', ch.idx).replace('{title}', ch.title),
+      url: `${SITE_URL}${P}/library/${b.slug}/${idx}/`,
       body,
     })
   );
 }
 
-/* ---------------- sitemap 片段 ---------------- */
+/* ---------------- sitemap 片段（zh-only：EN 动态页暂不入 sitemap） ---------------- */
 
 async function librarySitemap(env) {
   const { results } = await env.DB
@@ -412,27 +413,31 @@ async function librarySitemap(env) {
 
 /* ---------------- 页面骨架（对标 tv.js） ---------------- */
 
-async function getChrome(env) {
-  if (getChrome.c) return getChrome.c;
+async function getChrome(env, loc) {
+  getChrome.c = getChrome.c || {};
+  if (getChrome.c[loc]) return getChrome.c[loc];
   const asset = (p) => env.ASSETS.fetch(new Request('https://assets.whizzzest.local' + p));
   const [header, footer, meta] = await Promise.all([
-    asset('/partials/header.html').then((r) => r.text()),
-    asset('/partials/footer.html').then((r) => r.text()),
+    asset(`/partials/${loc}/header.html`).then((r) => r.text()),
+    asset(`/partials/${loc}/footer.html`).then((r) => r.text()),
     asset('/build-meta.json').then((r) => r.json()),
   ]);
-  getChrome.c = { header, footer, meta };
-  return getChrome.c;
+  getChrome.c[loc] = { header, footer, meta };
+  return getChrome.c[loc];
 }
 
-function pageShell(chrome, { title, description, url, body, jsonLd }) {
+function pageShell(chrome, loc, { title, description, url, body, jsonLd }) {
+  const L = LOCALES[loc];
   const cssV = chrome.meta['/assets/css/style.css'] || '';
   const jsV = chrome.meta['/assets/js/main.js'] || '';
   const ogImage = '/assets/img/longhu_yanhuowanhui.jpeg';
   const ld = jsonLd
     ? `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n`
     : '';
+  // main.js 的 UI 文案表：构建产物 build-meta.json 携带 per-locale js 串（与静态页 head 注入同源）
+  const i18nJs = `  <script>window.__I18N=${JSON.stringify(chrome.meta.i18n?.[loc] || {})}</script>\n`;
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${L.htmlLang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -440,7 +445,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd }) {
   <meta name="description" content="${esc(description)}">
   <link rel="canonical" href="${esc(url)}">
   <meta name="theme-color" content="#fbfbfd">
-  <meta property="og:site_name" content="焰境·万载">
+  <meta property="og:site_name" content="${L.siteName}">
   <meta property="og:type" content="article">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
@@ -448,7 +453,7 @@ function pageShell(chrome, { title, description, url, body, jsonLd }) {
   <meta property="og:image" content="${SITE_URL}${ogImage}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="manifest" href="${L.manifest}">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css?v=${esc(cssV)}">
 ${ld}</head>
@@ -458,13 +463,13 @@ ${ld}</head>
 ${body}
   </main>
   ${chrome.footer}
-  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
+${i18nJs}  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
 </body>
 </html>`;
 }
 
-async function notFound(env, url) {
-  const r = await env.ASSETS.fetch(new Request(new URL('/404.html', url.origin)));
+async function notFound(env, url, loc = 'zh') {
+  const r = await env.ASSETS.fetch(new Request(new URL(`${LOCALES[loc].prefix}/404.html`, url.origin)));
   return new Response(r.body, { status: 404, headers: r.headers });
 }
 

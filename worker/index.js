@@ -93,22 +93,18 @@ export default {
       return handleMedia(request, env, url);
     }
 
-    // 商户页动态渲染（/merchants/*，docs/商户功能方案.md M1）
+    // 动态板块：/tv /library /music /attractions /merchants + EN 子树 /en/<section>
+    // （docs/英文版方案.md Phase 3：UI 文案双语，D1 内容暂回退中文）
+    const mDyn = url.pathname.match(/^\/(en\/)?(tv|library|music|attractions|merchants)(\/|$)/);
     let res;
-    if (url.pathname === '/tv' || url.pathname.startsWith('/tv/')) {
-      // 万载TV 视频频道（docs/万载TV方案.md）：频道页/详情页/sitemap
-      res = await handleTv(request, env, url, ctx);
-    } else if (url.pathname === '/library' || url.pathname.startsWith('/library/')) {
-      // 焰境文库（docs/文库方案.md）：书架/详情/阅读页/sitemap
-      res = await handleLibrary(request, env, url, ctx);
-    } else if (url.pathname === '/music' || url.pathname.startsWith('/music/')) {
-      // 万载音乐（2026-09-06）：播放器页 + 播放计数
-      res = await handleMusic(request, env, url, ctx);
-    } else if (url.pathname === '/attractions' || url.pathname.startsWith('/attractions/')) {
-      // 旅游景点（2026-09-06）：瀑布流推荐栏/详情页/sitemap
-      res = await handleAttractions(request, env, url, ctx);
-    } else if (url.pathname === '/merchants' || url.pathname.startsWith('/merchants/')) {
-      res = await handleMerchants(request, env, url);
+    if (mDyn) {
+      const loc = mDyn[1] ? 'en' : 'zh';
+      const section = mDyn[2];
+      res = section === 'tv' ? await handleTv(request, env, url, ctx, loc)
+        : section === 'library' ? await handleLibrary(request, env, url, ctx, loc)
+        : section === 'music' ? await handleMusic(request, env, url, ctx, loc)
+        : section === 'attractions' ? await handleAttractions(request, env, url, ctx, loc)
+        : await handleMerchants(request, env, url, loc);
     } else {
       // 静态资产请求
       res = await env.ASSETS.fetch(request);

@@ -21,7 +21,8 @@
       "href": "/en/cuisine/",
       "label": "Cuisine",
       "menu": [
-        { "href": "/en/cuisine/", "label": "Cuisine overview" }
+        { "href": "/en/cuisine/", "label": "Cuisine overview" },
+        { "href": "/en/merchants/?cat=food", "label": "Whizzzest Picks · Food" }
       ]
     },
     {
@@ -30,15 +31,33 @@
       "menu": [
         { "href": "/en/industry/", "label": "Fireworks industry" },
         { "href": "/en/spots/", "label": "Viewing spots" },
-        { "href": "/en/digital-fireworks/", "label": "Digital fireworks" }
+        { "href": "/en/digital-fireworks/", "label": "Digital fireworks" },
+        { "href": "/en/tv/?cat=fireworks", "label": "Fireworks videos · Wanzai TV" }
       ]
     },
     {
-      "href": "/en/tourism/",
+      "href": "/en/attractions/",
       "label": "Travel",
       "menu": [
+        { "href": "/en/attractions/", "label": "Tourist attractions" },
         { "href": "/en/tourism/", "label": "Tour routes" }
       ]
+    },
+    {
+      "href": "/en/tv/",
+      "label": "Wanzai TV",
+      "menu": [
+        { "href": "/en/tv/", "label": "Wanzai TV" },
+        { "href": "/en/music/", "label": "Wanzai music" }
+      ]
+    },
+    {
+      "href": "/en/library/",
+      "label": "Library"
+    },
+    {
+      "href": "/en/merchants/",
+      "label": "Merchants"
     }
   ],
   "footer": {
