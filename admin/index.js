@@ -3193,8 +3193,8 @@ function renderMerchant(x) {
     ? '<div class="mrow-pay">💰 待核销：申请「' + esc(M_TIER[x.tier_request] || x.tier_request) + '」' +
       (x.paid_requested_at ? '（' + esc(x.paid_requested_at) + ' 提交）' : '') + '</div>'
     : '';
-  var thumb = coverUrl(x.cover)
-    ? '<img class="vthumb" loading="lazy" alt="" src="' + esc(coverUrl(x.cover)) + '">'
+  var thumb = merchantImg(x.cover)
+    ? '<img class="vthumb" loading="lazy" alt="" src="' + esc(merchantImg(x.cover)) + '">'
     : '<div class="vthumb"></div>';
   div.innerHTML =
     '<div class="vrow1">' + thumb +
