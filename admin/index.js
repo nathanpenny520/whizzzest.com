@@ -2012,7 +2012,7 @@ ${FAVICON_LINK}
   * { box-sizing: border-box; margin: 0; }
   html, body { min-height: 100%; }
   body {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 0;
+    min-height: 100vh; overflow: hidden; /* 单屏页：杜绝任何意外溢出/横向滚动把居中带偏 */
     color: #eef2f8;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -2023,8 +2023,9 @@ ${FAVICON_LINK}
   }
   #fx { position: fixed; inset: 0; z-index: 0; display: block; }
   .card {
-    position: relative; z-index: 1;
-    width: min(404px, calc(100vw - 44px)); padding: 36px 34px 30px;
+    /* 固定定位 + 四向归零 + auto 外边距：绝对居中，不受溢出/滚动/兄弟元素影响 */
+    position: fixed; inset: 0; margin: auto; z-index: 1;
+    width: min(404px, calc(100vw - 44px)); height: fit-content; padding: 36px 34px 30px;
     background: rgba(255,255,255,.055);
     border: 1px solid rgba(255,255,255,.14);
     border-radius: 22px;
