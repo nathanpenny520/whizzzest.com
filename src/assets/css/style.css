@@ -1561,6 +1561,11 @@ a.feature-card:hover {
   gap: 24px;
 }
 
+/* 无二维码栏时（如 EN 版联系渠道为海外社交），链接列表独占整行 */
+.contact-grid:not(:has(.qr-panel)) {
+  grid-template-columns: 1fr;
+}
+
 .qr-tile {
   background: var(--c-bg);
   border-radius: var(--radius);

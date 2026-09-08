@@ -145,7 +145,7 @@
           <h2>{{data.contact.title}}</h2>
         </div>
         <div class="contact-grid reveal">
-          <div class="qr-panel">
+          {{#if data.contact.showQrs}}<div class="qr-panel">
             {{#each data.contact.qrs as qr}}
             <figure class="qr-tile">
               <img src="/assets/img/{{qr.qr}}" alt="{{qr.label}}{{t.footer.qrAlt}}" loading="lazy" decoding="async">
@@ -155,7 +155,7 @@
               </figcaption>
             </figure>
             {{/each}}
-          </div>
+          </div>{{/if}}
           <ul class="contact-links">
             {{#each data.contact.links as link}}
             <li>

@@ -170,18 +170,8 @@
   },
   "contact": {
     "title": "Contact us",
-    "qrs": [
-      {
-        "label": "WeChat official account",
-        "value": "云上万载-焰遇乡旅",
-        "qr": "wxofficial.jpg"
-      },
-      {
-        "label": "WeChat Channels",
-        "value": "焰境·万载",
-        "qr": "videoaccount.jpeg"
-      }
-    ],
+    "showQrs": false,
+    "qrs": [],
     "links": [
       {
         "label": "Email",
@@ -189,19 +179,29 @@
         "href": "mailto:contact@whizzzest.com"
       },
       {
-        "label": "Douyin",
-        "value": "焰境·万载",
-        "href": "https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8"
+        "label": "X (Twitter)",
+        "value": "@NathanPenny520",
+        "href": "https://x.com/NathanPenny520"
       },
       {
-        "label": "Live chat",
-        "value": "WeChat customer service",
-        "href": "https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8"
+        "label": "Instagram",
+        "value": "@nathanpenny520",
+        "href": "https://www.instagram.com/nathanpenny520/"
       },
       {
-        "label": "Xiaohongshu (RED)",
-        "value": "焰境·万载",
-        "href": "https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4"
+        "label": "YouTube",
+        "value": "Whizzzest channel",
+        "href": "https://www.youtube.com/channel/UC_MydWjbYuZ5Z9Aa4EltDWw"
+      },
+      {
+        "label": "Facebook",
+        "value": "Whizzzest",
+        "href": "https://www.facebook.com/profile.php?id=61590685587340"
+      },
+      {
+        "label": "Discord",
+        "value": "discord.gg/2BkpXgYNQ",
+        "href": "https://discord.gg/2BkpXgYNQ"
       }
     ]
   }

@@ -39,10 +39,6 @@
       "menu": [
         { "href": "/en/tourism/", "label": "Tour routes" }
       ]
-    },
-    {
-      "href": "/en/about/",
-      "label": "About"
     }
   ],
   "footer": {

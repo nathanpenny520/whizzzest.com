@@ -166,6 +166,7 @@
   },
   "contact": {
     "title": "联系我们",
+    "showQrs": true,
     "qrs": [
       {
         "label": "微信公众号",
