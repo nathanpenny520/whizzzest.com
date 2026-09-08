@@ -1,515 +1,312 @@
+<div align="center">
+
+<img src="docs/assets/readme/home.jpg" alt="焰境·万载 — 首屏" width="100%">
+
 # 焰境・万载
 
-> **一朝相逢，便是万载。**
-> 围绕江西省万载县（中国花炮之乡）打造的现代化文旅数字平台 —— 烟花文化、非遗传承、美食特产、旅游线路、赏烟地点、数字烟花体验、AI 智能向导，一站式呈现。
+**一朝相逢，便是万载。**
 
-**官方网站：**[https://whizzzest.com](https://whizzzest.com)
+围绕「中国花炮之乡」江西万载打造的现代化文旅数字平台——烟花文化、非遗传承、美食特产、旅游线路、数字烟花体验、AI 智能向导，一站式呈现。
 
-![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers%20%2B%20D1%20%2B%20R2-orange)
-![Zero Deps](https://img.shields.io/badge/frontend-zero--deps%20native%20Web-brightgreen)
-![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)
+[**🌐 whizzzest.com**](https://whizzzest.com) · [▶ 数字烟花](https://whizzzest.com/digital-fireworks/) · [📺 万载TV](https://whizzzest.com/tv/) · [🤖 AI 问答](https://whizzzest.com/)
 
+[![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers%20·%20D1%20·%20R2%20·%20Vectorize-F48120?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![Frontend](https://img.shields.io/badge/前端运行时依赖-0-brightgreen)](#技术攻坚)
+[![AI](https://img.shields.io/badge/AI-RAG%20语义检索-blue)](#技术攻坚)
+[![PWA](https://img.shields.io/badge/PWA-可安装·离线可用-5A0FC8)](https://whizzzest.com/)
+[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](#版权声明)
 
+**[English](README.en.md) | 简体中文**
 
-***
+</div>
+
+---
 
 ## 目录
 
+- [在线体验](#在线体验)
+- [项目亮点](#项目亮点)
+- [功能巡礼](#功能巡礼)
+- [技术架构](#技术架构)
+- [技术攻坚](#技术攻坚)
+- [项目规模](#项目规模)
+- [工程化与质量保障](#工程化与质量保障)
+- [本地开发](#本地开发)
+- [数据模型](#数据模型)
+- [团队与合作伙伴](#团队与合作伙伴)
+- [联系方式](#联系方式)
+- [版权声明](#版权声明)
 
+---
 
-* [项目亮点](#项目亮点)
+## 在线体验
 
-* [功能模块](#功能模块)
+> 无需注册，打开即用；全站支持 PWA 安装到桌面 / 手机。
 
-* [技术架构](#技术架构)
+| 体验入口 | 链接 | 看点 |
+| --- | --- | --- |
+| 🏠 主站 | [whizzzest.com](https://whizzzest.com/) | 首屏烟花影像、全模块导航 |
+| 🎆 数字烟花 | [whizzzest.com/digital-fireworks](https://whizzzest.com/digital-fireworks/) | 纯浏览器烟花模拟器，亲手放一场焰火 |
+| 🤖 花傩 AI 问答 | [whizzzest.com](https://whizzzest.com/)（任意页面左下角） | 站内知识库 RAG 问答，回答附知识来源 |
+| 📺 万载 TV | [whizzzest.com/tv](https://whizzzest.com/tv/) | 短剧《一朝相逢便是万载》、宣传片、烟花实况 |
+| 🎵 万载音乐 | [whizzzest.com/music](https://whizzzest.com/music/) | 本地音乐播放器，主题曲《有一个地方叫万载》 |
+| 📚 焰境文库 | [whizzzest.com/library](https://whizzzest.com/library/) | 本地作者连载小说与随笔 |
+| 🏪 焰境好店 | [whizzzest.com/merchants](https://whizzzest.com/merchants/) | 商户指南 + 自助入驻 + 认证体系 |
 
-* [快速开始](#快速开始)
-
-* [部署方式](#部署方式)
-
-* [数据模型](#数据模型)
-
-* [团队](#团队)
-
-* [联系方式](#联系方式)
-
-* [版权声明](#版权声明)
-
-
-
-***
+---
 
 ## 项目亮点
 
-### 文化深度
+**文化深度**
 
+- **1400 年烟花文化**：万载花炮始于唐、盛于宋，2008 年列入国家级非物质文化遗产，4000 多个规格品种畅销全球 40 多个国家和地区
+- **5 项非遗系统化呈现**：万载花炮、得胜鼓、夏布织造、开口傩、纸棚山歌，每项独立页面 + 影像资料 + 详细图文
+- **地道美食全收录**：万载六大碗、罗城扎粉、龙牙百合、南酸枣糕等 15+ 道特色美食，每道含做法 / 历史 / 口感
+- **本地内容生态**：文库连载本地作者作品，万载 TV 播出自制短剧与城市宣传片
 
+**技术特色**
 
-* **1400 年烟花文化**：万载花炮始于唐、盛于宋，2008 年列入国家级非物质文化遗产，4000 多个规格品种畅销全球 40 多个国家和地区
+- **AI 原生**：内置 AI 助手「花傩」，Workers AI + Vectorize 语义混合检索的站内 RAG，回答附可追溯知识来源
+- **零依赖前端**：不用任何前端框架，纯原生 HTML/CSS/JS + 自研构建管线，弱网首屏约 1.5 秒
+- **全球边缘计算**：全站托管于 Cloudflare 300+ 边缘节点，静态资源直达边缘，动态内容由 Worker 就近渲染
+- **沉浸式交互**：Canvas + Web Audio 数字烟花模拟器，选弹体、定节奏，浏览器里点亮一场万载焰火
+- **完整商户闭环**：展示、自助入驻、邮箱验证码登录、认证置顶，全流程打通
+- **隐私零泄漏**：全站无第三方分析 / 广告 / 字体脚本，访客 IP 仅截断记录
 
-* **5 项非遗系统化呈现**：万载花炮、得胜鼓、夏布织造、开口傩、纸棚山歌，每项配独立页面、影像资料与详细图文
+---
 
-* **地道美食全收录**：万载六大碗（富贵油卷、扎肉、诈肉、块鱼、康乐三黄鸡、清炖黑山羊）、罗城扎粉、万载剁肉、龙牙百合、南酸枣糕等 15+ 道特色美食
+## 功能巡礼
 
-* **本地内容生态**：焰境文库连载本地作者小说与随笔，万载 TV 播出自制短剧《一朝相逢便是万载》与城市宣传片《遇见万载》
+| 模块 | 线上入口 | 说明 |
+| --- | --- | --- |
+| 首页 | [/](https://whizzzest.com/) | Hero 轮播、核心特色、景点精选、好店、TV、音乐 |
+| 非遗文化 | [/heritage](https://whizzzest.com/heritage/) | 5 项非遗概览 + 各非遗独立子页 |
+| 美食特产 | [/cuisine](https://whizzzest.com/cuisine/) | 六大碗、其他美食、传统特产 |
+| 烟花产业 | [/industry](https://whizzzest.com/industry/) | 产业历史、发展现状、花炮企业 |
+| 赏烟地点 | [/spots](https://whizzzest.com/spots/) | 万载古城「焰火之吻」、龙湖公园，含观赏位与交通 |
+| 旅游景点 | [/attractions](https://whizzzest.com/attractions/) | 万载古城、竹山洞、九龙原始森林等 |
+| 旅游线路 | [/tourism](https://whizzzest.com/tourism/) | 烟花 / 非遗 / 美食 / 山水主题线路 |
+| 万载 TV | [/tv](https://whizzzest.com/tv/) | 视频频道，后台流式上传 + B 站内容联动 |
+| 万载音乐 | [/music](https://whizzzest.com/music/) | 播放器页：循环三态 / 下载 / 分享 / 深链定位 |
+| 焰境文库 | [/library](https://whizzzest.com/library/) | 作品 / 章节双级审核的连载平台 |
+| 数字烟花 | [/digital-fireworks](https://whizzzest.com/digital-fireworks/) | 多弹体 / 特效 / 音效的烟花模拟器 |
+| 焰境好店 | [/merchants](https://whizzzest.com/merchants/) | 商户指南，自助入驻、认证置顶 |
+| AI 助手 | 全站任意页面 | 「花傩」智能问答，站内 RAG |
 
-### 技术特色
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/readme/fireworks.jpg" alt="数字烟花模拟器"><br><sub>数字烟花模拟器 —— Canvas 粒子系统 + Web Audio，纯浏览器运行</sub></td>
+    <td width="50%"><img src="docs/assets/readme/ai.jpg" alt="花傩 AI 问答"><br><sub>AI 助手「花傩」—— 站内 RAG 问答，回答附知识来源</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/readme/tv.jpg" alt="万载TV"><br><sub>万载 TV —— 视频频道，支持后台大文件流式上传</sub></td>
+    <td width="50%"><img src="docs/assets/readme/merchants.jpg" alt="焰境好店"><br><sub>焰境好店 —— 搜索 / 分类筛选 / 认证商户标识</sub></td>
+  </tr>
+</table>
 
+**子站与后台**（独立部署的三个门户 Worker，统一认证壳 + Passkey）
 
+| 子站 | 域名 | 说明 |
+| --- | --- | --- |
+| 管理后台 | `admin.whizzzest.com` | 多账号管理、内容审核、访客分析看板、媒体上传（Cloudflare Access + 应用密码 / 通行密钥双门） |
+| 商户门户 | `merchant.whizzzest.com` | 商户自助入驻、信息管理、认证申请 |
+| 作者门户 | `writer.whizzzest.com` | 作者注册、作品 / 章节管理、提交审核 |
 
-* **零依赖前端**：不使用任何前端框架，纯原生 HTML/CSS/JavaScript + 自研构建管线，首屏加载约 1.5 秒（弱网环境）
-
-* **全球边缘计算**：全站托管于 Cloudflare 全球 300+ 边缘节点，静态资源直达边缘，动态内容由 Workers 就近渲染
-
-* **AI 原生**：内置 AI 助手「花傩」，基于 Workers AI + RAG 站内知识库，随问随答万载文旅，回答附可追溯来源
-
-* **沉浸式交互**：浏览器数字烟花模拟器（Canvas + Web Audio API），选弹体、定节奏，亲手点亮一场万载焰火
-
-* **完整商户闭环**：「焰境好店」商户体系 —— 展示、自助入驻、邮箱验证码登录、认证置顶变现，全流程打通
-
-### 工程质量
-
-
-
-* **数据驱动渲染**：所有页面内容由 JSON 数据驱动，新增页面只需「建目录 + index.html + 数据 JSON」，构建脚本自动发现
-
-* **自研模板引擎**：支持 partial 嵌入、`{{#each}}` 循环、点路径取值、HTML 转义 / 原样输出，零依赖
-
-* **图片自动优化**：构建期自动生成 WebP 响应式多档图片（sharp，可选）
-
-* **PWA 支持**：Service Worker 离线缓存、manifest.webmanifest、可安装到桌面
-
-* **SEO 友好**：多页静态 HTML、自动生成 sitemap.xml/robots.txt、语义化标签、OG 图
-
-
-
-***
-
-## 功能模块
-
-
-
-| 模块    | 路径                    | 说明                                            |
-| ----- | --------------------- | --------------------------------------------- |
-| 首页    | `/`                   | Hero 轮播、核心特色、走进万载、景点精选、焰境好店、万载 TV、万载音乐、玩在万载   |
-| 非遗文化  | `/heritage/`          | 5 项非遗概览 + 各非遗独立子页（花炮 / 得胜鼓 / 夏布 / 开口傩 / 纸棚山歌） |
-| 美食特产  | `/cuisine/`           | 万载六大碗、其他美食、传统特产，每道含做法 / 历史 / 口感               |
-| 烟花产业  | `/industry/`          | 产业历史、发展现状、花炮企业                                |
-| 赏烟地点  | `/spots/`             | 万载古城（每周六晚 8 点「焰火之吻」）、龙湖公园，含最佳观赏位与交通指南         |
-| 旅游景点  | `/attractions/`       | 万载古城、竹山洞、九龙原始森林、三十把水库、仙源红色研学等                 |
-| 旅游线路  | `/tourism/`           | 主题线路规划（烟花之旅、非遗之旅、美食之旅、山水之旅）                   |
-| 万载 TV | `/tv/`                | 视频频道，支持后台流式上传 + B 站内容联动，短剧 / 宣传片 / 烟花实况       |
-| 万载音乐  | `/music/`             | 本地音乐播放器，主题曲《有一个地方叫万载》等                        |
-| 焰境文库  | `/library/`           | 本地作者小说与随笔，作品 / 章节双级审核，免费阅读持续连载                |
-| 数字烟花  | `/digital-fireworks/` | 浏览器烟花模拟器，多种弹体 / 特效 / 音效，全屏沉浸式体验               |
-| 焰境好店  | `/merchants/`         | 商户指南（美食 / 住宿 / 特产），自助入驻、认证置顶                  |
-| 关于我们  | `/about/`             | 团队介绍、项目背景、技术架构、发展历程、合作伙伴                      |
-| AI 助手 | 全站                    | 「花傩」智能问答，Workers AI + RAG 站内知识库               |
-
-### 子站与后台
-
-
-
-| 子站   | 域名                       | 说明                                                 |
-| ---- | ------------------------ | -------------------------------------------------- |
-| 管理后台 | `admin.whizzzest.com`    | 多账号管理、内容审核、访客分析看板、媒体上传（Cloudflare Access + 应用密码双门） |
-| 商户门户 | `merchant.whizzzest.com` | 商户自助入驻、信息管理、认证申请                                   |
-| 作者门户 | `writer.whizzzest.com`   | 作者注册、作品 / 章节管理、提交审核                                |
-
-
-
-***
+---
 
 ## 技术架构
 
-### 整体架构图
+```mermaid
+flowchart TB
+    U["🌍 全球用户"] --> EDGE["Cloudflare 边缘网络 · 300+ 节点"]
 
+    EDGE -->|"静态资源直达"| ASSETS["Static Assets<br/>图片 / CSS / JS / 字体"]
+    EDGE -->|"动态请求"| MAIN["主站 Worker<br/>页面渲染 · REST API · 流式上传"]
+    EDGE -->|"AI 问答"| AIW["花傩 AI 服务<br/>Workers AI + Vectorize"]
 
+    MAIN --> D1[("Cloudflare D1<br/>SQLite 边缘数据库 · 18 张表")]
+    MAIN --> R2[("Cloudflare R2<br/>商户图片桶 + 媒体桶")]
 
-```
-&#x20;                       ┌─────────────────────────────────────┐
+    subgraph PORTALS["统一认证壳 · 三门户独立 Worker"]
+        direction LR
+        ADMIN["admin<br/>管理后台"]
+        MER["merchant<br/>商户门户"]
+        WRI["writer<br/>作者门户"]
+    end
 
-&#x20;                       │         whizzzest.com (CDN)         │
+    AIW --> VEC[("Vectorize<br/>站内知识向量索引")]
+    AIW --> MODELS["Workers AI 推理<br/>白名单模型"]
 
-&#x20;                       │    Cloudflare 全球 300+ 边缘节点     │
-
-&#x20;                       └──────────────┬──────────────────────┘
-
-&#x20;                                      │
-
-&#x20;             ┌────────────────────────┼────────────────────────┐
-
-&#x20;             │                        │                        │
-
-&#x20;   ┌─────────▼─────────┐    ┌────────▼────────┐    ┌────────▼─────────┐
-
-&#x20;   │   静态资产直达边缘   │    │  Workers 动态渲染 │    │  Workers AI 推理  │
-
-&#x20;   │  图片/CSS/JS/字体   │    │  页面/API/商户/TV │    │  「花傩」RAG 问答 │
-
-&#x20;   │  (ASSETS binding)  │    │  /文库/音乐/景点  │    │  (AI binding)    │
-
-&#x20;   └────────────────────┘    └────────┬────────┘    └─────────┬────────┘
-
-&#x20;                                        │                          │
-
-&#x20;                              ┌─────────▼─────────┐      ┌───────▼───────┐
-
-&#x20;                              │   Cloudflare D1    │      │  向量索引(RAG) │
-
-&#x20;                              │   (SQLite 边缘数据库)│      │  站内内容向量化 │
-
-&#x20;                              └─────────┬─────────┘      └───────────────┘
-
-&#x20;                                        │
-
-&#x20;                              ┌─────────▼─────────┐
-
-&#x20;                              │   Cloudflare R2    │
-
-&#x20;                              │  (对象存储)         │
-
-&#x20;                              │  - whizzzest-merchant (商户图片)│
-
-&#x20;                              │  - whizzzest-media (TV/音乐媒体)│
-
-&#x20;                              └────────────────────┘
+    PORTALS --> D1
+    MER --> R2
 ```
 
-### 技术栈
+| 层级 | 技术 | 说明 |
+| --- | --- | --- |
+| **前端** | 原生 HTML / CSS / JavaScript | 零框架、零运行时依赖，系统字体栈，毛玻璃视觉语言 |
+| **构建** | 自研 `build.js`（Node.js） | 零依赖构建管线：模板引擎、页面自动发现、数据驱动渲染、sitemap/robots 生成、hash 缓存戳 |
+| **图片优化** | `sharp`（可选 devDependency） | 构建期 WebP 响应式多档生成，不装也能构建 |
+| **托管** | Cloudflare Workers + Static Assets | 静态资源直达边缘，动态路径 Worker 优先，`run_worker_first` 精细路由 |
+| **数据库** | Cloudflare D1（SQLite） | 商户、文库、TV、音乐、景点、留言、管理账号、访客分析 |
+| **对象存储** | Cloudflare R2 | 商户图片桶 + 媒体桶，Worker 代理公开读取 |
+| **AI** | Cloudflare Workers AI + Vectorize | 站内推理，无需外部 API Key；RAG 检索增强生成 |
+| **认证** | WebAuthn Passkey + 邮箱验证码 | 三门户统一认证壳，管理后台叠加 Cloudflare Access 双门 |
+| **邮件** | Cloudflare Workers + SMTP | 商户邮箱验证码、联系表单 |
+| **PWA** | Service Worker + Web App Manifest | 离线缓存、可安装、离线兜底页 |
+| **部署** | GitHub Actions | push `main` 自动构建 + 四端 dry-run 自检 + Wrangler 部署 |
 
+**性能指标**
 
+- 首屏加载约 **1.5 秒**（弱网 3G 环境），Lighthouse Performance **95+**
+- 全球边缘延迟 **< 50ms**（300+ 节点）
+- 静态资源永久缓存 + hash 文件名戳
+- **无第三方脚本**：全站无外部分析 / 广告 / 字体请求
 
-| 层级       | 技术                                 | 说明                                                                              |
-| -------- | ---------------------------------- | ------------------------------------------------------------------------------- |
-| **前端**   | 原生 HTML / CSS / JavaScript         | 零框架、零运行时依赖，系统字体栈，Apple 式毛玻璃视觉语言                                                 |
-| **构建**   | 自研 `build.js` (Node.js)            | 零依赖构建管线：模板引擎、页面自动发现、数据驱动渲染、sitemap/robots 生成、hash 缓存戳                           |
-| **图片优化** | `sharp` (可选，devDependency)         | 构建期 WebP 响应式多档生成，不装也能构建（仅跳过优化）                                                  |
-| **托管**   | Cloudflare Workers + Static Assets | 静态资源直达边缘，动态路径 Worker 优先，`run_worker_first` 精细路由                                 |
-| **数据库**  | Cloudflare D1 (SQLite)             | 商户、文库、TV、音乐、景点、留言、管理账号、访客分析                                                     |
-| **对象存储** | Cloudflare R2                      | 商户图片桶 + 媒体桶，Worker 代理公开读取                                                       |
-| **AI**   | Cloudflare Workers AI              | 站内推理，无需外部 API Key；RAG 检索增强生成                                                    |
-| **邮件**   | Cloudflare Workers + 外部 SMTP       | 商户邮箱验证码、联系表单                                                                    |
-| **PWA**  | Service Worker + Web App Manifest  | 离线缓存、可安装、apple-touch-icon                                                       |
-| **部署**   | GitHub Actions                     | push `main` 自动构建 + Wrangler 部署                                                  |
-| **DNS**  | Cloudflare DNS                     | [whizzzest.com](https://whizzzest.com) 主域 + www 301 + 子域（admin/merchant/writer） |
+---
 
-### 性能指标
+## 技术攻坚
 
+> 每一条都对应真实代码，欢迎按图索骥。
 
+**1. 统一认证壳 + Passkey（WebAuthn）**
+`shared/portal-ui.js` + `shared/webauthn.js` 一套代码支撑 admin / merchant / writer 三个门户的登录与账户中心，样式与交互只改一处全端生效；通行密钥基于 WebAuthn 标准（服务端 `@simplewebauthn/server`），管理后台在应用密码之上再叠 Cloudflare Access，形成「网络门 + 账号门 + 密钥门」三层防护。
 
-* **首屏加载**：约 1.5 秒（弱网 3G 环境）
+**2. 花傩 AI：Vectorize 语义混合检索**
+Workers AI 站内推理 + Vectorize 向量索引做语义检索，混合关键词匹配与实体池召回，回答附「知识来源」可追溯；检索故障自动熔断降级到词法匹配，模型走白名单，配套回归测试脚本（`scripts/ai-retrieval-test.mjs`）守住答案质量，语义检索与实时数据并行点火压低时延。
 
-* **Lighthouse Performance**：95+
+**3. 零依赖自研构建管线**
+`build.js` 仅用 Node 内置模块：自研模板引擎（partial 嵌入 / `{{#each}}` 循环 / 点路径取值 / 自动 HTML 转义）、页面自动发现（建目录即成页）、数据驱动渲染、WebP 响应式多档图片、hash 指纹缓存戳、sitemap/robots 与 Service Worker 清单注入，全部一条命令完成。
 
-* **全球边缘延迟**：< 50ms（300+ 节点）
+**4. 95MB 大文件流式上传**
+万载 TV 后台上传直传 R2，基于 `FixedLengthStream` 全程流式处理、不落内存，单文件支持到 95MB；B 站联动内容的封面图做了防盗链降级处理。
 
-* **静态资源缓存**：永久缓存 + hash 文件名戳
+**5. PWA 可安装 + 离线兜底**
+manifest + Service Worker 双件套，构建期注入资源清单与脏戳；音频缓存对 Range 请求做去 Range 的整流缓存处理，弱网 / 断网页面可完整离线呈现。
 
-* **无第三方脚本**：全站无外部分析 / 广告 / 字体脚本，零隐私泄漏
+**6. 数字烟花模拟器**
+纯浏览器 Canvas 粒子系统 + Web Audio 音效，多弹体、多特效、节奏编排，支持自定义背景图（IndexedDB 本地画廊），全屏沉浸式体验——无需任何后端。
 
+**7. 商户闭环全流程**
+邮箱验证码登录 → 自助入驻 → 后台审核 → 认证与置顶权重排序，图片走 R2 桶 + Worker 代理读取，配合访客分析数据看板，形成可运营的本地商户生态。
 
+---
 
-***
+## 项目规模
 
-## 快速开始
+| 指标 | 数值 |
+| --- | --- |
+| 独立部署的 Worker | **4** 个（主站 / 管理后台 / 商户门户 / 作者门户） |
+| 构建期生成的静态页面 | **15+** 页（另含动态路由） |
+| D1 数据表 | **18** 张 |
+| R2 存储桶 | **2** 个（商户图片 / TV·音乐媒体） |
+| 前端运行时依赖 | **0** |
+| 后端运行时依赖 | **1**（`@simplewebauthn/server`，WebAuthn 必需） |
+| 设计方案文档 | **12** 份（`docs/`） |
+| 冒烟测试断言 | **15** 项（`scripts/smoke.sh`，本地复跑） |
 
-### 环境要求
+---
 
+## 工程化与质量保障
 
+- **CI/CD**：GitHub Actions 双阶段流水线——构建 + 四端 dry-run 自检 → 主站与三门户部署
+- **本地冒烟测试**：`scripts/smoke.sh` 15 项断言一键体检全站关键路径；因边缘质询会拦截数据中心流量（CI 无法穿透），冒烟不进 CI、以本地复跑为准
+- **设计驱动开发**：12 份专项方案文档（AI 助手、文库、TV、商户、PWA、数字烟花、访客治理等）沉淀于 `docs/`，先方案后实现，持续修订
+- **数据库迁移纪律**：`schema.sql` 为全量图纸（不可直接执行），库变更一律走 `scripts/migrations/` 编号迁移——只增不改、远程/本地双执行、先执行后合入
 
-* **Node.js** 22（与 CI 一致；构建脚本仅使用内置模块）
+---
 
-* **Python 3**（可选，用于本地预览）
+## 本地开发
 
-* **Wrangler CLI**（可选，用于本地 Worker 调试和部署）
+> 本仓库为焰境·万载团队项目，源码开放仅作展示与学习交流之用（版权见文末）。
 
-### 安装与构建
+**环境要求**：Node.js 22（与 CI 一致）；可选 Wrangler CLI（本地 Worker 调试）
 
-
-
-```
-\# 克隆仓库
-
+```bash
 git clone https://github.com/nathanpenny520/whizzzest.com.git
-
 cd whizzzest.com
 
-\# 安装依赖（仅 sharp，用于构建期 WebP 图片优化；不装也能构建）
+npm install        # 仅 sharp（构建期 WebP 优化）；不装也能构建
+npm run build      # 零依赖构建，产物输出 dist/
 
-npm install
-
-\# 构建（零依赖，生成 dist/）
-
-npm run build
-```
-
-### 本地预览
-
-
-
-```
-\# 方式一：Python 静态服务器（仅预览静态页面，无 Worker 动态功能）
-
+# 静态预览（无动态功能）
 python3 -m http.server 8788 -d dist
 
-\# 访问 http://localhost:8788
-
-\# 方式二：Wrangler 本地开发（完整 Worker 环境，需配置 D1/R2）
-
+# 完整 Worker 环境（需配置 D1/R2 本地实例）
 npx wrangler dev
 ```
 
-### 新增页面
-
-构建脚本支持**页面自动发现**，新增页面只需三步：
-
-
-
-```
-\# 1. 建页面目录（支持任意深度嵌套）
-
-mkdir -p src/pages/my-new-page
-
-\# 2. 写页面模板
-
-cat > src/pages/my-new-page/index.html << 'EOF'
-
-{{> head}}
-
-{{> header}}
-
-\<main>
-
-&#x20; \<h1>{{ title }}\</h1>
-
-&#x20; \<p>{{ description }}\</p>
-
-\</main>
-
-{{> footer}}
-
-EOF
-
-\# 3. 写对应数据文件（路径与页面对应）
-
-cat > src/data/my-new-page.json << 'EOF'
-
-{
-
-&#x20; "title": "我的新页面",
-
-&#x20; "description": "这是一个示例页面"
-
-}
-
-EOF
-
-\# 重新构建即可
-
-npm run build
+```bash
+# 本地 D1 初始化（可选）：依次执行 001→003 编号迁移
+npx wrangler d1 execute whizzzest --local --file=scripts/migrations/001-20260907-ai-knowledge.sql
+npx wrangler d1 execute whizzzest --local --file=scripts/migrations/002-20260908-webauthn-credentials.sql
+npx wrangler d1 execute whizzzest --local --file=scripts/migrations/003-20260908-visits-governance.sql
 ```
 
-### 模板引擎语法
+部署采用 `npx wrangler deploy`（主站）+ `--config admin|merchant|writer/wrangler.jsonc`（三门户），线上由 GitHub Actions 自动完成。模板引擎语法、新增页面指引等详见 [docs/设计架构与方案.md](docs/设计架构与方案.md)。
 
-构建脚本内置轻量模板引擎，零依赖：
-
-
-
-```
-\<!-- 嵌入公共片段 -->
-
-{{> header}}
-
-\<!-- 变量输出（自动 HTML 转义） -->
-
-\<h1>{{ title }}\</h1>
-
-\<!-- 原样输出（不转义，用于富文本） -->
-
-\<div>{{{ content }}}\</div>
-
-\<!-- 循环 -->
-
-{{#each items as item}}
-
-&#x20; \<article>
-
-&#x20;   \<h2>{{@index}}. {{ item.title }}\</h2>
-
-&#x20;   \<p>{{ item.desc }}\</p>
-
-&#x20; \</article>
-
-{{/each}}
-
-\<!-- 点路径取值 -->
-
-\<p>{{ hero.subtitle }}\</p>
-```
-
-
-
-***
-
-## 部署方式
-
-### 自动部署（推荐）
-
-push 到 `main` 分支触发 GitHub Actions 自动部署：
-
-
-
-```
-\# .github/workflows/deploy.yml
-
-\# 1. npm install（安装 sharp）
-
-\# 2. npm run build（构建 dist/）
-
-\# 3. wrangler deploy（部署主站 Worker + 静态资产）
-
-\# 4. wrangler deploy --config admin/wrangler.jsonc（管理后台）
-
-\# 5. wrangler deploy --config merchant/wrangler.jsonc（商户门户）
-
-\# 6. wrangler deploy --config writer/wrangler.jsonc（作者门户）
-```
-
-### 手动部署
-
-
-
-```
-\# 构建
-
-npm run build
-
-\# 部署主站
-
-npx wrangler deploy
-
-\# 部署子站
-
-npx wrangler deploy --config admin/wrangler.jsonc
-
-npx wrangler deploy --config merchant/wrangler.jsonc
-
-npx wrangler deploy --config writer/wrangler.jsonc
-```
-
-### 数据库初始化
-
-
-
-```
-\# 本地 D1 初始化
-
-npx wrangler d1 execute whizzzest --local --file=schema.sql
-
-\# 远程 D1 初始化（首次部署）
-
-npx wrangler d1 execute whizzzest --remote --file=schema.sql
-
-\# 种子数据
-
-npx wrangler d1 execute whizzzest --remote --file=scripts/attractions-seed.sql
-```
-
-### 环境变量
-
-在 Cloudflare Dashboard 或 `.dev.vars` 中配置：
-
-
-
-| 变量                                                    | 说明                   |
-| ----------------------------------------------------- | -------------------- |
-| `ADMIN_PASSWORD`                                      | 管理后台主账号（站长）密码        |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | 邮件服务配置（商户验证码 / 联系表单） |
-
-
-
-***
+---
 
 ## 数据模型
 
-核心数据表（详见 `schema.sql`）：
+核心数据表（共 18 张；[schema.sql](schema.sql) 为全量图纸，库变更一律走 [scripts/migrations/](scripts/migrations/) 编号迁移）：
 
+| 表名 | 说明 |
+| --- | --- |
+| `merchants` | 商户信息（分类 / 地址 / 图片 / 认证状态 / 置顶权重） |
+| `merchant_sessions` | 商户邮箱验证码登录会话 |
+| `library_works` / `library_chapters` | 文库作品与章节（双级审核状态） |
+| `tv_videos` | 万载 TV 视频（R2 对象键 / 时长 / 分类） |
+| `music_tracks` | 万载音乐（R2 对象键 / 时长 / 封面） |
+| `attractions` | 旅游景点（坐标 / 图片 / 排序） |
+| `messages` | 访客留言 |
+| `admin_users` | 管理后台账号（PBKDF2 哈希 / 权限） |
+| `visitors` | 访客分析（路径 / UA / IP 截断） |
+| `ai_knowledge` | AI 知识库（内容 / 向量 / 来源 / 分类） |
 
+---
 
-| 表名                  | 说明                                         |
-| ------------------- | ------------------------------------------ |
-| `merchants`         | 商户信息（名称 / 分类 / 地址 / 电话 / 图片 / 认证状态 / 置顶权重） |
-| `merchant_sessions` | 商户邮箱验证码登录会话                                |
-| `library_works`     | 文库作品（标题 / 作者 / 简介 / 封面 / 状态）               |
-| `library_chapters`  | 文库章节（作品 ID / 标题 / 正文 / 排序 / 审核状态）          |
-| `tv_videos`         | 万载 TV 视频（标题 / 描述 / R2 对象键 / 时长 / 分类 / 排序）  |
-| `music_tracks`      | 万载音乐（标题 / 艺术家 / R2 对象键 / 时长 / 封面）          |
-| `attractions`       | 旅游景点（名称 / 描述 / 图片 / 坐标 / 排序）               |
-| `messages`          | 访客留言（姓名 / 邮箱 / 内容 / 已读状态 / 时间）             |
-| `admin_users`       | 管理后台账号（用户名 / PBKDF2 密码哈希 / 权限）             |
-| `visitors`          | 访客分析（路径 / UA/IP 哈希 / 时间）                   |
-| `ai_knowledge`      | AI 知识库向量索引（内容 / 向量 / 来源 / 分类）              |
+## 团队与合作伙伴
 
+「焰境・万载」由热爱家乡文化的北京高校在读生发起，6 人核心团队 + AI 智能伙伴：
 
-
-***
-
-## 团队
-
-「焰境・万载」由一群热爱家乡文化的**北京高校在读生**发起，6 人核心团队 + AI 智能伙伴：
-
-
-
-| 成员        | 角色     | 职责                         |
-| --------- | ------ | -------------------------- |
-| 龙紫琴       | 项目负责人  | 全局战略规划与团队协作，资源整合           |
-| 聂磐        | 技术架构师  | 全栈开发与系统架构，零依赖构建管线          |
-| 黄婧瑶       | 品牌运营总监 | 新媒体矩阵运营与品牌传播策略             |
-| 龙子萱       | 视频创意总监 | 视觉内容策划与制作，万载 TV            |
-| 闻可佳       | 内容战略总监 | 内容规划与项目方案，品牌叙事             |
+| 成员 | 角色 | 职责 |
+| --- | --- | --- |
+| 龙紫琴 | 项目负责人 | 全局战略规划与团队协作，资源整合 |
+| 聂磐 | 技术架构师 | 全栈开发与系统架构，零依赖构建管线 |
+| 黄婧瑶 | 品牌运营总监 | 新媒体矩阵运营与品牌传播策略 |
+| 龙子萱 | 视频创意总监 | 视觉内容策划与制作，万载 TV |
+| 闻可佳 | 内容战略总监 | 内容规划与项目方案，品牌叙事 |
 | Claude AI | 智能赋能助手 | 「花傩」AI 问答驱动、文案生成、代码评审、视觉创作 |
 
-### 合作伙伴
+**合作伙伴**：万载县文旅局 · 万载古城景区 · 彩天艺术焰火 · 泰麟花炮
 
-
-
-* 万载县文旅局
-
-* 万载古城景区
-
-* 彩天艺术焰火
-
-* 泰麟花炮
-
-
-
-***
+---
 
 ## 联系方式
 
-* **官方网站**：[whizzzest.com](https://whizzzest.com)
-* **电子邮箱**：[contact@whizzzest.com](mailto:contact@whizzzest.com)
-* **企业客服**：[点击咨询](https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8)
-* **微信公众号**：云上万载 - 焰遇乡旅（扫码关注）
-* **微信视频号**：焰境・万载（扫码关注）
-* **抖音**：[@焰境・万载](https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8)
-* **小红书**：[@焰境・万载](https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4)
-* **哔哩哔哩**：[@焰境・万载](https://space.bilibili.com/3546949301045835)
+- **官方网站**：[whizzzest.com](https://whizzzest.com/)
+- **电子邮箱**：[contact@whizzzest.com](mailto:contact@whizzzest.com)
+- **企业客服**：[点击咨询](https://work.weixin.qq.com/kfid/kfc339afcb020ce4dd8)
+- **微信公众号**：云上万载 - 焰遇乡旅
+- **微信视频号**：焰境・万载
+- **抖音**：[@焰境・万载](https://www.douyin.com/user/MS4wLjABAAAA0fPcuNv5vy46rDu3W1laQUVvZQiyr9MbDl7E60WUnrOKVkG_JKKy68tZiWA_L3A8)
+- **小红书**：[@焰境・万载](https://www.xiaohongshu.com/user/profile/69a2d84a0000000021023fd4)
+- **哔哩哔哩**：[@焰境・万载](https://space.bilibili.com/3546949301045835)
 
-
-
-***
+---
 
 ## 版权声明
 
-本项目（包括但不限于源代码、文案、图片、设计、数据结构、架构方案）的版权归 **焰境・万载团队** 所有，保留所有权利。
+本项目（包括但不限于源代码、文案、图片、设计、数据结构、架构方案）的版权归**焰境・万载团队**所有，保留所有权利。
 
-未经版权所有者事先书面许可，任何人不得以任何形式复制、修改、分发、再许可或用于商业用途。详见 [LICENSE](LICENSE)。
+仓库公开仅作展示与学习交流；未经版权所有者事先书面许可，不得复制、修改、分发、再许可或用于商业用途。详见 [LICENSE](LICENSE)。
 
+---
 
+<div align="center">
 
-***
+**一朝相逢，便是万载。**
 
-> **一朝相逢，便是万载。**
-> 用 AI 技术赋能县域文旅，让千年烟花文化在数字世界继续绽放。
+用 AI 技术赋能县域文旅，让千年烟花文化在数字世界继续绽放。
+
+</div>
