@@ -27,16 +27,32 @@ FAIL=0
 ROWS=()
 FAILURES=()
 
+# 浏览器 UA：部分边缘安全特性（安全级别/UA 规则）会质询非浏览器流量；
+# 尾缀 whizzzest-smoke 便于在 Cloudflare 日志中识别本检查流量。
+# 注意 Accept 仍为 */*：不满足访客采集的文档导航判定，不写 D1 统计。
+UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 whizzzest-smoke'
+
 md5_8() {
   # 与 build.js 的指纹算法一致：内容 md5 前 8 位（node 保证 macOS/CI 通用）
   node -e "const c=require('crypto');const d=[];process.stdin.on('data',b=>d.push(b));process.stdin.on('end',()=>console.log(c.createHash('md5').update(Buffer.concat(d)).digest('hex').slice(0,8)))"
 }
 
-# 取 HTTP 状态码；curl 自身失败（DNS/超时）按 000 处理
+# 取 HTTP 状态码 + curl 退出码；输出 "状态 curl_rc=N"（rc=6 DNS / 7 连接失败 / 28 超时）
 get_status() {
   local out
-  out=$(curl -sS -o /dev/null -m 20 -w '%{http_code}' -H 'Accept: */*' "$1" 2>/dev/null)
-  echo "${out:-000}"
+  out=$(curl -sS -o /dev/null -m 20 -w '%{http_code}' -A "$UA" -H 'Accept: */*' "$1" 2>/dev/null)
+  echo "${out:-000} curl_rc=$?"
+}
+
+# 失败诊断：打印关键响应头与响应体片段，用于判断是否被边缘质询（cf-mitigated: challenge）
+diag() {
+  local url="$1"
+  local body="/tmp/smoke-diag-body.$$"
+  echo "--- 诊断 $url ---"
+  curl -sS -m 20 -A "$UA" -H 'Accept: */*' -D - -o "$body" "$url" 2>&1 |
+    grep -iE '^(HTTP/|cf-mitigated:|server:|cf-ray:)' | head -6
+  echo "body 前 200 字节: $(head -c 200 "$body" 2>/dev/null | tr '\n\r' '  ')"
+  rm -f "$body"
 }
 
 # check <名称> <URL> <期望: 200 | 301 | 404 | ok(2xx/3xx)>
@@ -48,7 +64,7 @@ check() {
   esac
   pass=0
   for attempt in $(seq 1 "$ATTEMPTS"); do
-    status=$(get_status "$url")
+    read -r status rcinfo <<< "$(get_status "$url")"
     case "$expect" in
       ok)  case "$status" in 2*|3*) pass=1 ;; esac ;;
       *)   [ "$status" = "$expect" ] && pass=1 ;;
@@ -58,12 +74,12 @@ check() {
   done
   if [ "$pass" = 1 ]; then
     PASS=$((PASS + 1))
-    ROWS+=("| ✅ | $name | \`$status\` |")
+    ROWS+=("| ✅ | $name | \`${status}\` |")
   else
     FAIL=$((FAIL + 1))
-    # 注意：$var 后紧跟全角字符在 bash 3.2/macOS 下会被并入变量名，必须用 ${var} 隔离
-    ROWS+=("| ❌ | $name | \`${status}\`（期望 ${want}） |")
-    FAILURES+=("$name → \`$url\` 返回 ${status}，期望 ${want}")
+    ROWS+=("| ❌ | $name | \`${status}\`/${rcinfo}（期望 ${want}） |")
+    FAILURES+=("$name → \`$url\` 返回 ${status}（${rcinfo}），期望 ${want}")
+    diag "$url"
   fi
 }
 
@@ -82,7 +98,7 @@ fp_check() {
     mismatches=""
     while read -r path expected; do
       [ -n "$path" ] || continue
-      actual=$(curl -sS -m 20 "$BASE_URL$path" 2>/dev/null | md5_8)
+      actual=$(curl -sS -m 20 -A "$UA" "$BASE_URL$path" 2>/dev/null | md5_8)
       if [ "$actual" != "$expected" ]; then
         mismatches="$mismatches \`$path\`(本地 $expected / 线上 ${actual:-空})"
       fi
@@ -137,7 +153,8 @@ else
   [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning::CLOUDFLARE_API_TOKEN 缺失或 deploy job 未执行，线上仍为旧版本，本次未做部署落地校验"
 fi
 
-# --- 输出 summary ---
+# --- 输出 summary：表格同时进 stdout（CI 日志可直接看）与 job summary ---
+SUMMARY_OUT="${GITHUB_STEP_SUMMARY:-$(mktemp)}"
 {
   echo "## 🩺 部署后冒烟检查"
   echo ""
@@ -154,7 +171,8 @@ fi
   else
     echo "✅ 全部通过（$PASS 项）"
   fi
-} > "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+} > "$SUMMARY_OUT"
+cat "$SUMMARY_OUT"
 
 echo "== 结果：$PASS 通过 / $FAIL 失败 =="
 [ "$FAIL" -eq 0 ] || exit 1
