@@ -278,7 +278,7 @@ Whizzzest (焰境·万载) was founded by university students in Beijing who lov
 | 闻可佳 (Wen Kejia) | Content strategy director | Content planning, project proposals, brand narrative |
 | Claude AI | AI teammate | Huanuo Q&A engine, copywriting, code review, visual creation |
 
-**Partners**: Wanzai Culture & Tourism Bureau · Wanzai Ancient Town · Caitian Artistic Fireworks · Tailin Firecrackers
+**Partners**: [Wanzai Culture & Tourism Bureau](https://www.wanzai.gov.cn/) · [Wanzai Ancient Town](http://zgwzgc.com/) · Caitian Artistic Fireworks · [Tailin Firecrackers](http://www.wztlhp.com/)
 
 ---
 

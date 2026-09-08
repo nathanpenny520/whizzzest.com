@@ -278,7 +278,7 @@ npx wrangler d1 execute whizzzest --local --file=scripts/migrations/003-20260908
 | 闻可佳 | 内容战略总监 | 内容规划与项目方案，品牌叙事 |
 | Claude AI | 智能赋能助手 | 「花傩」AI 问答驱动、文案生成、代码评审、视觉创作 |
 
-**合作伙伴**：万载县文旅局 · 万载古城景区 · 彩天艺术焰火 · 泰麟花炮
+**合作伙伴**：[万载县文旅局](https://www.wanzai.gov.cn/) · [万载古城景区](http://zgwzgc.com/) · 彩天艺术焰火 · [泰麟花炮](http://www.wztlhp.com/)
 
 ---
 
