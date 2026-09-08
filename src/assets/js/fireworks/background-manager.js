@@ -42,7 +42,7 @@
 			return fetch(resolvedUrl.href, { cache: "no-store" }).then((response) => {
 				const contentType = response.headers.get("content-type") || "";
 				if (!response.ok || !contentType.startsWith("image/")) {
-					throw new Error("背景图片加载失败");
+					throw new Error(fwT("bgLoadFailed", "背景图片加载失败"));
 				}
 			});
 		}
@@ -50,7 +50,7 @@
 		return new Promise((resolve, reject) => {
 			const image = new Image();
 			image.onload = () => resolve();
-			image.onerror = () => reject(new Error("背景图片加载失败"));
+			image.onerror = () => reject(new Error(fwT("bgLoadFailed", "背景图片加载失败")));
 			image.src = resolvedUrl.href;
 		});
 	}
@@ -81,7 +81,7 @@
 			container.style.backgroundPosition = "";
 			container.style.backgroundRepeat = "";
 			container.style.backgroundSize = "";
-			setStatus("未设置自定义背景", "idle");
+			setStatus(fwT("bgNone", "未设置自定义背景"), "idle");
 			return {
 				mode: "none",
 				value: "",
@@ -108,7 +108,7 @@
 			}
 
 			const currentRequestId = ++requestId;
-			setStatus("正在加载背景", "loading");
+			setStatus(fwT("bgApplying", "正在加载背景"), "loading");
 
 			try {
 				await preloadImage(backgroundDefinition.preloadUrl);
@@ -119,7 +119,7 @@
 				const validationNode = document.createElement("div");
 				validationNode.style.backgroundImage = backgroundDefinition.cssValue;
 				if (!validationNode.style.backgroundImage) {
-					throw new Error("背景样式无效");
+					throw new Error(fwT("bgStyleInvalid", "背景样式无效"));
 				}
 
 				container.style.backgroundImage = backgroundDefinition.cssValue;
@@ -127,7 +127,7 @@
 				container.style.backgroundRepeat = "no-repeat";
 				container.style.backgroundSize = "cover";
 				revokeActiveObjectUrl();
-				setStatus("自定义背景已应用", "success");
+				setStatus(fwT("bgApplied", "自定义背景已应用"), "success");
 
 				return {
 					ok: true,
@@ -141,7 +141,7 @@
 					return { ok: false, cancelled: true };
 				}
 
-				setStatus("背景加载失败，请检查地址或样式", "error");
+				setStatus(fwT("bgInvalidCheckUrl", "背景加载失败，请检查地址或样式"), "error");
 				return {
 					ok: false,
 					error,
@@ -151,7 +151,7 @@
 
 		async function applyLibraryImage(record) {
 			const currentRequestId = ++requestId;
-			setStatus("正在加载背景", "loading");
+			setStatus(fwT("bgApplying", "正在加载背景"), "loading");
 
 			try {
 				const objectUrl = URL.createObjectURL(record.blob);
@@ -159,7 +159,7 @@
 				validationNode.style.backgroundImage = `url("${objectUrl}")`;
 				if (!validationNode.style.backgroundImage) {
 					URL.revokeObjectURL(objectUrl);
-					throw new Error("背景样式无效");
+					throw new Error(fwT("bgStyleInvalid", "背景样式无效"));
 				}
 
 				if (currentRequestId !== requestId) {
@@ -173,7 +173,7 @@
 				container.style.backgroundPosition = "center";
 				container.style.backgroundRepeat = "no-repeat";
 				container.style.backgroundSize = "cover";
-				setStatus("已应用上传的背景图", "success");
+				setStatus(fwT("bgUploaded", "已应用上传的背景图"), "success");
 
 				return {
 					ok: true,
@@ -188,7 +188,7 @@
 					return { ok: false, cancelled: true };
 				}
 
-				setStatus("背景加载失败，请重试", "error");
+				setStatus(fwT("bgLoadRetry", "背景加载失败，请重试"), "error");
 				return {
 					ok: false,
 					error,

@@ -1,0 +1,272 @@
+{
+  "nav": {
+    "skip": "Skip to main content",
+    "mainLabel": "Main navigation",
+    "pagesLabel": "Site pages",
+    "logoAria": "Whizzzest home",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "langSwitchAria": "Switch language"
+  },
+  "footer": {
+    "contactSuffix": ": ",
+    "friendLinksTitle": "Links",
+    "aboutLink": "About this site ›",
+    "socialLabel": "Social media",
+    "qrAria": " (view QR code)",
+    "lightboxLabel": "QR code viewer",
+    "close": "Close",
+    "qrAlt": "QR code"
+  },
+  "common": {
+    "readMore": "Read more ›",
+    "videoSuffix": " video"
+  },
+  "hero": {
+    "prev": "Previous slide",
+    "next": "Next slide",
+    "dotsLabel": "Choose slide",
+    "dotBefore": "Slide ",
+    "dotAfter": ""
+  },
+  "home": {
+    "attractKicker": "Attractions · Wanzai scenery",
+    "attractTitle": "Explore Wanzai — ancient town, rivers and fireworks",
+    "attractMore": "All attractions ›",
+    "tvKicker": "Whizzzest Vision · Wanzai TV",
+    "tvTitle": "Start your Wanzai story with an episode",
+    "tvMore": "Enter the channel ›",
+    "musicKicker": "Wanzai Music · Sounds of Wanzai",
+    "musicTitle": "Every sound of Wanzai lives here",
+    "musicMore": "Enter the music hall ›"
+  },
+  "heritage": {
+    "crumb": "← Heritage",
+    "pagerLabel": "Heritage items"
+  },
+  "industry": {
+    "kickerHistory": "01 · History",
+    "kickerTourism": "03 · Culture & Tourism",
+    "kickerFuture": "04 · Future"
+  },
+  "about": {
+    "qrBtnTitle": "Click to view the WeChat QR code"
+  },
+  "form": {
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "email": "Email (optional)",
+    "emailPlaceholder": "So we can reply to you",
+    "message": "Message",
+    "messagePlaceholder": "What you'd like to say…",
+    "send": "Send message"
+  },
+  "notfound": {
+    "body": "The fireworks on this page have all faded.",
+    "home": "Back to home"
+  },
+  "fw": {
+    "loading": "Loading",
+    "loadingStatus": "Preparing fireworks",
+    "pauseAria": "Pause or resume",
+    "soundAria": "Toggle sound",
+    "openSettingsAria": "Open settings",
+    "closeSettingsAria": "Close settings",
+    "settings": "Settings",
+    "settingsHint": "Click any label to learn more",
+    "shellType": "Firework type",
+    "shellSize": "Firework size",
+    "quality": "Quality",
+    "skyLighting": "Sky lighting",
+    "scaleFactor": "Zoom",
+    "background": "Custom background",
+    "bgPlaceholder": "Image URL, or linear-gradient(...)",
+    "apply": "Apply",
+    "clear": "Clear",
+    "upload": "Upload image",
+    "wordShell": "Text fireworks",
+    "autoLaunch": "Auto launch",
+    "finale": "Finale mode",
+    "hideControls": "Hide controls",
+    "fullscreen": "Fullscreen",
+    "longExposure": "Long exposure",
+    "close": "Close",
+    "noscript": "Digital fireworks need JavaScript to bloom. Please enable JavaScript in your browser and try again."
+  },
+  "offline": {
+    "title": "Offline · Whizzzest",
+    "h1": "You are offline",
+    "p": "No cached copy of this page was found. Pages you have visited, music you have played and the digital fireworks still work offline; everything catches up once you are back online.",
+    "retry": "Reconnect"
+  },
+  "js": {
+    "a11y": {
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "play": "Play",
+      "pause": "Pause"
+    },
+    "qr": {
+      "defaultAlt": "QR code"
+    },
+    "music": {
+      "loopAll": "Loop all",
+      "loopOne": "Repeat one",
+      "loopOff": "Play in order",
+      "loopMode": "Loop mode: ",
+      "unnamed": "Unknown artist",
+      "title": "Wanzai Music",
+      "album": "Wanzai Music · Whizzzest",
+      "nowPlaying": "Now playing",
+      "paused": "Paused",
+      "copied": "Link copied — go share it with a friend",
+      "copyPrompt": "Long-press or select all to copy the link: ",
+      "shareTitle": "{title} — Wanzai Music · Whizzzest"
+    },
+    "form": {
+      "needName": "Please fill in your name and message.",
+      "sending": "Sending…",
+      "sent": "Got it — thank you for your message!",
+      "rateLimited": "You're sending too often. Please try again later.",
+      "failed": "Sending failed. Please try again later or reach us by email.",
+      "network": "Network error. Please try again later."
+    },
+    "ai": {
+      "fabAria": "Open Huanuo smart Q&A",
+      "panelAria": "Huanuo smart Q&A",
+      "panelTitle": "Huanuo · Wanzai smart Q&A",
+      "historyAria": "Chat history",
+      "clearAria": "Clear current conversation",
+      "closeAria": "Close",
+      "inputPlaceholder": "Ask something… (Enter to send)",
+      "sendAria": "Send",
+      "welcomeTitle": "Hi, I'm Huanuo",
+      "welcomeDesc": "Your Wanzai travel & culture assistant — ask me about fireworks, heritage, food or itineraries.",
+      "newChat": "New chat",
+      "emptyHistory": "No conversations yet",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "rename": "Rename",
+      "renamePrompt": "Rename conversation (leave empty to cancel): ",
+      "delete": "Delete",
+      "deleteConfirm": "Delete \"{name}\"? This cannot be undone.",
+      "clearConfirm": "Clear the current conversation?",
+      "offline": "You are offline — Huanuo needs a connection to answer. Please try again once you are back online.",
+      "rateLimited": "That's a lot of questions! Take a short break and try again.",
+      "unavailable": "Huanuo is unavailable right now. Please try again later.",
+      "network": "Network error. Please try again later.",
+      "offlineShort": "You are offline. Reconnect and ask again.",
+      "sources": "Sources: ",
+      "goto": "Go to ",
+      "openPage": "Open page",
+      "playSong": "▶ Play this song",
+      "msgsUnit": "msgs",
+      "routes": {
+        "/tv": "Wanzai TV",
+        "/library": "Library",
+        "/music": "Music",
+        "/attractions": "Attractions",
+        "/merchants": "Merchants",
+        "/spots": "Viewing spots",
+        "/cuisine": "Cuisine",
+        "/heritage": "Heritage",
+        "/industry": "Fireworks industry",
+        "/tourism": "Tour routes",
+        "/digital-fireworks": "Fireworks simulator",
+        "/about": "About",
+        "/pay": "Partnership"
+      }
+    },
+    "fw": {
+      "qualityLow": "Low",
+      "qualityNormal": "Normal",
+      "qualityHigh": "High",
+      "skyNone": "None",
+      "skyDim": "Dim",
+      "skyNormal": "Normal",
+      "igniting": "Lighting the fuse",
+      "bgNone": "No custom background set",
+      "processingImage": "Processing image",
+      "saveFailed": "Failed to save image",
+      "usingWebBg": "Using web-configured background",
+      "webBgInvalid": "Web background invalid — no default background set",
+      "webBgFallback": "Web background invalid — fell back to built-in default",
+      "webBgAndDefaultInvalid": "Both web background and built-in default are invalid",
+      "usingDefaultBg": "Using built-in default background",
+      "defaultBgInvalid": "Built-in default background invalid — showing no background",
+      "usingSavedBg": "Using saved background image",
+      "savedBgInvalid": "Saved background no longer valid — no default background set",
+      "savedBgFallback": "Saved background no longer valid — fell back to built-in default",
+      "savedBgAndDefaultInvalid": "Both saved background and built-in default are invalid",
+      "bgLoadFailed": "Failed to load background image",
+      "bgApplying": "Loading background",
+      "bgStyleInvalid": "Invalid background style",
+      "bgApplied": "Custom background applied",
+      "bgInvalidCheckUrl": "Background failed to load — check the URL or style",
+      "bgUploaded": "Uploaded background applied",
+      "bgLoadRetry": "Background failed to load — please retry",
+      "galleryOpenFailed": "Could not open the local image gallery",
+      "galleryBlocked": "The local gallery is in use by another page",
+      "galleryFailed": "Local gallery operation failed",
+      "imageReadFailed": "Could not read this image — try another one",
+      "imageProcessFailed": "Failed to process this image — try another one",
+      "imageUnsupported": "This browser cannot process this image",
+      "saveUnsupported": "This browser cannot save uploaded images",
+      "imageTooLarge": "Image is too large — please choose one under 30MB",
+      "galleryFull": "At most {n} background images can be saved — delete some first",
+      "bgDefaultName": "Background",
+      "useBg": "Use background {name}",
+      "deleteBg": "Delete background {name}",
+      "help": {
+        "shellType": {
+          "header": "Firework type",
+          "body": "The type of firework you launch. Choosing random keeps the original mixed rhythm of the show."
+        },
+        "shellSize": {
+          "header": "Firework size",
+          "body": "Bigger fireworks burst wider but demand more from your device."
+        },
+        "quality": {
+          "header": "Quality",
+          "body": "Higher quality means more particles. Lower it if your device struggles."
+        },
+        "skyLighting": {
+          "header": "Sky lighting",
+          "body": "Controls how strongly explosions light up the background."
+        },
+        "scaleFactor": {
+          "header": "Zoom",
+          "body": "Adjusts viewing distance. Smaller values show more of each firework."
+        },
+        "wordShell": {
+          "header": "Text fireworks",
+          "body": "Off by default. When on, text fireworks fire reliably instead of relying on random chance."
+        },
+        "autoLaunch": {
+          "header": "Auto launch",
+          "body": "Launch fireworks automatically and continuously. When off, fireworks fire only on tap."
+        },
+        "finaleMode": {
+          "header": "Finale mode",
+          "body": "Densifies the rhythm during the auto-launch phase."
+        },
+        "hideControls": {
+          "header": "Hide controls",
+          "body": "Hides the top buttons for a cleaner view."
+        },
+        "fullscreen": {
+          "header": "Fullscreen",
+          "body": "Toggles browser fullscreen mode."
+        },
+        "longExposure": {
+          "header": "Long exposure",
+          "body": "Keeps longer trailing sparks."
+        },
+        "background": {
+          "header": "Custom background",
+          "body": "\"Upload image\" saves a picture to this browser (IndexedDB); reopen the page and tap its thumbnail to use it. Image URLs and styles like `url(...)` or `linear-gradient(...)` also work. Clearing site data removes uploaded images."
+        }
+      }
+    }
+  }
+}

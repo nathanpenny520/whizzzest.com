@@ -310,7 +310,7 @@ function refreshBackgroundGallery() {
 }
 
 async function handleBackgroundUpload(file) {
-	backgroundManager.setStatus("正在处理图片", "loading");
+	backgroundManager.setStatus(fwT("processingImage", "正在处理图片"), "loading");
 
 	try {
 		const record = await backgroundLibrary.addImage(file);
@@ -318,7 +318,7 @@ async function handleBackgroundUpload(file) {
 		renderGalleryWithSelection();
 		commitBackgroundSettings(await backgroundManager.applyLibraryImage(record));
 	} catch (error) {
-		backgroundManager.setStatus(error && error.message ? error.message : "图片保存失败", "error");
+		backgroundManager.setStatus(error && error.message ? error.message : fwT("saveFailed", "图片保存失败"), "error");
 	}
 }
 
@@ -405,25 +405,25 @@ function applyResolvedBackground() {
 
 		backgroundManager.applyBackground(resolvedBackground.background).then((result) => {
 			if (result.ok) {
-				backgroundManager.setStatus("正在使用网页端背景", "success");
+				backgroundManager.setStatus(fwT("usingWebBg", "正在使用网页端背景"), "success");
 				return;
 			}
 
 			const fallbackBackground = getCodeDefaultBackground();
 			if (!fallbackBackground.value) {
 				backgroundManager.clearBackground();
-				backgroundManager.setStatus("网页端背景无效，当前未设置默认背景", "error");
+				backgroundManager.setStatus(fwT("webBgInvalid", "网页端背景无效，当前未设置默认背景"), "error");
 				return;
 			}
 
 			backgroundManager.applyBackground(fallbackBackground).then((fallbackResult) => {
 				if (fallbackResult.ok) {
-					backgroundManager.setStatus("网页端背景无效，已回退到代码默认背景", "idle");
+					backgroundManager.setStatus(fwT("webBgFallback", "网页端背景无效，已回退到代码默认背景"), "idle");
 					return;
 				}
 
 				backgroundManager.clearBackground();
-				backgroundManager.setStatus("网页端背景和代码默认背景都无效", "error");
+				backgroundManager.setStatus(fwT("webBgAndDefaultInvalid", "网页端背景和代码默认背景都无效"), "error");
 			});
 		});
 		return;
@@ -432,12 +432,12 @@ function applyResolvedBackground() {
 	if (resolvedBackground.source === "default") {
 		backgroundManager.applyBackground(resolvedBackground.background).then((result) => {
 			if (result.ok) {
-				backgroundManager.setStatus("正在使用代码默认背景", "idle");
+				backgroundManager.setStatus(fwT("usingDefaultBg", "正在使用代码默认背景"), "idle");
 				return;
 			}
 
 			backgroundManager.clearBackground();
-			backgroundManager.setStatus("代码默认背景无效，当前未显示背景", "error");
+			backgroundManager.setStatus(fwT("defaultBgInvalid", "代码默认背景无效，当前未显示背景"), "error");
 		});
 		return;
 	}
@@ -450,7 +450,7 @@ async function applyUserLibraryBackground() {
 	if (record) {
 		const result = await backgroundManager.applyLibraryImage(record);
 		if (result.ok && !result.cancelled) {
-			backgroundManager.setStatus("正在使用保存的背景图", "success");
+			backgroundManager.setStatus(fwT("usingSavedBg", "正在使用保存的背景图"), "success");
 		}
 		return;
 	}
@@ -466,18 +466,18 @@ async function applyUserLibraryBackground() {
 	const fallbackBackground = getCodeDefaultBackground();
 	if (!fallbackBackground.value) {
 		backgroundManager.clearBackground();
-		backgroundManager.setStatus("保存的背景图已失效，当前未设置默认背景", "error");
+		backgroundManager.setStatus(fwT("savedBgInvalid", "保存的背景图已失效，当前未设置默认背景"), "error");
 		return;
 	}
 
 	backgroundManager.applyBackground(fallbackBackground).then((fallbackResult) => {
 		if (fallbackResult.ok) {
-			backgroundManager.setStatus("保存的背景图已失效，已回退到代码默认背景", "idle");
+			backgroundManager.setStatus(fwT("savedBgFallback", "保存的背景图已失效，已回退到代码默认背景"), "idle");
 			return;
 		}
 
 		backgroundManager.clearBackground();
-		backgroundManager.setStatus("保存的背景图和代码默认背景都无效", "error");
+		backgroundManager.setStatus(fwT("savedBgAndDefaultInvalid", "保存的背景图和代码默认背景都无效"), "error");
 	});
 }
 

@@ -19,14 +19,14 @@ function populateAppControls() {
 			label,
 		})),
 		qualityOptions: [
-			{ label: "低", value: QUALITY_LOW },
-			{ label: "正常", value: QUALITY_NORMAL },
-			{ label: "高", value: QUALITY_HIGH },
+			{ label: fwT("qualityLow", "低"), value: QUALITY_LOW },
+			{ label: fwT("qualityNormal", "正常"), value: QUALITY_NORMAL },
+			{ label: fwT("qualityHigh", "高"), value: QUALITY_HIGH },
 		],
 		skyLightingOptions: [
-			{ label: "不", value: SKY_LIGHT_NONE },
-			{ label: "暗", value: SKY_LIGHT_DIM },
-			{ label: "正常", value: SKY_LIGHT_NORMAL },
+			{ label: fwT("skyNone", "不"), value: SKY_LIGHT_NONE },
+			{ label: fwT("skyDim", "暗"), value: SKY_LIGHT_DIM },
+			{ label: fwT("skyNormal", "正常"), value: SKY_LIGHT_NORMAL },
 		],
 		scaleFactorOptions: appConfig.scaleFactorOptions.map((value) => ({
 			value: value.toFixed(2),
@@ -95,7 +95,7 @@ function attachRuntimeBindings() {
 		appNodes.fullscreenFormOption.classList.add("remove");
 	}
 
-	backgroundManager.setStatus("未设置自定义背景", "idle");
+	backgroundManager.setStatus(fwT("bgNone", "未设置自定义背景"), "idle");
 	handleResize();
 }
 
@@ -104,7 +104,7 @@ attachRuntimeBindings();
 if (IS_HEADER) {
 	init();
 } else {
-	setLoadingStatus("正在点燃导火线");
+	setLoadingStatus(fwT("igniting", "正在点燃导火线"));
 	setTimeout(() => {
 		Promise.all([soundManager.preload()])
 			.then(() => {

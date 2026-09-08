@@ -1,6 +1,6 @@
 <!-- {"title":"得胜鼓 — 焰境·万载","description":"得胜鼓是万载传统民间鼓乐，起源于北宋，取材于唐朝平定安史之乱——雄浑激越的气势、整齐划一的节奏，万载重要文化品牌。","ogImage":"/assets/img/deshengu.jpg"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body>
   {{> header}}
@@ -11,7 +11,7 @@
         <img src="/assets/img/{{data.hero.img}}" alt="" loading="eager" fetchpriority="high">
       </div>
       <div class="hero-content">
-        <a class="hero-crumb" href="/heritage/">← 非遗文化</a>
+        <a class="hero-crumb" href="/heritage/">{{t.heritage.crumb}}</a>
         <h1>{{data.hero.title}}</h1>
         <p class="hero-sub">{{data.hero.subtitle}}</p>
       </div>
@@ -22,7 +22,7 @@
         <article class="split reveal">
           <div class="split-media">
             <div class="video-frame">
-              <iframe src="https://player.bilibili.com/player.html?bvid={{data.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{data.hero.title}}视频"></iframe>
+              <iframe src="https://player.bilibili.com/player.html?bvid={{data.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{data.hero.title}}{{t.common.videoSuffix}}"></iframe>
             </div>
             <p class="video-hint">{{data.videoHint}}</p>
           </div>
@@ -31,7 +31,7 @@
             {{#each data.paras as p}}<p>{{p}}</p>{{/each}}
           </div>
         </article>
-        <nav class="pager" aria-label="非遗项目切换">
+        <nav class="pager" aria-label="{{t.heritage.pagerLabel}}">
           {{#if data.prev}}<a class="pager-link" href="{{data.prev.href}}">← {{data.prev.label}}</a>{{/if}}
           {{#if data.next}}<a class="pager-link pager-next" href="{{data.next.href}}">{{data.next.label}} →</a>{{/if}}
         </nav>

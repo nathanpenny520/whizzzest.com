@@ -1,6 +1,6 @@
 <!-- {"title":"关于 — 焰境·万载","description":"焰境·万载团队介绍——项目背景、使命愿景、发展历程、合作伙伴与全部联系方式。","ogImage":"/assets/img/student-team.jpg"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body>
   {{> header}}
@@ -132,7 +132,7 @@
           {{#each data.partners.list as partner}}
           <div class="partner-card">
             {{#if partner.href}}<a href="{{partner.href}}" target="_blank" rel="noopener">{{partner.name}} ↗</a>{{/if}}
-            {{#if partner.qr}}<button type="button" class="partner-qr-btn" data-qr="/assets/img/{{partner.qr}}" data-cap="{{partner.cap}}" title="点击查看微信公众号二维码">{{partner.name}}</button>{{/if}}
+            {{#if partner.qr}}<button type="button" class="partner-qr-btn" data-qr="/assets/img/{{partner.qr}}" data-cap="{{partner.cap}}" title="{{t.about.qrBtnTitle}}">{{partner.name}}</button>{{/if}}
           </div>
           {{/each}}
         </div>
@@ -148,7 +148,7 @@
           <div class="qr-panel">
             {{#each data.contact.qrs as qr}}
             <figure class="qr-tile">
-              <img src="/assets/img/{{qr.qr}}" alt="{{qr.label}}二维码" loading="lazy" decoding="async">
+              <img src="/assets/img/{{qr.qr}}" alt="{{qr.label}}{{t.footer.qrAlt}}" loading="lazy" decoding="async">
               <figcaption>
                 <strong>{{qr.label}}</strong>
                 <span>{{qr.value}}</span>
@@ -169,22 +169,22 @@
         <form class="contact-form reveal" id="contact-form" novalidate>
           <div class="form-row">
             <label class="form-field">
-              <span class="form-label">姓名</span>
-              <input type="text" name="name" required maxlength="50" placeholder="怎么称呼您" autocomplete="name">
+              <span class="form-label">{{t.form.name}}</span>
+              <input type="text" name="name" required maxlength="50" placeholder="{{t.form.namePlaceholder}}" autocomplete="name">
             </label>
             <label class="form-field">
-              <span class="form-label">邮箱（选填）</span>
-              <input type="email" name="email" maxlength="100" placeholder="用于回复您" autocomplete="email">
+              <span class="form-label">{{t.form.email}}</span>
+              <input type="email" name="email" maxlength="100" placeholder="{{t.form.emailPlaceholder}}" autocomplete="email">
             </label>
           </div>
           <label class="form-field">
-            <span class="form-label">留言</span>
-            <textarea name="message" required maxlength="2000" rows="5" placeholder="想说的内容……"></textarea>
+            <span class="form-label">{{t.form.message}}</span>
+            <textarea name="message" required maxlength="2000" rows="5" placeholder="{{t.form.messagePlaceholder}}"></textarea>
           </label>
           <!-- Honeypot：对用户隐藏，机器人填了即静默丢弃 -->
           <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
           <div class="form-foot">
-            <button class="btn" type="submit">发送留言</button>
+            <button class="btn" type="submit">{{t.form.send}}</button>
             <p class="form-status" role="status" aria-live="polite"></p>
           </div>
         </form>

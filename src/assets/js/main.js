@@ -7,6 +7,14 @@
 /* JS 可用标记：滚动浮现等增强样式仅在 .js 下生效（无 JS 时内容直接可见） */
 document.documentElement.classList.add('js');
 
+/* 多语言（docs/英文版方案.md Phase 1）：build.js 按 locale 注入 window.__I18N（静态页）；
+   Worker 动态页无注入 → 全部走代码内 zh 兜底。t('a.b', '兜底') 取串。 */
+const I18N = window.__I18N || {};
+const t = (path, fallback) => {
+  const v = path.split('.').reduce((node, key) => (node == null ? undefined : node[key]), I18N);
+  return v == null ? fallback : v;
+};
+
 /* 导航：汉堡菜单开合（抽屉在 header 外层，见 header.html 注释） */
 const burger = document.querySelector('.nav-burger');
 const drawer = document.getElementById('nav-drawer');
@@ -14,7 +22,7 @@ const drawer = document.getElementById('nav-drawer');
 function setMenu(open) {
   if (!burger || !drawer) return;
   burger.setAttribute('aria-expanded', String(open));
-  burger.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+  burger.setAttribute('aria-label', open ? t('a11y.closeMenu', '关闭菜单') : t('a11y.openMenu', '打开菜单'));
   drawer.classList.toggle('open', open);
 }
 
@@ -170,7 +178,7 @@ if (lightbox) {
     } else {
       lbImg.src = src;
     }
-    lbImg.alt = caption || '二维码';
+    lbImg.alt = caption || t('qr.defaultAlt', '二维码');
     lbCap.textContent = caption || '';
     lastFocus = document.activeElement;
     lightbox.classList.add('open');
@@ -407,7 +415,11 @@ if (musicPage) {
     let current = -1;
     let seeking = false;
     // 循环三态：all 列表循环 / one 单曲循环 / off 顺序播放（播完即停）
-    const LOOP_LABEL = { all: '列表循环', one: '单曲循环', off: '顺序播放' };
+    const LOOP_LABEL = {
+      all: t('music.loopAll', '列表循环'),
+      one: t('music.loopOne', '单曲循环'),
+      off: t('music.loopOff', '顺序播放'),
+    };
     let loopMode = 'all';
     const counted = new Set(); // 每首每次进页面只计一次播放（真正开始播放时回报）
 
@@ -457,7 +469,7 @@ if (musicPage) {
 
     const setNow = (tr) => {
       nowTitle.textContent = tr.dataset.title;
-      nowArtist.textContent = tr.dataset.artist || '佚名';
+      nowArtist.textContent = tr.dataset.artist || t('music.unnamed', '佚名');
       setCover(nowCover, tr.dataset.cover);
       setCover(barCover, tr.dataset.cover);
     };
@@ -482,8 +494,8 @@ if (musicPage) {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: tr.dataset.title,
-          artist: tr.dataset.artist || '万载音乐',
-          album: '万载音乐 · 焰境万载',
+          artist: tr.dataset.artist || t('music.title', '万载音乐'),
+          album: t('music.album', '万载音乐 · 焰境万载'),
           artwork: tr.dataset.cover ? [{ src: tr.dataset.cover, sizes: '512x512', type: 'image/jpeg' }] : [],
         });
       }
@@ -537,7 +549,7 @@ if (musicPage) {
       loopBtn.classList.toggle('on', mode !== 'off');
       loopBtn.classList.toggle('one', mode === 'one');
       loopBtn.setAttribute('aria-pressed', String(mode !== 'off'));
-      loopBtn.setAttribute('aria-label', `循环模式：${LOOP_LABEL[mode]}`);
+      loopBtn.setAttribute('aria-label', `${t('music.loopMode', '循环模式：')}${LOOP_LABEL[mode]}`);
     };
     if (loopBtn) {
       setLoopMode('all'); // 与服务端渲染的初始高亮对齐
@@ -559,7 +571,10 @@ if (musicPage) {
       } catch { /* 忽略，用拼接值 */ }
       if (navigator.share) {
         try {
-          await navigator.share({ title: `${tr.dataset.title} — 万载音乐 · 焰境万载`, url: shareUrl });
+          await navigator.share({
+            title: t('music.shareTitle', '{title} — 万载音乐 · 焰境万载').replace('{title}', tr.dataset.title),
+            url: shareUrl,
+          });
           return;
         } catch (err) {
           if (err && err.name === 'AbortError') return; // 用户取消分享
@@ -567,9 +582,9 @@ if (musicPage) {
       }
       try {
         await navigator.clipboard.writeText(shareUrl);
-        toast('链接已复制，去分享给朋友吧');
+        toast(t('music.copied', '链接已复制，去分享给朋友吧'));
       } catch {
-        prompt('长按/全选复制链接：', shareUrl);
+        prompt(t('music.copyPrompt', '长按/全选复制链接：'), shareUrl);
       }
     });
 
@@ -590,15 +605,15 @@ if (musicPage) {
     audio.addEventListener('play', () => {
       count(rows[current]?.dataset.id);
       toggleBtn.classList.add('playing');
-      toggleBtn.setAttribute('aria-label', '暂停');
+      toggleBtn.setAttribute('aria-label', t('a11y.pause', '暂停'));
       rows[current]?.classList.remove('paused');
-      nowMeta.textContent = '正在播放';
+      nowMeta.textContent = t('music.nowPlaying', '正在播放');
     });
     audio.addEventListener('pause', () => {
       toggleBtn.classList.remove('playing');
-      toggleBtn.setAttribute('aria-label', '播放');
+      toggleBtn.setAttribute('aria-label', t('a11y.play', '播放'));
       rows[current]?.classList.add('paused');
-      nowMeta.textContent = '已暂停';
+      nowMeta.textContent = t('music.paused', '已暂停');
     });
     audio.addEventListener('ended', () => {
       if (loopMode === 'one') {
@@ -644,13 +659,13 @@ form?.addEventListener('submit', async (e) => {
   const data = Object.fromEntries(new FormData(form).entries());
 
   if (!data.name?.trim() || !data.message?.trim()) {
-    status.textContent = '请填写姓名和留言内容。';
+    status.textContent = t('form.needName', '请填写姓名和留言内容。');
     status.className = 'form-status err';
     return;
   }
 
   btn.disabled = true;
-  status.textContent = '发送中……';
+  status.textContent = t('form.sending', '发送中……');
   status.className = 'form-status';
   try {
     const res = await fetch('/api/contact', {
@@ -660,18 +675,18 @@ form?.addEventListener('submit', async (e) => {
     });
     const out = await res.json().catch(() => ({}));
     if (res.ok && out.ok) {
-      status.textContent = '已收到，谢谢您的留言！';
+      status.textContent = t('form.sent', '已收到，谢谢您的留言！');
       status.className = 'form-status ok';
       form.reset();
     } else if (out.error === 'rate_limited') {
-      status.textContent = '发送太频繁，请稍后再试。';
+      status.textContent = t('form.rateLimited', '发送太频繁，请稍后再试。');
       status.className = 'form-status err';
     } else {
-      status.textContent = '发送失败，请稍后重试或直接邮件联系。';
+      status.textContent = t('form.failed', '发送失败，请稍后重试或直接邮件联系。');
       status.className = 'form-status err';
     }
   } catch {
-    status.textContent = '网络异常，请稍后重试。';
+    status.textContent = t('form.network', '网络异常，请稍后重试。');
     status.className = 'form-status err';
   } finally {
     btn.disabled = false;

@@ -12,7 +12,8 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    // 只有需要 Worker 逻辑的路径先过 Worker（访客采集的文档路径 / API / 商户动态页 / 万载TV / 文库 / 音乐 / 景点 / R2 代理），
+    // 只有需要 Worker 逻辑的路径先过 Worker（访客采集的文档路径 / API / 商户动态页 / 万载TV / 文库 / 音乐 / 景点 / R2 代理；
+    // /en/* 为英文静态页：访客采集 + EN 404 本地化，docs/英文版方案.md Phase 1），
     // 其余静态资产（图片/CSS/JS）直达边缘，省一次 Worker 调用
     "run_worker_first": [
       "/api/*",
@@ -43,7 +44,9 @@
       "/tourism",
       "/tourism/*",
       "/pay",
-      "/pay/*"
+      "/pay/*",
+      "/en",
+      "/en/*"
     ]
   },
   "d1_databases": [

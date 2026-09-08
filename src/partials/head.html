@@ -4,18 +4,22 @@
   <title>{{page.title}}</title>
   <meta name="description" content="{{page.description}}">
   <link rel="canonical" href="{{page.url}}">
-  <meta name="theme-color" content="{{page.themeColor}}">
+  {{#each page.alternates as alt}}<link rel="alternate" hreflang="{{alt.hreflang}}" href="{{alt.href}}">
+  {{/each}}  <meta name="theme-color" content="{{page.themeColor}}">
   <meta property="og:site_name" content="{{site.name}}">
-  <meta property="og:type" content="{{page.ogType}}">
+  <meta property="og:locale" content="{{page.ogLocale}}">
+  {{#each page.ogAlternates as og}}<meta property="og:locale:alternate" content="{{og}}">
+  {{/each}}  <meta property="og:type" content="{{page.ogType}}">
   <meta property="og:title" content="{{page.title}}">
   <meta property="og:description" content="{{page.description}}">
   <meta property="og:url" content="{{page.url}}">
   <meta property="og:image" content="https://whizzzest.com{{page.ogImage}}">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="manifest" href="{{page.manifestHref}}">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css">
   {{#if page.css}}<link rel="stylesheet" href="{{page.css}}">{{/if}}
+  <script>window.__I18N={{{page.i18n}}};</script>
   <script type="module" src="/assets/js/main.js"></script>
 </head>

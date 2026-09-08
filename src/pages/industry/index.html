@@ -1,6 +1,6 @@
 <!-- {"title":"烟花产业 — 焰境·万载","description":"中国四大花炮主产区之一，1400 余年烟花爆竹生产史。产业规模 233 亿、出口 2.64 亿美元——读懂万载花炮产业。","ogImage":"/assets/img/longhu_yanhuowanhui.jpeg"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body>
   {{> header}}
@@ -21,11 +21,11 @@
         <article class="split reveal">
           <div class="split-media">
             <div class="video-frame">
-              <iframe src="https://player.bilibili.com/player.html?bvid={{data.history.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{data.history.title}}视频"></iframe>
+              <iframe src="https://player.bilibili.com/player.html?bvid={{data.history.video}}&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true" loading="lazy" title="{{data.history.title}}{{t.common.videoSuffix}}"></iframe>
             </div>
           </div>
           <div class="split-body">
-            <span class="kicker">01 · 历史</span>
+            <span class="kicker">{{t.industry.kickerHistory}}</span>
             <h3>{{data.history.title}}</h3>
             {{#each data.history.paras as p}}<p>{{p}}</p>{{/each}}
           </div>
@@ -54,7 +54,7 @@
             <img src="/assets/img/{{data.cultureTourism.img}}" alt="{{data.cultureTourism.title}}" loading="lazy" decoding="async" data-sizes="(max-width: 833px) 100vw, 512px" {{#if data.cultureTourism.ar}}style="aspect-ratio:{{data.cultureTourism.ar}}"{{/if}}>
           </div>
           <div class="split-body">
-            <span class="kicker">03 · 文旅</span>
+            <span class="kicker">{{t.industry.kickerTourism}}</span>
             <h3>{{data.cultureTourism.title}}</h3>
             {{#each data.cultureTourism.paras as p}}<p>{{p}}</p>{{/each}}
           </div>
@@ -64,7 +64,7 @@
             <img src="/assets/img/{{data.future.img}}" alt="{{data.future.title}}" loading="lazy" decoding="async" data-sizes="(max-width: 833px) 100vw, 512px" {{#if data.future.ar}}style="aspect-ratio:{{data.future.ar}}"{{/if}}>
           </div>
           <div class="split-body">
-            <span class="kicker">04 · 未来</span>
+            <span class="kicker">{{t.industry.kickerFuture}}</span>
             <h3>{{data.future.title}}</h3>
             {{#each data.future.paras as p}}<p>{{p}}</p>{{/each}}
           </div>

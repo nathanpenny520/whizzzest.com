@@ -1,6 +1,6 @@
 <!-- {"title":"数字烟花 · 在线烟花模拟器 — 焰境·万载","description":"在浏览器里点亮属于你的夜空：13 种烟花类型、文字烟花、终场连放与长曝光拖尾，点击即发射，献给花炮之乡万载的数字浪漫。","ogImage":"/assets/img/longhu_yanhuowanhui.jpeg","themeColor":"#000000","css":"/assets/css/fireworks.css"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body class="page-sim">
   {{> header}}
@@ -30,8 +30,8 @@
     </div>
 
     <div class="loading-init">
-      <div class="loading-init__header">加载中</div>
-      <div class="loading-init__status">正在装配烟花</div>
+      <div class="loading-init__header">{{t.fw.loading}}</div>
+      <div class="loading-init__status">{{t.fw.loadingStatus}}</div>
     </div>
 
     <div class="stage-container remove">
@@ -40,17 +40,17 @@
         <canvas id="main-canvas" aria-hidden="true"> </canvas>
       </div>
       <div class="controls">
-        <button class="fw-btn pause-btn" type="button" aria-label="暂停或继续">
+        <button class="fw-btn pause-btn" type="button" aria-label="{{t.fw.pauseAria}}">
           <svg fill="white" width="24" height="24" aria-hidden="true">
             <use href="#icon-pause" xlink:href="#icon-pause"></use>
           </svg>
         </button>
-        <button class="fw-btn sound-btn" type="button" aria-label="切换声音">
+        <button class="fw-btn sound-btn" type="button" aria-label="{{t.fw.soundAria}}">
           <svg fill="white" width="24" height="24" aria-hidden="true">
             <use href="#icon-sound-off" xlink:href="#icon-sound-off"></use>
           </svg>
         </button>
-        <button class="fw-btn settings-btn" type="button" aria-label="打开设置">
+        <button class="fw-btn settings-btn" type="button" aria-label="{{t.fw.openSettingsAria}}">
           <svg fill="white" width="24" height="24" aria-hidden="true">
             <use href="#icon-settings" xlink:href="#icon-settings"></use>
           </svg>
@@ -58,43 +58,43 @@
       </div>
       <div class="menu hide">
         <div class="menu__inner-wrap">
-          <button class="fw-btn fw-btn--bright close-menu-btn" type="button" aria-label="关闭设置">
+          <button class="fw-btn fw-btn--bright close-menu-btn" type="button" aria-label="{{t.fw.closeSettingsAria}}">
             <svg fill="white" width="24" height="24" aria-hidden="true">
               <use href="#icon-close" xlink:href="#icon-close"></use>
             </svg>
           </button>
-          <div class="menu__header">设置</div>
-          <div class="menu__subheader">若想了解更多信息 请点击任意标签</div>
+          <div class="menu__header">{{t.fw.settings}}</div>
+          <div class="menu__subheader">{{t.fw.settingsHint}}</div>
           <form>
             <div class="form-option form-option--select">
-              <label class="shell-type-label"> 烟花类型 </label>
+              <label class="shell-type-label"> {{t.fw.shellType}} </label>
               <select class="shell-type"></select>
             </div>
             <div class="form-option form-option--select">
-              <label class="shell-size-label"> 烟花大小 </label>
+              <label class="shell-size-label"> {{t.fw.shellSize}} </label>
               <select class="shell-size"></select>
             </div>
             <div class="form-option form-option--select">
-              <label class="quality-ui-label"> 画质 </label>
+              <label class="quality-ui-label"> {{t.fw.quality}} </label>
               <select class="quality-ui"></select>
             </div>
             <div class="form-option form-option--select">
-              <label class="sky-lighting-label"> 照亮天空 </label>
+              <label class="sky-lighting-label"> {{t.fw.skyLighting}} </label>
               <select class="sky-lighting"></select>
             </div>
             <div class="form-option form-option--select">
-              <label class="scaleFactor-label"> 缩放 </label>
+              <label class="scaleFactor-label"> {{t.fw.scaleFactor}} </label>
               <select class="scaleFactor"></select>
             </div>
             <div class="form-option form-option--stacked">
-              <label class="background-label"> 自定义背景 </label>
+              <label class="background-label"> {{t.fw.background}} </label>
               <div class="form-option__content">
-                <input class="background-input" type="text" placeholder="图片地址，或 linear-gradient(...)" autocomplete="off" spellcheck="false" />
+                <input class="background-input" type="text" placeholder="{{t.fw.bgPlaceholder}}" autocomplete="off" spellcheck="false" />
                 <div class="form-option__actions">
-                  <button class="background-apply-btn" type="button">应用</button>
-                  <button class="background-clear-btn" type="button">清除</button>
+                  <button class="background-apply-btn" type="button">{{t.fw.apply}}</button>
+                  <button class="background-clear-btn" type="button">{{t.fw.clear}}</button>
                   <label class="background-upload-btn">
-                    上传图片
+                    {{t.fw.upload}}
                     <input class="background-upload-input" type="file" accept="image/*" />
                   </label>
                 </div>
@@ -103,27 +103,27 @@
               </div>
             </div>
             <div class="form-option form-option--checkbox">
-              <label class="word-shell-label"> 文字烟花 </label>
+              <label class="word-shell-label"> {{t.fw.wordShell}} </label>
               <input class="word-shell" type="checkbox" />
             </div>
             <div class="form-option form-option--checkbox">
-              <label class="auto-launch-label"> 自动放烟花 </label>
+              <label class="auto-launch-label"> {{t.fw.autoLaunch}} </label>
               <input class="auto-launch" type="checkbox" />
             </div>
             <div class="form-option form-option--checkbox form-option--finale-mode">
-              <label class="finale-mode-label"> 同时放更多的烟花 </label>
+              <label class="finale-mode-label"> {{t.fw.finale}} </label>
               <input class="finale-mode" type="checkbox" />
             </div>
             <div class="form-option form-option--checkbox">
-              <label class="hide-controls-label"> 隐藏控制按钮 </label>
+              <label class="hide-controls-label"> {{t.fw.hideControls}} </label>
               <input class="hide-controls" type="checkbox" />
             </div>
             <div class="form-option form-option--checkbox form-option--fullscreen">
-              <label class="fullscreen-label"> 全屏 </label>
+              <label class="fullscreen-label"> {{t.fw.fullscreen}} </label>
               <input class="fullscreen" type="checkbox" />
             </div>
             <div class="form-option form-option--checkbox">
-              <label class="long-exposure-label"> 保留烟花的火花 </label>
+              <label class="long-exposure-label"> {{t.fw.longExposure}} </label>
               <input class="long-exposure" type="checkbox" />
             </div>
           </form>
@@ -136,12 +136,12 @@
       <div class="help-modal__dialog">
         <div class="help-modal__header"></div>
         <div class="help-modal__body"></div>
-        <button type="button" class="help-modal__close-btn">关闭</button>
+        <button type="button" class="help-modal__close-btn">{{t.fw.close}}</button>
       </div>
     </div>
 
     <noscript>
-      <p class="fw-noscript">数字烟花需要启用 JavaScript 才能绽放，请在浏览器设置中允许 JavaScript 后重试。</p>
+      <p class="fw-noscript">{{t.fw.noscript}}</p>
     </noscript>
   </main>
   <script src="/assets/js/fireworks.js"></script>

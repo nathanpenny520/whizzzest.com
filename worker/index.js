@@ -70,7 +70,7 @@ export default {
       return handleAiChat(request, env, ctx);
     }
     if (url.pathname === '/api/ai/config' && request.method === 'GET') {
-      return handleAiConfig(env);
+      return handleAiConfig(env, url);
     }
 
     // 商户图片代理（R2 对象，merchant Worker 上传，M2）——不可浏览文档，直接返回不进访客采集
@@ -112,6 +112,12 @@ export default {
     } else {
       // 静态资产请求
       res = await env.ASSETS.fetch(request);
+      // EN 子树 404 本地化（docs/英文版方案.md Phase 1）：not_found_handling 是全局的，
+      // /en/* miss 会返回中文 404 → 改送 /en/404.html（保留 404 状态码，供访客采集扫描标记）
+      if (res.status === 404 && (url.pathname === '/en' || url.pathname.startsWith('/en/'))) {
+        const en404 = await env.ASSETS.fetch(new URL('/en/404.html', url));
+        if (en404.ok) res = new Response(en404.body, { status: 404, headers: en404.headers });
+      }
     }
 
     // 访客采集：仅针对「文档导航」，跳过资源请求与爬虫

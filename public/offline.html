@@ -2,11 +2,15 @@
 <!-- 离线兜底页（docs/PWA应用方案.md §3.5）：请求的页面既没联网拿到、又无缓存版时，
      Service Worker 回退到此页。自身在预缓存清单内，style.css 引用由构建统一补 ?v= 指纹；
      <style> 内联底样式保证极端情况下（CSS 未缓存）也不白屏。 -->
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
+<!-- 离线兜底页（docs/PWA应用方案.md §3.5 / docs/英文版方案.md Phase 1）：模板含 t.offline.* 变量，
+     构建时按 locale 渲染为 dist/offline.html 与 dist/<prefix>/offline.html；sw.js 按导航路径前缀选兜底页。
+     自身在预缓存清单内，style.css 引用由构建统一补 ?v= 指纹；
+     <style> 内联底样式保证极端情况下（CSS 未缓存）也不白屏。 -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>离线 · 焰境·万载</title>
+  <title>{{t.offline.title}}</title>
   <meta name="theme-color" content="#fbfbfd">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/assets/css/style.css">
@@ -22,9 +26,9 @@
 <body class="offline-page">
   <main class="offline-wrap">
     <img src="/icons/icon-192.png" alt="" width="64" height="64">
-    <h1>当前处于离线状态</h1>
-    <p>没有找到本页的缓存版本。已看过的页面、听过的音乐和数字烟花在离线时仍可打开；恢复联网后，这里会自动恢复最新内容。</p>
-    <button class="offline-retry" onclick="location.reload()">重新连接</button>
+    <h1>{{t.offline.h1}}</h1>
+    <p>{{t.offline.p}}</p>
+    <button class="offline-retry" onclick="location.reload()">{{t.offline.retry}}</button>
   </main>
 </body>
 </html>

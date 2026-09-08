@@ -1,0 +1,272 @@
+{
+  "nav": {
+    "skip": "跳到主要内容",
+    "mainLabel": "主导航",
+    "pagesLabel": "站内页面",
+    "logoAria": "焰境·万载 首页",
+    "openMenu": "打开菜单",
+    "closeMenu": "关闭菜单",
+    "langSwitchAria": "切换语言"
+  },
+  "footer": {
+    "contactSuffix": "：",
+    "friendLinksTitle": "友情链接",
+    "aboutLink": "关于本站 ›",
+    "socialLabel": "社交媒体",
+    "qrAria": "（查看二维码）",
+    "lightboxLabel": "二维码查看",
+    "close": "关闭",
+    "qrAlt": "二维码"
+  },
+  "common": {
+    "readMore": "阅读详情 ›",
+    "videoSuffix": "视频"
+  },
+  "hero": {
+    "prev": "上一张",
+    "next": "下一张",
+    "dotsLabel": "轮播图选择",
+    "dotBefore": "第",
+    "dotAfter": "张"
+  },
+  "home": {
+    "attractKicker": "旅游景点 · 万载山水",
+    "attractTitle": "游万载，古城山水焰火间",
+    "attractMore": "全部景点 ›",
+    "tvKicker": "焰境影像 · 万载TV",
+    "tvTitle": "看万载，从一集短剧开始",
+    "tvMore": "进入频道 ›",
+    "musicKicker": "万载音乐 · 听见万载",
+    "musicTitle": "万载的声音，都在这里",
+    "musicMore": "进入音乐馆 ›"
+  },
+  "heritage": {
+    "crumb": "← 非遗文化",
+    "pagerLabel": "非遗项目切换"
+  },
+  "industry": {
+    "kickerHistory": "01 · 历史",
+    "kickerTourism": "03 · 文旅",
+    "kickerFuture": "04 · 未来"
+  },
+  "about": {
+    "qrBtnTitle": "点击查看微信公众号二维码"
+  },
+  "form": {
+    "name": "姓名",
+    "namePlaceholder": "怎么称呼您",
+    "email": "邮箱（选填）",
+    "emailPlaceholder": "用于回复您",
+    "message": "留言",
+    "messagePlaceholder": "想说的内容……",
+    "send": "发送留言"
+  },
+  "notfound": {
+    "body": "这一页的烟花已经放完了。",
+    "home": "返回首页"
+  },
+  "fw": {
+    "loading": "加载中",
+    "loadingStatus": "正在装配烟花",
+    "pauseAria": "暂停或继续",
+    "soundAria": "切换声音",
+    "openSettingsAria": "打开设置",
+    "closeSettingsAria": "关闭设置",
+    "settings": "设置",
+    "settingsHint": "若想了解更多信息 请点击任意标签",
+    "shellType": "烟花类型",
+    "shellSize": "烟花大小",
+    "quality": "画质",
+    "skyLighting": "照亮天空",
+    "scaleFactor": "缩放",
+    "background": "自定义背景",
+    "bgPlaceholder": "图片地址，或 linear-gradient(...)",
+    "apply": "应用",
+    "clear": "清除",
+    "upload": "上传图片",
+    "wordShell": "文字烟花",
+    "autoLaunch": "自动放烟花",
+    "finale": "同时放更多的烟花",
+    "hideControls": "隐藏控制按钮",
+    "fullscreen": "全屏",
+    "longExposure": "保留烟花的火花",
+    "close": "关闭",
+    "noscript": "数字烟花需要启用 JavaScript 才能绽放，请在浏览器设置中允许 JavaScript 后重试。"
+  },
+  "offline": {
+    "title": "离线 · 焰境·万载",
+    "h1": "当前处于离线状态",
+    "p": "没有找到本页的缓存版本。已看过的页面、听过的音乐和数字烟花在离线时仍可打开；恢复联网后，这里会自动恢复最新内容。",
+    "retry": "重新连接"
+  },
+  "js": {
+    "a11y": {
+      "openMenu": "打开菜单",
+      "closeMenu": "关闭菜单",
+      "play": "播放",
+      "pause": "暂停"
+    },
+    "qr": {
+      "defaultAlt": "二维码"
+    },
+    "music": {
+      "loopAll": "列表循环",
+      "loopOne": "单曲循环",
+      "loopOff": "顺序播放",
+      "loopMode": "循环模式：",
+      "unnamed": "佚名",
+      "title": "万载音乐",
+      "album": "万载音乐 · 焰境万载",
+      "nowPlaying": "正在播放",
+      "paused": "已暂停",
+      "copied": "链接已复制，去分享给朋友吧",
+      "copyPrompt": "长按/全选复制链接：",
+      "shareTitle": "{title} — 万载音乐 · 焰境万载"
+    },
+    "form": {
+      "needName": "请填写姓名和留言内容。",
+      "sending": "发送中……",
+      "sent": "已收到，谢谢您的留言！",
+      "rateLimited": "发送太频繁，请稍后再试。",
+      "failed": "发送失败，请稍后重试或直接邮件联系。",
+      "network": "网络异常，请稍后重试。"
+    },
+    "ai": {
+      "fabAria": "打开花傩智能问答",
+      "panelAria": "花傩智能问答",
+      "panelTitle": "花傩 · 万载智能问答",
+      "historyAria": "历史对话",
+      "clearAria": "清空当前对话",
+      "closeAria": "关闭",
+      "inputPlaceholder": "问点什么…（Enter 发送）",
+      "sendAria": "发送",
+      "welcomeTitle": "你好，我是花傩",
+      "welcomeDesc": "万载文旅智能问答助手，烟花、非遗、美食、行程都可以问我。",
+      "newChat": "新对话",
+      "emptyHistory": "还没有历史对话",
+      "pin": "置顶",
+      "unpin": "取消置顶",
+      "rename": "重命名",
+      "renamePrompt": "重命名对话（留空取消）：",
+      "delete": "删除",
+      "deleteConfirm": "删除「{name}」？删除后不可恢复。",
+      "clearConfirm": "确定清空当前对话记录？",
+      "offline": "当前离线，花傩需要联网才能回答，请恢复网络后再问。",
+      "rateLimited": "问题有点多啦，请休息几分钟再问。",
+      "unavailable": "花傩暂时不在，请稍后再试。",
+      "network": "网络异常，请稍后再试。",
+      "offlineShort": "网络已断开，请恢复网络后再问。",
+      "sources": "知识来源：",
+      "goto": "前往",
+      "openPage": "打开页面",
+      "playSong": "▶ 播放这首歌",
+      "msgsUnit": "条",
+      "routes": {
+        "/tv": "万载TV",
+        "/library": "焰境文库",
+        "/music": "万载音乐",
+        "/attractions": "旅游景点",
+        "/merchants": "商户名录",
+        "/spots": "观赏 spots",
+        "/cuisine": "美食",
+        "/heritage": "非遗文化",
+        "/industry": "花炮产业",
+        "/tourism": "旅游线路",
+        "/digital-fireworks": "烟花模拟器",
+        "/about": "关于本站",
+        "/pay": "付费合作"
+      }
+    },
+    "fw": {
+      "qualityLow": "低",
+      "qualityNormal": "正常",
+      "qualityHigh": "高",
+      "skyNone": "不",
+      "skyDim": "暗",
+      "skyNormal": "正常",
+      "igniting": "正在点燃导火线",
+      "bgNone": "未设置自定义背景",
+      "processingImage": "正在处理图片",
+      "saveFailed": "图片保存失败",
+      "usingWebBg": "正在使用网页端背景",
+      "webBgInvalid": "网页端背景无效，当前未设置默认背景",
+      "webBgFallback": "网页端背景无效，已回退到代码默认背景",
+      "webBgAndDefaultInvalid": "网页端背景和代码默认背景都无效",
+      "usingDefaultBg": "正在使用代码默认背景",
+      "defaultBgInvalid": "代码默认背景无效，当前未显示背景",
+      "usingSavedBg": "正在使用保存的背景图",
+      "savedBgInvalid": "保存的背景图已失效，当前未设置默认背景",
+      "savedBgFallback": "保存的背景图已失效，已回退到代码默认背景",
+      "savedBgAndDefaultInvalid": "保存的背景图和代码默认背景都无效",
+      "bgLoadFailed": "背景图片加载失败",
+      "bgApplying": "正在加载背景",
+      "bgStyleInvalid": "背景样式无效",
+      "bgApplied": "自定义背景已应用",
+      "bgInvalidCheckUrl": "背景加载失败，请检查地址或样式",
+      "bgUploaded": "已应用上传的背景图",
+      "bgLoadRetry": "背景加载失败，请重试",
+      "galleryOpenFailed": "无法打开本地图片库",
+      "galleryBlocked": "本地图片库被其他页面占用",
+      "galleryFailed": "本地图片库操作失败",
+      "imageReadFailed": "无法读取这张图片，请换一张试试",
+      "imageProcessFailed": "图片处理失败，请换一张试试",
+      "imageUnsupported": "当前浏览器无法处理这张图片",
+      "saveUnsupported": "当前浏览器不支持保存上传的图片",
+      "imageTooLarge": "图片文件过大，请选择 30MB 以内的图片",
+      "galleryFull": "最多保存 {n} 张背景图，请先删除部分图片",
+      "bgDefaultName": "背景图",
+      "useBg": "使用背景图 {name}",
+      "deleteBg": "删除背景图 {name}",
+      "help": {
+        "shellType": {
+          "header": "烟花类型",
+          "body": "你要放的烟花类型。选择随机，可以保持当前作品原本的组合节奏。"
+        },
+        "shellSize": {
+          "header": "烟花大小",
+          "body": "烟花越大，绽放范围越大，对设备性能的压力也越高。"
+        },
+        "quality": {
+          "header": "画质",
+          "body": "画质越高，粒子数量越多。设备吃力时直接降低画质。"
+        },
+        "skyLighting": {
+          "header": "照亮天空",
+          "body": "控制烟花爆炸时对背景的照亮强度。"
+        },
+        "scaleFactor": {
+          "header": "缩放",
+          "body": "调整观察距离。数值越小，看到的烟花越完整。"
+        },
+        "wordShell": {
+          "header": "文字烟花",
+          "body": "默认关闭。开启后，系统会稳定触发文字烟花，不再依赖随机概率。"
+        },
+        "autoLaunch": {
+          "header": "自动放烟花",
+          "body": "开启后自动连续放烟花。关闭后只能通过点击屏幕发射。"
+        },
+        "finaleMode": {
+          "header": "同时放更多的烟花",
+          "body": "开启后会在自动发射阶段加密节奏。"
+        },
+        "hideControls": {
+          "header": "隐藏控制按钮",
+          "body": "隐藏顶部按钮，保留更干净的观看画面。"
+        },
+        "fullscreen": {
+          "header": "全屏",
+          "body": "切换浏览器全屏模式。"
+        },
+        "longExposure": {
+          "header": "保留烟花的火花",
+          "body": "保留更长的拖尾痕迹。"
+        },
+        "background": {
+          "header": "自定义背景",
+          "body": "点「上传图片」可以把图片保存到当前浏览器（IndexedDB），刷新或下次打开后点缩略图即可选用；也支持输入图片地址或 `url(...)`、`linear-gradient(...)` 这类背景样式。清除浏览器站点数据会删除已上传的图片。"
+        }
+      }
+    }
+  }
+}

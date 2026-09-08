@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "title": "Whizzzest — One glimpse, a thousand years of fire",
+    "description": "Explore a thousand years of fireworks culture, living heritage, local flavors and the scenery of Wanzai. The home of Chinese fireworks · Jiangxi, China."
+  },
+  "hero": {
+    "title": "One glimpse, a thousand years of fire",
+    "subtitle": "A thousand years of fireworks, living heritage, distinctive flavors and the scenery of Wanzai",
+    "cta": "See tour routes"
+  },
+  "carousel": [
+    {
+      "img": "yzxf_bswz.jpeg",
+      "alt": "One glimpse, a thousand years of fire",
+      "ar": "1600/1116"
+    },
+    {
+      "img": "guchen_xuejing.jpg",
+      "alt": "Wanzai Ancient City",
+      "ar": "1600/916"
+    },
+    {
+      "img": "sanshiba_pool.jpeg",
+      "alt": "Sanshiba Reservoir",
+      "ar": "1600/1007"
+    },
+    {
+      "img": "xianyuanyanxue.jpg",
+      "alt": "Wanzai Xianyuan study tour",
+      "ar": "1080/721"
+    }
+  ],
+  "featuresTitle": "Highlights",
+  "features": [
+    {
+      "title": "A millennium of fireworks",
+      "desc": "Wanzai has made fireworks for over 1,400 years — it is known as \"the hometown of Chinese fireworks\"."
+    },
+    {
+      "title": "Distinctive local flavors",
+      "desc": "Taste the Six Bowls of Wanzai, lily dishes and Luocheng rice noodles — the unique food culture of western Jiangxi."
+    },
+    {
+      "title": "Rich travel resources",
+      "desc": "Wanzai Ancient City, Zhushan Cave, Jiulong primeval forest and more — something for every traveler."
+    }
+  ],
+  "themes": {
+    "title": "Discover Wanzai",
+    "desc": "Millennium fireworks, western-Jiangxi flavors, an ancient town by the water — three doors into Wanzai.",
+    "items": [
+      {
+        "title": "Living heritage",
+        "desc": "Fireworks, Desheng Drum, Kaikou Nuo and Xiabu weaving — millennium-old traditions alive in the city's daily glow.",
+        "learnMore": "Learn more",
+        "href": "/heritage/",
+        "img": "nuowu.jpeg"
+      },
+      {
+        "title": "Local flavors",
+        "desc": "The Six Bowls, Luocheng rice noodles, lily starch — Wanzai on the tip of your tongue.",
+        "learnMore": "Learn more",
+        "href": "/cuisine/",
+        "img": "liudawan.jpeg"
+      },
+      {
+        "title": "Fireworks industry",
+        "desc": "One of China's four major fireworks production regions — from family workshops to skies around the globe.",
+        "learnMore": "Learn more",
+        "href": "/industry/",
+        "img": "longhu_yanhuowanhui.jpeg"
+      }
+    ]
+  },
+  "experience": {
+    "title": "Experience Wanzai",
+    "desc": "More than watching from behind a screen — launch your own fireworks and read stories by Wanzai writers.",
+    "items": [
+      {
+        "key": "fireworks",
+        "kicker": "Digital fireworks",
+        "title": "Launch a Wanzai firework in your browser",
+        "desc": "A free fireworks simulator — pick your shells, set the rhythm, light up your own night sky.",
+        "cta": "Start the show",
+        "href": "/digital-fireworks/"
+      },
+      {
+        "key": "library",
+        "kicker": "Whizzzest Library",
+        "title": "Read Wanzai through local voices",
+        "desc": "Fiction and essays by local authors — free to read, with new chapters on the way.",
+        "cta": "Browse the shelves",
+        "href": "/library/"
+      }
+    ]
+  },
+  "cta": {
+    "title": "Start your Wanzai journey",
+    "desc": "Millennium fireworks culture, distinctive cuisine or natural scenery — Wanzai has something for you.",
+    "viewRoutes": "See tour routes"
+  },
+  "merchants": {
+    "title": "Whizzzest Picks",
+    "desc": "The Wanzai guide trusted by travelers and locals alike — eat well, sleep well, bring Wanzai home.",
+    "cats": [
+      {
+        "key": "food",
+        "icon": "🍜",
+        "title": "Authentic food",
+        "desc": "Six Bowls, rice noodles, lily banquets — the flavors of the fireworks hometown."
+      },
+      {
+        "key": "stay",
+        "icon": "🛏️",
+        "title": "Comfortable stays",
+        "desc": "Ancient-town guesthouses and county hotels — rest easy after the fireworks."
+      },
+      {
+        "key": "specialty",
+        "icon": "🎁",
+        "title": "Local specialties",
+        "desc": "Fireworks crafts, lily starch, sour-jujube cakes — take Wanzai home with you."
+      }
+    ],
+    "cta": "See all picks"
+  }
+}

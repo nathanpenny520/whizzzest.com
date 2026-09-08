@@ -1,14 +1,14 @@
-<a class="skip-link" href="#main">跳到主要内容</a>
+<a class="skip-link" href="#main">{{t.nav.skip}}</a>
 <header class="nav">
-  <nav class="nav-inner" aria-label="主导航">
-    <a class="nav-logo" href="/" aria-label="焰境·万载 首页">
-      <img class="nav-logo-icon" src="/favicon.svg" alt="" width="22" height="22" aria-hidden="true">焰境·万载
+  <nav class="nav-inner" aria-label="{{t.nav.mainLabel}}">
+    <a class="nav-logo" href="{{site.navHome}}" aria-label="{{t.nav.logoAria}}">
+      <img class="nav-logo-icon" src="/favicon.svg" alt="" width="22" height="22" aria-hidden="true">{{site.name}}
     </a>
-    <button class="nav-burger" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="nav-drawer">
+    <button class="nav-burger" type="button" aria-label="{{t.nav.openMenu}}" aria-expanded="false" aria-controls="nav-drawer">
       <span class="nav-burger-line" aria-hidden="true"></span>
       <span class="nav-burger-line" aria-hidden="true"></span>
     </button>
-    <ul class="nav-menu" aria-label="站内页面">
+    <ul class="nav-menu" aria-label="{{t.nav.pagesLabel}}">
       {{#each site.nav as item}}
       <li class="nav-item{{#if item.menu}} has-menu{{/if}}">
         <a class="nav-link" href="{{item.href}}"{{#if item.menu}} aria-haspopup="true" aria-expanded="false"{{/if}}>{{item.label}}</a>
@@ -24,11 +24,13 @@
         {{/if}}
       </li>
       {{/each}}
+      <!-- 语言切换器：桌面在导航尾部；locale 注册表驱动，当前页无对应语言产物时不渲染（§1.2 不产出策略） -->
+      <li class="nav-lang-item">{{#each page.locales as l}}<a class="nav-lang" href="{{l.href}}" hreflang="{{l.hreflang}}" aria-label="{{t.nav.langSwitchAria}}: {{l.label}}">{{l.label}}</a>{{/each}}</li>
     </ul>
   </nav>
 </header>
 <div class="nav-drawer" id="nav-drawer">
-  <ul class="nav-drawer-list" aria-label="站内页面">
+  <ul class="nav-drawer-list" aria-label="{{t.nav.pagesLabel}}">
     {{#each site.nav as item}}
     {{#if item.menu}}
     <li class="nav-drawer-item has-menu">
@@ -41,6 +43,9 @@
     {{#unless item.menu}}
     <li class="nav-drawer-item"><a class="nav-link" href="{{item.href}}">{{item.label}}</a></li>
     {{/unless}}
+    {{/each}}
+    {{#each page.locales as l}}
+    <li class="nav-drawer-item nav-drawer-lang"><a class="nav-link" href="{{l.href}}" hreflang="{{l.hreflang}}" aria-label="{{t.nav.langSwitchAria}}: {{l.label}}">{{l.label}}</a></li>
     {{/each}}
   </ul>
 </div>

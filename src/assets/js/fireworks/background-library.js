@@ -34,8 +34,8 @@
 				}
 			};
 			request.onsuccess = () => resolve(request.result);
-			request.onerror = () => reject(request.error || new Error("无法打开本地图片库"));
-			request.onblocked = () => reject(new Error("本地图片库被其他页面占用"));
+			request.onerror = () => reject(request.error || new Error(fwT("galleryOpenFailed", "无法打开本地图片库")));
+			request.onblocked = () => reject(new Error(fwT("galleryBlocked", "本地图片库被其他页面占用")));
 		}).catch((error) => {
 			dbPromise = null;
 			throw error;
@@ -56,8 +56,8 @@
 			}
 
 			transaction.oncomplete = () => resolve(request ? request.result : undefined);
-			transaction.onabort = () => reject(transaction.error || new Error("本地图片库操作失败"));
-			transaction.onerror = () => reject(transaction.error || new Error("本地图片库操作失败"));
+			transaction.onabort = () => reject(transaction.error || new Error(fwT("galleryFailed", "本地图片库操作失败")));
+			transaction.onerror = () => reject(transaction.error || new Error(fwT("galleryFailed", "本地图片库操作失败")));
 		});
 	}
 
@@ -101,7 +101,7 @@
 			};
 			image.onerror = () => {
 				URL.revokeObjectURL(objectUrl);
-				reject(new Error("无法读取这张图片，请换一张试试"));
+				reject(new Error(fwT("imageReadFailed", "无法读取这张图片，请换一张试试")));
 			};
 			image.src = objectUrl;
 		});
@@ -129,7 +129,7 @@
 					return;
 				}
 
-				reject(new Error("图片处理失败，请换一张试试"));
+				reject(new Error(fwT("imageProcessFailed", "图片处理失败，请换一张试试")));
 			}, type, quality);
 		});
 	}
@@ -156,7 +156,7 @@
 
 		if (!sourceWidth || !sourceHeight) {
 			releaseImageSource(source);
-			throw new Error("无法读取这张图片，请换一张试试");
+			throw new Error(fwT("imageReadFailed", "无法读取这张图片，请换一张试试"));
 		}
 
 		const scale = Math.min(1, MAX_EDGE / Math.max(sourceWidth, sourceHeight));
@@ -169,7 +169,7 @@
 		const context = canvas.getContext("2d");
 		if (!context) {
 			releaseImageSource(source);
-			throw new Error("当前浏览器无法处理这张图片");
+			throw new Error(fwT("imageUnsupported", "当前浏览器无法处理这张图片"));
 		}
 
 		context.drawImage(source, 0, 0, width, height);
@@ -186,23 +186,23 @@
 
 	async function addImage(file) {
 		if (!isSupported()) {
-			throw new Error("当前浏览器不支持保存上传的图片");
+			throw new Error(fwT("saveUnsupported", "当前浏览器不支持保存上传的图片"));
 		}
 
 		if (file.size > LIMITS.maxFileSize) {
-			throw new Error("图片文件过大，请选择 30MB 以内的图片");
+			throw new Error(fwT("imageTooLarge", "图片文件过大，请选择 30MB 以内的图片"));
 		}
 
 		const db = await openDb();
 		const existing = await runInTransaction(db, "readonly", (store) => store.getAll());
 		if (existing.length >= LIMITS.maxImages) {
-			throw new Error(`最多保存 ${LIMITS.maxImages} 张背景图，请先删除部分图片`);
+			throw new Error(fwT("galleryFull", "最多保存 {n} 张背景图，请先删除部分图片").replace("{n}", String(LIMITS.maxImages)));
 		}
 
 		const compressed = await compressImage(file);
 		return putImage({
 			id: createRecordId(),
-			name: file.name || "背景图",
+			name: file.name || fwT("bgDefaultName", "背景图"),
 			thumb: compressed.thumb,
 			blob: compressed.blob,
 			width: compressed.width,

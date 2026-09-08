@@ -1,0 +1,55 @@
+{
+  "name": "Whizzzest",
+  "tagline": "One glimpse, a thousand years of fire",
+  "email": "contact@whizzzest.com",
+  "navHome": "/en/",
+  "nav": [
+    {
+      "href": "/en/",
+      "label": "Home"
+    }
+  ],
+  "footer": {
+    "aboutTitle": "About Whizzzest",
+    "aboutDesc": "Whizzzest is a modern showcase of Wanzai County, Jiangxi — its fireworks culture, intangible cultural heritage, local cuisine and scenery.",
+    "contact": "Contact us",
+    "friendLinks": [
+      {
+        "label": "Wanzai County Government",
+        "href": "http://www.wanzai.gov.cn/"
+      },
+      {
+        "label": "Author's homepage",
+        "href": "https://nathanpenny.fun"
+      }
+    ],
+    "icpLines": [
+      "赣ICP备2026003337号-1"
+    ],
+    "beianHref": "https://beian.miit.gov.cn/",
+    "socials": [],
+    "aboutHref": "/about/"
+  },
+  "manifest": {
+    "name": "Whizzzest",
+    "short_name": "Whizzzest",
+    "description": "Explore a thousand years of fireworks culture, living heritage, local flavors and the scenery of Wanzai — the home of Chinese fireworks in Jiangxi.",
+    "shortcuts": [
+      {
+        "name": "Fireworks simulator",
+        "url": "/digital-fireworks/",
+        "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      },
+      {
+        "name": "Wanzai Music",
+        "url": "/music/",
+        "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      },
+      {
+        "name": "Attractions",
+        "url": "/attractions/",
+        "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      }
+    ]
+  }
+}

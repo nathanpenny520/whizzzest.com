@@ -1,6 +1,6 @@
 <!-- {"title":"非遗文化 — 焰境·万载","description":"万载花炮制作技艺、得胜鼓、开口傩、夏布织造、纸棚山歌——探秘江西万载非物质文化遗产，附非遗影像视频。","ogImage":"/assets/img/nuowu.jpeg"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body>
   {{> header}}
@@ -28,7 +28,7 @@
             <span class="feature-no">{{item.badge}}</span>
             <h3>{{item.title}}</h3>
             <p>{{item.summary}}</p>
-            <span class="card-go">阅读详情 ›</span>
+            <span class="card-go">{{t.common.readMore}}</span>
           </a>
           {{/each}}
         </div>

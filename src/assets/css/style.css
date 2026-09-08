@@ -180,6 +180,37 @@ button {
   font-weight: 600;
 }
 
+/* 语言切换器（docs/英文版方案.md Phase 1）：桌面在导航尾部，移动在抽屉尾部；locale 注册表驱动 */
+.nav-lang-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-lang {
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  color: rgba(29, 29, 31, 0.8);
+  border: 1px solid var(--c-hairline);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.nav-lang:hover {
+  color: var(--c-text);
+  border-color: var(--c-text);
+}
+
+.nav-drawer-lang {
+  margin-top: 8px;
+}
+
+.nav-drawer-lang .nav-link {
+  color: var(--c-text-2);
+}
+
 /* 汉堡按钮（仅移动端） */
 
 .nav-burger {

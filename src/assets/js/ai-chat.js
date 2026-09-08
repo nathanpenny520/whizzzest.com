@@ -52,16 +52,20 @@
   var ICON_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
   var ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 
-  /* open_page 路径 → 跳转按钮文案 */
-  var ROUTE_LABELS = [
-    ['/tv', '万载TV'], ['/library', '焰境文库'], ['/music', '万载音乐'],
-    ['/attractions', '旅游景点'], ['/merchants', '商户名录'], ['/spots', '观赏 spots'],
-    ['/cuisine', '美食'], ['/heritage', '非遗文化'], ['/industry', '花炮产业'],
-    ['/tourism', '旅游线路'], ['/digital-fireworks', '烟花模拟器'],
-    ['/about', '关于本站'], ['/pay', '付费合作'],
-  ];
+  /* open_page 路径 → 跳转按钮文案（per-locale 名称表在 strings.json js.ai.routes） */
+  var ROUTES = ['/tv', '/library', '/music', '/attractions', '/merchants', '/spots',
+    '/cuisine', '/heritage', '/industry', '/tourism', '/digital-fireworks', '/about', '/pay'];
 
   var config = { enabled: true, quick: [] };
+  /* 多语言（docs/英文版方案.md Phase 1）：build.js 注入 window.__I18N（静态页）；
+     Worker 动态页无注入 → 全部走代码内 zh 兜底。 */
+  var I18N = window.__I18N || {};
+  var LOCALE = I18N.locale || (document.documentElement.lang || 'zh-CN').slice(0, 2).toLowerCase();
+  var IS_EN = LOCALE === 'en';
+  function t(path, fallback) {
+    var v = path.split('.').reduce(function (node, key) { return node == null ? undefined : node[key]; }, I18N);
+    return v == null ? fallback : v;
+  }
   var sessions = loadSessions();
   var currentId = restoreCurrent();
   var listing = false;          // 面板是否处于历史列表视图
@@ -74,8 +78,9 @@
   init();
 
   function init() {
-    fetch('/api/ai/config').then(function (r) { return r.ok ? r.json() : null; }).then(function (c) {
-      if (c && c.ok) config = { enabled: !!c.enabled, quick: c.quick || [] };
+    // EN 页请求英文招呼语/快捷问题（zh 不带参数，保持请求形态不变）
+    fetch(IS_EN ? '/api/ai/config?lang=en' : '/api/ai/config').then(function (r) { return r.ok ? r.json() : null; }).then(function (c) {
+      if (c && c.ok) config = { enabled: !!c.enabled, quick: c.quick || [], greeting: c.greeting || '' };
       if (!config.enabled) return;          // 后台停用 → 不渲染任何入口
       buildFab();
       buildPanel();
@@ -90,7 +95,7 @@
     fab = document.createElement('button');
     fab.className = 'hn-fab';
     fab.type = 'button';
-    fab.setAttribute('aria-label', '打开花傩智能问答');
+    fab.setAttribute('aria-label', t('ai.fabAria', '打开花傩智能问答'));
     fab.setAttribute('aria-expanded', 'false');
     fab.innerHTML = NUO;
     fab.addEventListener('click', togglePanel);
@@ -102,21 +107,21 @@
     p.className = 'hn-panel';
     p.id = 'hn-panel';
     p.setAttribute('role', 'dialog');
-    p.setAttribute('aria-label', '花傩智能问答');
+    p.setAttribute('aria-label', t('ai.panelAria', '花傩智能问答'));
     p.hidden = true;
     p.innerHTML =
       '<div class="hn-head">' +
         '<span class="hn-head-flame">' + NUO + '</span>' +
-        '<span class="hn-head-title">花傩 · 万载智能问答</span>' +
-        '<button type="button" class="hn-head-btn" data-hn="list" aria-label="历史对话" title="历史对话">' + ICON_HISTORY + '</button>' +
-        '<button type="button" class="hn-head-btn" data-hn="clear" aria-label="清空当前对话" title="清空当前对话">' + ICON_TRASH + '</button>' +
-        '<button type="button" class="hn-head-btn" data-hn="close" aria-label="关闭" title="关闭">' + ICON_CLOSE + '</button>' +
+        '<span class="hn-head-title">' + t('ai.panelTitle', '花傩 · 万载智能问答') + '</span>' +
+        '<button type="button" class="hn-head-btn" data-hn="list" aria-label="' + t('ai.historyAria', '历史对话') + '" title="' + t('ai.historyAria', '历史对话') + '">' + ICON_HISTORY + '</button>' +
+        '<button type="button" class="hn-head-btn" data-hn="clear" aria-label="' + t('ai.clearAria', '清空当前对话') + '" title="' + t('ai.clearAria', '清空当前对话') + '">' + ICON_TRASH + '</button>' +
+        '<button type="button" class="hn-head-btn" data-hn="close" aria-label="' + t('ai.closeAria', '关闭') + '" title="' + t('ai.closeAria', '关闭') + '">' + ICON_CLOSE + '</button>' +
       '</div>' +
       '<div class="hn-body"></div>' +
       '<div class="hn-history" hidden></div>' +
       '<div class="hn-input">' +
-        '<textarea rows="1" maxlength="200" placeholder="问点什么…（Enter 发送）" aria-label="输入问题"></textarea>' +
-        '<button type="button" class="hn-send" aria-label="发送" disabled>' + ICON_SEND + '</button>' +
+        '<textarea rows="1" maxlength="200" placeholder="' + t('ai.inputPlaceholder', '问点什么…（Enter 发送）') + '" aria-label="' + t('ai.inputPlaceholder', '输入问题') + '"></textarea>' +
+        '<button type="button" class="hn-send" aria-label="' + t('ai.sendAria', '发送') + '" disabled>' + ICON_SEND + '</button>' +
       '</div>';
     document.body.appendChild(p);
 
@@ -278,10 +283,18 @@
     var d = new Date(s.updatedAt);
     var p = function (n) { return String(n).padStart(2, '0'); };
     var now = new Date();
-    var datePart = d.getFullYear() === now.getFullYear()
-      ? (d.getMonth() + 1) + '月' + d.getDate() + '日'
-      : d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
-    return (s.messages.length ? s.messages.length + ' 条 · ' : '') + datePart + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    var datePart;
+    if (IS_EN) {
+      datePart = d.getFullYear() === now.getFullYear()
+        ? (d.getMonth() + 1) + '/' + d.getDate()
+        : d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+    } else {
+      datePart = d.getFullYear() === now.getFullYear()
+        ? (d.getMonth() + 1) + '月' + d.getDate() + '日'
+        : d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    }
+    var msgs = s.messages.length ? s.messages.length + ' ' + t('ai.msgsUnit', '条') + ' · ' : '';
+    return msgs + datePart + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
   /* ---------------- 历史列表视图 ---------------- */
@@ -293,7 +306,7 @@
     var newBtn = document.createElement('button');
     newBtn.className = 'hn-sess-new';
     newBtn.type = 'button';
-    newBtn.innerHTML = ICON_PLUS + '<span>新对话</span>';
+    newBtn.innerHTML = ICON_PLUS + '<span>' + t('ai.newChat', '新对话') + '</span>';
     newBtn.addEventListener('click', startNewSession);
     h.appendChild(newBtn);
 
@@ -301,7 +314,7 @@
     if (!list.length) {
       var empty = document.createElement('p');
       empty.className = 'hn-sess-empty';
-      empty.textContent = '还没有历史对话';
+      empty.textContent = t('ai.emptyHistory', '还没有历史对话');
       h.appendChild(empty);
       return;
     }
@@ -322,7 +335,7 @@
       renderMessages();
     });
     var b = document.createElement('b');
-    b.textContent = s.title || '新对话';
+    b.textContent = s.title || t('ai.newChat', '新对话');
     var i = document.createElement('i');
     i.textContent = fmtMeta(s);
     main.appendChild(b);
@@ -331,23 +344,23 @@
 
     var acts = document.createElement('span');
     acts.className = 'hn-sess-acts';
-    acts.appendChild(sessBtn(ICON_PIN, s.pinned ? '取消置顶' : '置顶', function () {
+    acts.appendChild(sessBtn(ICON_PIN, s.pinned ? t('ai.unpin', '取消置顶') : t('ai.pin', '置顶'), function () {
       s.pinned = !s.pinned;
       saveSessions();
       renderHistory();
     }, s.pinned));
-    acts.appendChild(sessBtn(ICON_EDIT, '重命名', function () {
-      var t = window.prompt('重命名对话（留空取消）：', s.title || '');
-      if (t === null) return;
-      t = t.trim();
-      if (!t) return;
-      s.title = t.slice(0, 30);
+    acts.appendChild(sessBtn(ICON_EDIT, t('ai.rename', '重命名'), function () {
+      var title = window.prompt(t('ai.renamePrompt', '重命名对话（留空取消）：'), s.title || '');
+      if (title === null) return;
+      title = title.trim();
+      if (!title) return;
+      s.title = title.slice(0, 30);
       saveSessions();
       renderHistory();
     }, false));
-    acts.appendChild(sessBtn(ICON_TRASH, '删除', function () {
-      var name = s.title || '新对话';
-      if (!window.confirm('删除「' + name + '」？删除后不可恢复。')) return;
+    acts.appendChild(sessBtn(ICON_TRASH, t('ai.delete', '删除'), function () {
+      var name = s.title || t('ai.newChat', '新对话');
+      if (!window.confirm(t('ai.deleteConfirm', '删除「{name}」？删除后不可恢复。').replace('{name}', name))) return;
       sessions = sessions.filter(function (x) { return x.id !== s.id; });
       if (currentId === s.id) {
         var latest = sessions.slice().sort(byUpdated)[0];
@@ -390,7 +403,7 @@
   function clearCurrentSession() {
     var s = cur();
     if (!s) return;
-    if (s.messages.length && !window.confirm('确定清空当前对话记录？')) return;
+    if (s.messages.length && !window.confirm(t('ai.clearConfirm', '确定清空当前对话记录？'))) return;
     s.messages = [];
     s.title = '';
     s.updatedAt = Date.now();
@@ -407,17 +420,20 @@
     if (!messages.length) {
       var w = document.createElement('div');
       w.className = 'hn-welcome';
+      // 欢迎副文案：zh 用后台配置的招呼语（config.greeting），en 用 strings 文案
+      var desc = IS_EN ? t('ai.welcomeDesc', '万载文旅智能问答助手，烟花、非遗、美食、行程都可以问我。')
+        : (config.greeting || t('ai.welcomeDesc', '万载文旅智能问答助手，烟花、非遗、美食、行程都可以问我。'));
       w.innerHTML =
         '<span class="hn-welcome-flame">' + NUO + '</span>' +
-        '<div class="hn-welcome-title">你好，我是花傩</div>' +
-        '<div class="hn-welcome-desc">万载文旅智能问答助手，烟花、非遗、美食、行程都可以问我。</div>';
+        '<div class="hn-welcome-title">' + t('ai.welcomeTitle', '你好，我是花傩') + '</div>' +
+        '<div class="hn-welcome-desc">' + desc + '</div>';
       var q = document.createElement('div');
       q.className = 'hn-quick';
-      (config.quick.length ? config.quick : DEFAULT_QUICK).forEach(function (t) {
+      (config.quick.length ? config.quick : (IS_EN ? DEFAULT_QUICK_EN : DEFAULT_QUICK)).forEach(function (qt) {
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = t;
-        btn.addEventListener('click', function () { submit(t); });
+        btn.textContent = qt;
+        btn.addEventListener('click', function () { submit(qt); });
         q.appendChild(btn);
       });
       w.appendChild(q);
@@ -428,7 +444,15 @@
     scrollBottom();
   }
 
-  var DEFAULT_QUICK = ['万载古城烟花秀什么时候看？', '有哪些必吃的万载美食？', '推荐一条一日游线路', '万载有哪些非物质文化遗产？'];
+  var DEFAULT_QUICK = [
+    '万载古城烟花秀什么时候看？', '有哪些必吃的万载美食？', '推荐一条一日游线路', '万载有哪些非物质文化遗产？',
+  ];
+  var DEFAULT_QUICK_EN = [
+    'When is the fireworks show at Wanzai Ancient City?',
+    'What must-eat local foods do you recommend?',
+    'Suggest a one-day itinerary',
+    'What intangible cultural heritage does Wanzai have?',
+  ];
 
   function appendBubble(role, text, extra, animate) {
     var row = document.createElement('div');
@@ -460,7 +484,7 @@
     if (extra && extra.sources && extra.sources.length) {
       var src = document.createElement('div');
       src.className = 'hn-src';
-      src.textContent = '知识来源：' + extra.sources.join(' · ');
+      src.textContent = t('ai.sources', '知识来源：') + extra.sources.join(' · ');
       bubble.appendChild(src);
     }
     if (extra && extra.route) {
@@ -493,13 +517,14 @@
   }
 
   function routeLabel(route) {
-    if (route.indexOf('/music/?t=') === 0) return '▶ 播放这首歌';
-    for (var i = 0; i < ROUTE_LABELS.length; i++) {
-      if (route === ROUTE_LABELS[i][0] || route.indexOf(ROUTE_LABELS[i][0] + '/') === 0) {
-        return '前往' + ROUTE_LABELS[i][1];
+    if (route.indexOf('/music/?t=') === 0) return t('ai.playSong', '▶ 播放这首歌');
+    var names = (I18N.ai && I18N.ai.routes) || {};
+    for (var i = 0; i < ROUTES.length; i++) {
+      if (route === ROUTES[i] || route.indexOf(ROUTES[i] + '/') === 0) {
+        if (names[ROUTES[i]]) return t('ai.goto', '前往') + names[ROUTES[i]];
       }
     }
-    return '打开页面';
+    return t('ai.openPage', '打开页面');
   }
 
   /* ---------------- 发送 ---------------- */
@@ -509,7 +534,7 @@
     if (!text || busy) return;
     if (!navigator.onLine) {
       // 离线不发请求、不清空输入框，方便联网后原样重发（docs/PWA应用方案.md §3.5）
-      appendBubble('ai', '当前离线，花傩需要联网才能回答，请恢复网络后再问。', null, false);
+      appendBubble('ai', t('ai.offline', '当前离线，花傩需要联网才能回答，请恢复网络后再问。'), null, false);
       return;
     }
     els.input.value = '';
@@ -553,7 +578,7 @@
       return r.json().catch(function () { return null; }).then(function (j) { return { status: r.status, json: j }; });
     }).then(function (res) {
       var j = res.json || {};
-      var reply = j.text || (res.status === 429 ? '问题有点多啦，请休息几分钟再问。' : '花傩暂时不在，请稍后再试。');
+      var reply = j.text || (res.status === 429 ? t('ai.rateLimited', '问题有点多啦，请休息几分钟再问。') : t('ai.unavailable', '花傩暂时不在，请稍后再试。'));
       var extra = {};
       if (j.sources && j.sources.length) extra.sources = j.sources;
       if (j.action && j.action.type === 'open_page' && j.action.payload && j.action.payload.route) {
@@ -561,7 +586,7 @@
       }
       done(reply, extra);
     }).catch(function () {
-      done(navigator.onLine ? '网络异常，请稍后再试。' : '网络已断开，请恢复网络后再问。', {});
+      done(navigator.onLine ? t('ai.network', '网络异常，请稍后再试。') : t('ai.offlineShort', '网络已断开，请恢复网络后再问。'), {});
     }).finally(function () {
       busy = false;
       els.send.disabled = !els.input.value.trim();

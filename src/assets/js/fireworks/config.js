@@ -9,6 +9,13 @@ Gitee：https://gitee.com/nianbroken/Firework_Simulator
 "use strict";
 
 (function initFireworksAppConfig(global) {
+	/* 多语言（docs/英文版方案.md Phase 1）：window.__I18N.fw 由 build.js 按 locale 注入（head 内联脚本先于本文件执行）；
+	   无注入（zh 或 Worker 动态页）走字面量兜底。fwT 挂全局，供拼接文件序中的后续模块共用。 */
+	var fwT = function (key, fallback) {
+		var v = ((global.__I18N || {}).fw || {})[key];
+		return v == null ? fallback : v;
+	};
+	global.fwT = fwT;
 	const config = {
 		storageKey: "whizzzest_fireworks_data",
 		storageVersion: "1.0",
@@ -83,52 +90,52 @@ Gitee：https://gitee.com/nianbroken/Firework_Simulator
 		}),
 		helpContent: Object.freeze({
 			shellType: {
-				header: "烟花类型",
-				body: "你要放的烟花类型。选择随机，可以保持当前作品原本的组合节奏。",
+				header: fwT("help.shellType.header", "烟花类型"),
+				body: fwT("help.shellType.body", "你要放的烟花类型。选择随机，可以保持当前作品原本的组合节奏。"),
 			},
 			shellSize: {
-				header: "烟花大小",
-				body: "烟花越大，绽放范围越大，对设备性能的压力也越高。",
+				header: fwT("help.shellSize.header", "烟花大小"),
+				body: fwT("help.shellSize.body", "烟花越大，绽放范围越大，对设备性能的压力也越高。"),
 			},
 			quality: {
-				header: "画质",
-				body: "画质越高，粒子数量越多。设备吃力时直接降低画质。",
+				header: fwT("help.quality.header", "画质"),
+				body: fwT("help.quality.body", "画质越高，粒子数量越多。设备吃力时直接降低画质。"),
 			},
 			skyLighting: {
-				header: "照亮天空",
-				body: "控制烟花爆炸时对背景的照亮强度。",
+				header: fwT("help.skyLighting.header", "照亮天空"),
+				body: fwT("help.skyLighting.body", "控制烟花爆炸时对背景的照亮强度。"),
 			},
 			scaleFactor: {
-				header: "缩放",
-				body: "调整观察距离。数值越小，看到的烟花越完整。",
+				header: fwT("help.scaleFactor.header", "缩放"),
+				body: fwT("help.scaleFactor.body", "调整观察距离。数值越小，看到的烟花越完整。"),
 			},
 			wordShell: {
-				header: "文字烟花",
-				body: "默认关闭。开启后，系统会稳定触发文字烟花，不再依赖随机概率。",
+				header: fwT("help.wordShell.header", "文字烟花"),
+				body: fwT("help.wordShell.body", "默认关闭。开启后，系统会稳定触发文字烟花，不再依赖随机概率。"),
 			},
 			autoLaunch: {
-				header: "自动放烟花",
-				body: "开启后自动连续放烟花。关闭后只能通过点击屏幕发射。",
+				header: fwT("help.autoLaunch.header", "自动放烟花"),
+				body: fwT("help.autoLaunch.body", "开启后自动连续放烟花。关闭后只能通过点击屏幕发射。"),
 			},
 			finaleMode: {
-				header: "同时放更多的烟花",
-				body: "开启后会在自动发射阶段加密节奏。",
+				header: fwT("help.finaleMode.header", "同时放更多的烟花"),
+				body: fwT("help.finaleMode.body", "开启后会在自动发射阶段加密节奏。"),
 			},
 			hideControls: {
-				header: "隐藏控制按钮",
-				body: "隐藏顶部按钮，保留更干净的观看画面。",
+				header: fwT("help.hideControls.header", "隐藏控制按钮"),
+				body: fwT("help.hideControls.body", "隐藏顶部按钮，保留更干净的观看画面。"),
 			},
 			fullscreen: {
-				header: "全屏",
-				body: "切换浏览器全屏模式。",
+				header: fwT("help.fullscreen.header", "全屏"),
+				body: fwT("help.fullscreen.body", "切换浏览器全屏模式。"),
 			},
 			longExposure: {
-				header: "保留烟花的火花",
-				body: "保留更长的拖尾痕迹。",
+				header: fwT("help.longExposure.header", "保留烟花的火花"),
+				body: fwT("help.longExposure.body", "保留更长的拖尾痕迹。"),
 			},
 			background: {
-				header: "自定义背景",
-				body: "点「上传图片」可以把图片保存到当前浏览器（IndexedDB），刷新或下次打开后点缩略图即可选用；也支持输入图片地址或 `url(...)`、`linear-gradient(...)` 这类背景样式。清除浏览器站点数据会删除已上传的图片。",
+				header: fwT("help.background.header", "自定义背景"),
+				body: fwT("help.background.body", "点「上传图片」可以把图片保存到当前浏览器（IndexedDB），刷新或下次打开后点缩略图即可选用；也支持输入图片地址或 `url(...)`、`linear-gradient(...)` 这类背景样式。清除浏览器站点数据会删除已上传的图片。"),
 			},
 		}),
 		helpNodeMap: Object.freeze({

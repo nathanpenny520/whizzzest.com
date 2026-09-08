@@ -1,6 +1,6 @@
 <!-- {"title":"焰境·万载 — 一朝相逢，便是万载","description":"探索千年烟花文化，体验非遗魅力，品味特色美食，领略万载风光。中国花炮之乡·江西万载。","ogImage":"/assets/img/yzxf_bswz.jpeg"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body>
   {{> header}}
@@ -15,15 +15,15 @@
         {{/each}}
       </div>
       <div class="hero-overlay" aria-hidden="true"></div>
-      <button class="hero-arrow hero-arrow-prev" type="button" aria-label="上一张">
+      <button class="hero-arrow hero-arrow-prev" type="button" aria-label="{{t.hero.prev}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 19l-7-7 7-7"/></svg>
       </button>
-      <button class="hero-arrow hero-arrow-next" type="button" aria-label="下一张">
+      <button class="hero-arrow hero-arrow-next" type="button" aria-label="{{t.hero.next}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
       </button>
-      <div class="hero-dots" aria-label="轮播图选择">
+      <div class="hero-dots" aria-label="{{t.hero.dotsLabel}}">
         {{#each data.carousel as slide}}
-        <button class="hero-dot" type="button" aria-label="第 {{@index}} 张"></button>
+        <button class="hero-dot" type="button" aria-label="{{t.hero.dotBefore}}{{@index}}{{t.hero.dotAfter}}"></button>
         {{/each}}
       </div>
       <div class="hero-content">
@@ -74,19 +74,20 @@
       </div>
     </section>
 
-    <!-- 景点精选：JS 从 /api/attractions/latest 拉取填充；无 JS / 无数据时整块隐藏不占位 -->
-    <section class="section home-strip" id="attract-strip" hidden>
+    <!-- 景点精选：JS 从 /api/attractions/latest 拉取填充；无 JS / 无数据时整块隐藏不占位。
+         数据来自 zh-only 的动态 API，非默认语言页不渲染（避免英文壳 + 中文内容）。 -->
+    {{#if page.isDefaultLocale}}<section class="section home-strip" id="attract-strip" hidden>
       <div class="container-wide">
         <div class="home-strip-head reveal in">
           <div>
-            <span class="home-strip-kicker">旅游景点 · 万载山水</span>
-            <h2>游万载，古城山水焰火间</h2>
+            <span class="home-strip-kicker">{{t.home.attractKicker}}</span>
+            <h2>{{t.home.attractTitle}}</h2>
           </div>
-          <a class="home-strip-more" href="/attractions/">全部景点 ›</a>
+          <a class="home-strip-more" href="/attractions/">{{t.home.attractMore}}</a>
         </div>
         <div class="home-strip-row" id="attract-strip-row"></div>
       </div>
-    </section>
+    </section>{{/if}}
 
     <section class="section section-alt home-merchants">
       <div class="container">
@@ -108,32 +109,32 @@
     </section>
 
     <!-- 焰境影像：JS 从 /api/tv/latest 拉最新视频填充；无 JS / 无数据时整块隐藏不占位 -->
-    <section class="section tv-strip-wrap" id="tv-strip" hidden>
+    {{#if page.isDefaultLocale}}<section class="section tv-strip-wrap" id="tv-strip" hidden>
       <div class="container-wide">
         <div class="tv-strip-head reveal in">
           <div>
-            <span class="tv-strip-kicker">焰境影像 · 万载TV</span>
-            <h2>看万载，从一集短剧开始</h2>
+            <span class="tv-strip-kicker">{{t.home.tvKicker}}</span>
+            <h2>{{t.home.tvTitle}}</h2>
           </div>
-          <a class="tv-strip-more" href="/tv/">进入频道 ›</a>
+          <a class="tv-strip-more" href="/tv/">{{t.home.tvMore}}</a>
         </div>
         <div class="tv-strip-row" id="tv-strip-row"></div>
       </div>
-    </section>
+    </section>{{/if}}
 
     <!-- 万载音乐：JS 从 /api/music/latest 拉取填充；无 JS / 无数据时整块隐藏不占位 -->
-    <section class="section section-alt home-strip" id="music-strip" hidden>
+    {{#if page.isDefaultLocale}}<section class="section section-alt home-strip" id="music-strip" hidden>
       <div class="container-wide">
         <div class="home-strip-head reveal in">
           <div>
-            <span class="home-strip-kicker">万载音乐 · 听见万载</span>
-            <h2>万载的声音，都在这里</h2>
+            <span class="home-strip-kicker">{{t.home.musicKicker}}</span>
+            <h2>{{t.home.musicTitle}}</h2>
           </div>
-          <a class="home-strip-more" href="/music/">进入音乐馆 ›</a>
+          <a class="home-strip-more" href="/music/">{{t.home.musicMore}}</a>
         </div>
         <div class="home-strip-row" id="music-strip-row"></div>
       </div>
-    </section>
+    </section>{{/if}}
 
     <!-- 数字体验：数字烟花 + 焰境文库（静态入口卡） -->
     <section class="section">

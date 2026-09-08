@@ -107,7 +107,7 @@
 			thumbButton.className = "background-gallery__thumb";
 			thumbButton.classList.toggle("is-selected", item.id === selectedId);
 			thumbButton.title = item.name;
-			thumbButton.setAttribute("aria-label", `使用背景图 ${item.name}`);
+			thumbButton.setAttribute("aria-label", fwT("useBg", "使用背景图 {name}").replace("{name}", item.name));
 			thumbButton.setAttribute("aria-pressed", String(item.id === selectedId));
 			thumbButton.style.backgroundImage = `url("${item.thumb}")`;
 
@@ -115,7 +115,7 @@
 			deleteButton.type = "button";
 			deleteButton.className = "background-gallery__delete";
 			deleteButton.textContent = "×";
-			deleteButton.setAttribute("aria-label", `删除背景图 ${item.name}`);
+			deleteButton.setAttribute("aria-label", fwT("deleteBg", "删除背景图 {name}").replace("{name}", item.name));
 
 			cell.append(thumbButton, deleteButton);
 			gallery.append(cell);

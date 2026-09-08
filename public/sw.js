@@ -114,11 +114,13 @@ async function handleNavigate(request, url) {
   } catch (err) {
     const pages = await caches.open(PAGE_CACHE);
     const shell = await caches.open(SHELL_CACHE);
+    // 离线兜底双语（docs/英文版方案.md Phase 1）：/en/* 导航回退英文兜底页，其余回退中文
+    const offlinePage = url.pathname === '/en' || url.pathname.startsWith('/en/') ? '/en/offline.html' : '/offline.html';
     const hit =
       (await pages.match(request)) ||
       (url.search && (await pages.match(pageKey(url)))) ||
       (await shell.match(pageKey(url))) ||
-      (await shell.match('/offline.html'));
+      (await shell.match(offlinePage));
     if (hit) return hit;
     throw err;
   }

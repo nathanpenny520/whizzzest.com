@@ -193,9 +193,30 @@ export async function handleAiChat(request, env, ctx) {
   }
 }
 
-/** 前端配置：公开端点只暴露招呼语与快捷问题，设置缓存复用 */
-export async function handleAiConfig(env) {
+/** 前端配置：公开端点只暴露招呼语与快捷问题，设置缓存复用。
+ *  lang=en（docs/英文版方案.md Phase 1）：EN 页悬浮入口英文文案（后台设置暂为 zh-only，
+ *  二期 admin 双语录入后再接管；enabled 开关两种语言共用）。 */
+const AI_EN_CONFIG = {
+  greeting: 'Hi, I\'m Huanuo — your Wanzai travel & culture guide. Fireworks, heritage, food, itineraries — ask away.',
+  quick: [
+    'When is the fireworks show at Wanzai Ancient City?',
+    'What must-eat local foods do you recommend?',
+    'Suggest a one-day itinerary',
+    'What intangible cultural heritage does Wanzai have?',
+  ],
+};
+
+export async function handleAiConfig(env, url) {
   const s = await loadAiSettings(env);
+  const lang = url && url.searchParams.get('lang') === 'en' ? 'en' : 'zh';
+  if (lang === 'en') {
+    return aiJson({
+      ok: true,
+      enabled: s.enabled === '1',
+      greeting: AI_EN_CONFIG.greeting,
+      quick: AI_EN_CONFIG.quick,
+    });
+  }
   let quick = [];
   try { quick = JSON.parse(s.quick_questions || '[]'); } catch { /* 后台配坏则给空 */ }
   return aiJson({

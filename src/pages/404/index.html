@@ -1,14 +1,14 @@
 <!-- {"title":"页面不存在 — 焰境·万载","description":"你访问的页面不存在，返回焰境·万载首页继续探索。","ogImage":"/assets/img/longhu_yanhuowanhui.jpeg"} -->
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{page.htmlLang}}">
 {{> head}}
 <body>
   {{> header}}
   <main id="main">
     <div class="notfound">
       <div class="code">404</div>
-      <p>这一页的烟花已经放完了。</p>
-      <a class="btn" href="/">返回首页</a>
+      <p>{{t.notfound.body}}</p>
+      <a class="btn" href="/">{{t.notfound.home}}</a>
     </div>
   </main>
   {{> footer}}
