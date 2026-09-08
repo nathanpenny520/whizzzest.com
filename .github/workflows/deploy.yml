@@ -3,10 +3,20 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
+# 串行化部署：同一 ref（main 的 push/dispatch）排队执行，避免交叉部署/冒烟错检。
+# 按 ref 分组 —— PR 检查之间互不排队；cancel-in-progress: false 只排队不取消，不阻断正常部署。
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  # 构建自检 + 4 个 Worker 的部署 dry-run（不需要任何 token/secret）。
+  # push main 时与 deploy 并行执行，仅报告不拦截 —— 失败不阻塞正常上线。
+  check:
+    name: Build + deploy dry-run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,14 +32,49 @@ jobs:
       - name: Build
         run: node build.js
 
+      - name: Dry-run main site
+        run: npx -y wrangler@4.129.0 deploy --dry-run --outdir=.wrangler-dry
+
+      - name: Dry-run admin portal
+        working-directory: admin
+        run: npx -y wrangler@4.129.0 deploy --dry-run --outdir=.wrangler-dry
+
+      - name: Dry-run merchant portal
+        working-directory: merchant
+        run: npx -y wrangler@4.129.0 deploy --dry-run --outdir=.wrangler-dry
+
+      - name: Dry-run writer portal
+        working-directory: writer
+        run: npx -y wrangler@4.129.0 deploy --dry-run --outdir=.wrangler-dry
+
+  deploy:
+    name: Deploy
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      has_token: ${{ steps.token_check.outputs.has_token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: node build.js
+
       - name: Check API token
-        id: check
+        id: token_check
         env:
           HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         run: echo "has_token=$HAS_TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Deploy
-        if: steps.check.outputs.has_token == 'true'
+        if: steps.token_check.outputs.has_token == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -38,7 +83,7 @@ jobs:
 
       # 管理后台（admin.whizzzest.com，admin/ 目录独立 worker）
       - name: Deploy admin
-        if: steps.check.outputs.has_token == 'true'
+        if: steps.token_check.outputs.has_token == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -48,7 +93,7 @@ jobs:
 
       # 商户门户（merchant.whizzzest.com，merchant/ 目录独立 worker）
       - name: Deploy merchant portal
-        if: steps.check.outputs.has_token == 'true'
+        if: steps.token_check.outputs.has_token == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -58,10 +103,37 @@ jobs:
 
       # 文库作者门户（writer.whizzzest.com，writer/ 目录独立 worker，docs/文库方案.md）
       - name: Deploy writer portal
-        if: steps.check.outputs.has_token == 'true'
+        if: steps.token_check.outputs.has_token == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 67e59aecb10a2a8b4b4d525ff8ddcb56
           wranglerVersion: "4.129.0"
           workingDirectory: writer
+
+  # 部署后冒烟检查：全部只读 GET，结果写 job summary，失败仅告警（此时部署已完成，不影响上线）。
+  # always() —— 即使 deploy 失败也检查线上现状，便于区分「部署挂了」和「线上本来就挂了」。
+  smoke:
+    name: Post-deploy smoke
+    needs: deploy
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      # dist 不进 git，重建以取得本次 commit 的 build-meta.json 资产指纹
+      - name: Build
+        run: node build.js
+
+      - name: Smoke
+        env:
+          SMOKE_FINGERPRINT: ${{ needs.deploy.outputs.has_token == 'true' }}
+        run: bash scripts/smoke.sh
