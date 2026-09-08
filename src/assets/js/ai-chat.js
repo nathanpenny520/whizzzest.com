@@ -57,7 +57,8 @@
     ['/tv', '万载TV'], ['/library', '焰境文库'], ['/music', '万载音乐'],
     ['/attractions', '旅游景点'], ['/merchants', '商户名录'], ['/spots', '观赏 spots'],
     ['/cuisine', '美食'], ['/heritage', '非遗文化'], ['/industry', '花炮产业'],
-    ['/tourism', '旅游线路'], ['/about', '关于本站'], ['/pay', '付费合作'],
+    ['/tourism', '旅游线路'], ['/digital-fireworks', '烟花模拟器'],
+    ['/about', '关于本站'], ['/pay', '付费合作'],
   ];
 
   var config = { enabled: true, quick: [] };
@@ -492,6 +493,7 @@
   }
 
   function routeLabel(route) {
+    if (route.indexOf('/music/?t=') === 0) return '▶ 播放这首歌';
     for (var i = 0; i < ROUTE_LABELS.length; i++) {
       if (route === ROUTE_LABELS[i][0] || route.indexOf(ROUTE_LABELS[i][0] + '/') === 0) {
         return '前往' + ROUTE_LABELS[i][1];
@@ -580,10 +582,17 @@
     els.body.scrollTop = els.body.scrollHeight;
   }
 
-  /** Markdown 白名单渲染：全文先转义，仅放行粗体/斜体/行内代码/无序列表/站内与 https 链接 */
+  /** Markdown 白名单渲染：全文先转义，仅放行粗体/斜体/行内代码/无序列表/链接 */
   function mdLite(src) {
     function esc(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    /* 链接白名单：站内相对路径 + 本域 https；其余外链降级为纯文本（防注入导流钓鱼站） */
+    function safeSite(href) {
+      var m = href.match(/^https?:\/\/([^/\s]+)/);
+      if (!m) return false;
+      var h = m[1].toLowerCase();
+      return h === 'whizzzest.com' || h.slice(-14) === '.whizzzest.com';
     }
     function inline(s) {
       return s
@@ -591,11 +600,11 @@
         .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, t, href) {
-          if (/^https?:\/\//.test(href)) {
+          if (/^\//.test(href)) return '<a href="' + href + '">' + t + '</a>';
+          if (/^https?:\/\//.test(href) && safeSite(href)) {
             return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + t + '</a>';
           }
-          if (/^\//.test(href)) return '<a href="' + href + '">' + t + '</a>';
-          return m;
+          return t;
         });
     }
     var lines = esc(src).split(/\r?\n/);
