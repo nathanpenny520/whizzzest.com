@@ -277,3 +277,19 @@ CREATE TABLE IF NOT EXISTS ai_chats (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ai_chats_created ON ai_chats(created_at);
+
+-- 门户通行密钥（2026-09-08，docs/商户功能方案.md v1.7 / docs/文库方案.md v1.2）
+-- merchant / writer 两门户共用一张表，portal 列隔离（与两门户账号隔离一致）；
+-- credential_id / public_key 均为 base64url 字符串；transports 为 JSON 数组字符串
+CREATE TABLE IF NOT EXISTS webauthn_credentials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  portal TEXT NOT NULL,                    -- 'merchant' | 'writer'
+  user_id INTEGER NOT NULL,                -- merchant_users.id / writer_users.id
+  credential_id TEXT NOT NULL UNIQUE,
+  public_key TEXT NOT NULL,
+  counter INTEGER NOT NULL DEFAULT 0,      -- 验签后回写，回退视为重放
+  transports TEXT,
+  device TEXT,                             -- 展示名（UA 推断 + 是否云同步）
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_wa_portal_user ON webauthn_credentials(portal, user_id);

@@ -3,10 +3,12 @@
  *
  *  - GET  /apply             入驻申请表单（multipart：资料 + 最多 9 张图片）
  *  - POST /api/apply         提交申请 → merchants(pending) + merchant_users + R2 图片 → 自动登录
- *  - GET  /login             登录（手机号+密码 或 邮箱+验证码）
+ *  - GET  /login             登录（账密 / 邮箱验证码 / 通行密钥，shared/portal-ui.js 统一壳）
  *  - POST /api/login         手机号+密码：PBKDF2 验证 → HMAC 会话 Cookie（mp_session）
  *  - POST /api/email-code    发送 6 位邮箱验证码（未登录=login 用途；已登录=bind 绑定用）
  *  - POST /api/login/email   邮箱+验证码登录（仅已绑定邮箱的账号）
+ *  - POST /api/webauthn/*    通行密钥（Passkey，shared/webauthn.js）：login-options/login-verify
+ *                            免密登录；reg-options/reg-verify 添加；delete 删除（表 webauthn_credentials，portal='merchant'）
  *  - POST /api/bind-email    看板「账号安全」绑定/更换登录邮箱
  *  - GET  /dashboard         状态看板（审核中/已上线/已驳回/已到期 + 近 30 天浏览统计）
  *  - GET  /dashboard/edit    编辑资料（图片可选替换；保存后重新进入审核）
@@ -22,6 +24,8 @@
  *       公开读取走主站 https://whizzzest.com/assets-merchant/<key>（主 Worker 代理）。
  */
 import { sendMail } from '../worker/smtp.js';
+import { authPage, loginPanel, widePage, passkeyRowHtml, PASSKEY_DASH_JS } from '../shared/portal-ui.js';
+import { createWebAuthn } from '../shared/webauthn.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
@@ -46,6 +50,51 @@ const MAX_IMG_BYTES = 5 * 1024 * 1024;
 
 // 后台页内嵌 favicon（SVG data URI，与主站标签页同款）
 const FAVICON_LINK = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB0PSIxNzcwNjM5ODE2OTM3IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTUxMi44IDQyMC44Yy0xNTYuOCAyMzQuNC0xNDEuNiA1NzYuOC00OCA1NzguNCA5Ni44IDIuNC0xNC40LTM5NC40IDQ4LTU3OC40ek00ODAuOCAzOTUuMmMtMjI3LjIgNzQuNC0zOTIgMzExLjItMzI4LjggMzYxLjYgNjQuOCA1MiAxOTEuMi0yNzIgMzI4LjgtMzYxLjZ6TTQ4Ny4yIDM3NkMyOTAuNCAyODggMjQgMzMyIDMxLjIgMzk5LjJjNy4yIDY4LjggMzA3LjItNDkuNiA0NTYtMjMuMnpNNTEyLjggMzU0LjRjLTg5LjYtMTY5LjYtMzAwLTMwMC44LTMzMS4yLTI1Ni0zMiA0Ni40IDI0MS42IDE1MiAzMzEuMiAyNTZ6TTUzMS4yIDM1NC40QzYyNi40IDIyOCA2MzIgMzQuNCA1ODAuOCAyOS42Yy01Mi44LTQuOC03LjIgMjIzLjItNDkuNiAzMjQuOHpNNTQ4IDM2Ni40YzE0NC44IDMuMiAyOTUuMi05NC40IDI3Mi0xMzUuMi0yNC00MS42LTE3My42IDExMi0yNzIgMTM1LjJ6TTU2MS42IDM5OS4yYzE2MCAxMTkuMiA0MjAgMTYwLjggNDMxLjIgMTA5LjYgMTEuMi01Mi44LTI5OS4yLTQ4LjgtNDMxLjItMTA5LjZ6TTUzOS4yIDQyNi40YzI5LjYgMjE2IDIxMS4yIDQxNy42IDI2NC44IDM3NS4yIDU1LjItNDMuMi0yMDcuMi0yMzMuNi0yNjQuOC0zNzUuMnoiIGZpbGw9IiNFODM1MTgiIHAtaWQ9Ijg1MzkiPjwvcGF0aD48cGF0aCBkPSJNOTE5LjIgNjIyLjRsMTYgMzIuOCAzNiA0LjgtMjUuNiAyNS42IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjUuNiAzNi00Ljh6IiBmaWxsPSIjRjREMzFGIiBwLWlkPSI4NTQwIj48L3BhdGg+PHBhdGggZD0iTTUyMCAzMzkuMmwxNiAzMi44IDM2IDUuNi0yNS42IDI0LjggNS42IDM2LTMyLTE2LjgtMzIgMTYuOCA2LjQtMzYtMjYuNC0yNC44IDM2LTUuNnpNMjM5LjIgNzkyLjhsMTQuNCAzMC40IDM0LjQgNC44LTI0LjggMjQgNS42IDMzLjYtMjkuNi0xNi0zMC40IDE2IDUuNi0zMy42LTI0LjgtMjQgMzQuNC00Ljh6TTE1MS4yIDE4OGgtMzJ2LTMyYzAtMi40LTEuNi00LTQtNHMtNCAxLjYtNCA0djMyaC0zMmMtMi40IDAtNCAxLjYtNCA0czEuNiA0IDQgNGgzMnYzMmMwIDIuNCAxLjYgNCA0IDRzNC0xLjYgNC00di0zMmgzMmMyLjQgMCA0LTEuNiA0LTRzLTEuNi00LTQtNHoiIGZpbGw9IiNGNUUzMjgiIHAtaWQ9Ijg1NDEiPjwvcGF0aD48L3N2Zz4=">';
+
+// 品牌图标 data URI（认证页共享壳 shared/portal-ui.js 复用：顶栏 logo / 侧栏 / favicon）
+const LOGO_URI = (FAVICON_LINK.match(/href="([^"]+)"/) || [])[1] || '';
+
+/* 认证页门户配置（writer / merchant 各一份，结构一致，文案各自维护） */
+const PORTAL_UI = {
+  brand: '焰境好店',
+  area: '商户中心',
+  home: 'https://whizzzest.com/merchants/',
+  logoUri: LOGO_URI,
+  slogan: '把你的店，展示给每一位来万载的游客',
+  highlights: [
+    '免费入驻，审核通过即上线',
+    '认证商户独享详情页 + 认证徽标',
+    '电话微信一键直达，数据看板随行',
+    '申请后 24 小时内完成审核',
+  ],
+};
+
+/* 通行密钥（WebAuthn/Passkey）：验证逻辑在 shared/webauthn.js，D1 读写留在本 Worker */
+const wa = createWebAuthn({
+  portal: 'merchant',
+  rpName: '焰境好店 · 商户中心',
+  secret: (env) => env.MERCHANT_SESSION_SECRET || null,
+  limited,
+  listCredentials: (env, uid) =>
+    env.DB.prepare('SELECT id, credential_id, public_key, counter, transports FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 ORDER BY id')
+      .bind('merchant', uid).all().then((r) => r.results || []),
+  findCredential: (env, credId) =>
+    env.DB.prepare('SELECT id, user_id, credential_id, public_key, counter FROM webauthn_credentials WHERE portal = ?1 AND credential_id = ?2')
+      .bind('merchant', credId).first(),
+  insertCredential: (env, uid, c, device) =>
+    env.DB.prepare('INSERT INTO webauthn_credentials (portal, user_id, credential_id, public_key, counter, transports, device) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)')
+      .bind('merchant', uid, c.id, c.publicKey, c.counter, JSON.stringify(c.transports || []), device).run(),
+  deleteCredential: (env, uid, rowId) =>
+    env.DB.prepare('DELETE FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 AND id = ?3')
+      .bind('merchant', uid, rowId).run(),
+  touchCounter: (env, rowId, counter) =>
+    env.DB.prepare('UPDATE webauthn_credentials SET counter = ?2 WHERE id = ?1').bind(rowId, counter).run(),
+  issueSession: (env, uid) => authedResponse(env.MERCHANT_SESSION_SECRET, uid),
+  userName: (user) => user.login_email
+    || (user.login_phone ? user.login_phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2') : '商户 ' + user.uid),
+});
+
+
 
 export default {
   async fetch(request, env) {
@@ -133,6 +182,11 @@ async function handleApi(request, env, path, url) {
     return sendEmailCode(request, env, u);
   }
   if (path === '/api/login/email' && method === 'POST') return handleEmailLogin(request, env);
+  // 通行密钥：login-* 公开（内部限流），reg-*/delete 需登录（shared/webauthn.js 内部判定）
+  if (path.startsWith('/api/webauthn/')) {
+    const u = await currentUser(request, env);
+    return wa.handle(request, env, path, u);
+  }
   if (path === '/api/logout' && method === 'POST') {
     const res = json({ ok: true });
     res.headers.set('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
@@ -636,6 +690,10 @@ async function dashboardHtml(env, merchant, url) {
   const thumbs = (merchant.cover ? [merchant.cover] : [])
     .concat(safeImages(merchant.images).filter((k) => k !== merchant.cover));
 
+  const { results: pkeys } = await env.DB.prepare(
+    'SELECT id, device, created_at FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 ORDER BY id'
+  ).bind('merchant', merchant.uid).all();
+
   const htmlText = shell(`
     <header><h1>焰境好店 · 商户中心</h1>
       <a class="btn-text" href="/dashboard/edit">编辑资料</a>
@@ -662,8 +720,9 @@ async function dashboardHtml(env, merchant, url) {
         <table>
           <tr><th>登录手机号</th><td>${esc(merchant.login_phone || '—')}</td></tr>
           <tr><th>登录邮箱</th><td>${merchant.login_email ? esc(maskEmail(merchant.login_email)) + ' ' : ''}<button type="button" class="btn-text" id="bind-toggle">${merchant.login_email ? '更换' : '绑定邮箱'}</button></td></tr>
+          ${passkeyRowHtml((pkeys || []).map((k) => ({ ...k, device: esc(k.device || '') })))}
         </table>
-        <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录商户中心，无需输入密码。验证码由 notifications@whizzzest.com 发送。</p>
+        <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录商户中心，无需输入密码。验证码由 notifications@whizzzest.com 发送。通行密钥（指纹/面容）添加后可免密登录本站。</p>
         <div id="bindbox" style="display:none;margin-top:14px">
           <div class="ops" style="flex-wrap:wrap;align-items:center">
             <input class="inl" id="bind-email" type="email" placeholder="邮箱" style="flex:1;min-width:200px">
@@ -683,6 +742,8 @@ async function dashboardHtml(env, merchant, url) {
     </div>
   <script>
   (function () {
+    // 通行密钥添加/删除（shared/portal-ui.js；置于 bind-toggle 早退之前，保证始终绑定）
+    ${PASSKEY_DASH_JS}
     var toggle = document.getElementById('bind-toggle');
     if (!toggle) return;
     toggle.addEventListener('click', function () {
@@ -942,14 +1003,15 @@ function errLine(url) {
 }
 
 function applyHtml(url) {
-  return shell(`
-  <header><h1>焰境好店 · 商户入驻</h1><a class="btn-text" href="/login">已有账号，登录</a></header>
-  <div class="wrap">
-    <div class="card" style="display:block">
-      <h2>把你的店，展示给每一位来万载的游客</h2>
-      <p>提交后我们将在 24 小时内审核。通过即上线 whizzzest.com/merchants/，基础展示免费，可随时升级。</p>
-    </div>
-    <div class="panel">
+  return widePage(PORTAL_UI, {
+    titleTag: '商户入驻',
+    entry: { href: '/login', label: '已有账号，登录' },
+    title: '焰境好店 · 商户入驻',
+    sub: '提交后我们将在 24 小时内审核。通过即上线 whizzzest.com/merchants/，基础展示免费，可随时升级。',
+    extraCss: BASE_CSS,
+    noticeHtml: errLine(url),
+    content: `
+    <div class="panel" style="margin-top:0">
       <h3>展示权益与定价</h3>
       <table>
         <tr><th>基础展示</th><td><b>免费</b> —— 审核后上线，目录页名称 + 简介卡片</td></tr>
@@ -958,7 +1020,6 @@ function applyHtml(url) {
       </table>
       <p class="tip" style="margin-top:10px">入驻后可在「商户中心」随时升级 / 续费（扫码付款，站长核销后自动开通）。</p>
     </div>
-    ${errLine(url)}
     <form class="card" method="post" action="/api/apply" enctype="multipart/form-data">
       <input type="hidden" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true">
       <div class="fgrid">
@@ -986,113 +1047,21 @@ function applyHtml(url) {
         <button class="primary" type="submit">提交申请</button>
         <a class="btn" href="${SITE}/">返回官网</a>
       </div>
-    </form>
-  </div>
-  `);
+    </form>`,
+  });
 }
 
 function loginHtml(url) {
-  return shell(`
-  <header><h1>焰境好店 · 商户登录</h1><a class="btn-text" href="/apply">没有账号？申请入驻</a></header>
-  <div class="wrap">
-    ${errLine(url)}
-    ${loginNotice(url)}
-    <div class="card" style="display:block">
-      <h2 style="margin-bottom:12px">商户登录</h2>
-      <div class="ops" style="margin-bottom:16px">
-        <button type="button" class="tabbtn active" id="mt-phone">手机号 + 密码</button>
-        <button type="button" class="tabbtn" id="mt-email">邮箱 + 验证码</button>
-      </div>
-      <form class="fcol" id="f">
-        <input class="inl" id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号">
-        <input class="inl" id="pw" type="password" autocomplete="current-password" placeholder="密码（申请入驻时设置）">
-        <button class="primary" id="go" type="submit">登 录</button>
-        <p class="err-line" id="err" style="display:none"></p>
-      </form>
-      <form class="fcol" id="fe" style="display:none">
-        <input class="inl" id="email" type="email" placeholder="已绑定的邮箱">
-        <div style="display:flex;gap:10px">
-          <input class="inl" id="code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
-          <button class="btn" id="send" type="button">发送验证码</button>
-        </div>
-        <button class="primary" id="goe" type="submit">登 录</button>
-        <p class="err-line" id="erre" style="display:none"></p>
-        <p class="tip" style="font-size:12px">仅支持已在「商户中心 → 账号安全」绑定邮箱的账号；验证码由 notifications@whizzzest.com 发送。</p>
-      </form>
-    </div>
-  </div>
-  <script>
-  (function () {
-    var PHONE_ERR = { bad: '手机号或密码不正确', rate: '尝试过于频繁，请 10 分钟后再试', format: '提交内容格式有误', config: '服务端未配置完成，请联系站长' };
-    var EMAIL_ERR = { bad: '验证码错误或邮箱未绑定', expired: '验证码已过期，请重新发送', rate: '尝试过于频繁，请 10 分钟后再试', too_fast: '发送太频繁，请 1 分钟后再试', send_failed: '邮件发送失败，请稍后再试', format: '请输入邮箱和 6 位验证码', config: '邮件服务未配置，请联系站长' };
-    function showErr(id, text) { var e = document.getElementById(id); e.textContent = text; e.style.display = 'block'; }
-    function post(path, data) {
-      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
-        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { s: r.status, d: d }; }); });
-    }
-    // 登录提交：成功时 302 已被 fetch 跟随到 /dashboard（HTML），先看 r.ok 再解析错误 JSON
-    function submitPost(path, data, errId, btn, msgs) {
-      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
-        .then(function (r) {
-          if (r.ok) { location.href = '/dashboard'; return; }
-          return r.json().catch(function () { return {}; }).then(function (d) {
-            btn.disabled = false;
-            showErr(errId, (r.status === 429 ? msgs.rate : msgs[d.error]) || '登录失败，请重试');
-          });
-        })
-        .catch(function () { btn.disabled = false; showErr(errId, '网络错误，请重试'); });
-    }
-    function switchMode(email) {
-      document.getElementById('f').style.display = email ? 'none' : 'flex';
-      document.getElementById('fe').style.display = email ? 'flex' : 'none';
-      document.getElementById('mt-phone').classList.toggle('active', !email);
-      document.getElementById('mt-email').classList.toggle('active', email);
-    }
-    document.getElementById('mt-phone').addEventListener('click', function () { switchMode(false); });
-    document.getElementById('mt-email').addEventListener('click', function () { switchMode(true); });
-
-    document.getElementById('f').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var btn = document.getElementById('go');
-      btn.disabled = true;
-      submitPost('/api/login', { phone: document.getElementById('phone').value.trim(), password: document.getElementById('pw').value }, 'err', btn, PHONE_ERR);
-    });
-
-    document.getElementById('send').addEventListener('click', function () {
-      var btn = this;
-      if (btn.disabled) return;
-      post('/api/email-code', { email: document.getElementById('email').value.trim() })
-        .then(function (r) {
-          if (r.s === 200 && r.d.ok) {
-            var n = 60;
-            btn.disabled = true; btn.textContent = n + 's 后重发';
-            var t = setInterval(function () {
-              n--;
-              if (n <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '发送验证码'; return; }
-              btn.textContent = n + 's 后重发';
-            }, 1000);
-            showErr('erre', '✅ 若该邮箱已绑定商户，验证码已发送（10 分钟内有效）');
-            return;
-          }
-          showErr('erre', (r.s === 429 ? (r.d.error === 'too_fast' ? EMAIL_ERR.too_fast : EMAIL_ERR.rate) : EMAIL_ERR[r.d.error]) || '发送失败，请重试');
-        })
-        .catch(function () { showErr('erre', '网络错误，请重试'); });
-    });
-
-    document.getElementById('fe').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var btn = document.getElementById('goe');
-      btn.disabled = true;
-      submitPost('/api/login/email', { email: document.getElementById('email').value.trim(), code: document.getElementById('code').value.trim() }, 'erre', btn, EMAIL_ERR);
-    });
-  })();
-  </script>
-  `);
+  return authPage(PORTAL_UI, {
+    titleTag: '商户登录',
+    noticeHtml: errLine(url) + loginNotice(url),
+    panelHtml: loginPanel({ pwPlaceholder: '密码（申请入驻时设置）', entryHref: '/apply', entryLabel: '申请入驻' }),
+  });
 }
 
 function loginNotice(url) {
   if (!url.searchParams.get('applied')) return '';
-  return '<div class="ok-line">✅ 申请已提交，审核通过前你可以先登录完善资料。</div>';
+  return '<div class="aok" style="margin-bottom:6px">✅ 申请已提交，审核通过前你可以先登录完善资料。</div>';
 }
 
 function editPageHtml(env, merchant, url) {

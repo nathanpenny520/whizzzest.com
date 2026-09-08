@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "description": "焰境·万载 — 零依赖静态构建 + Cloudflare Workers；sharp 仅用于构建期 WebP 图片优化",
+  "description": "焰境·万载 — 零依赖静态构建 + Cloudflare Workers；sharp 仅用于构建期 WebP 图片优化；@simplewebauthn/server 用于门户通行密钥（打包进 writer/merchant Worker）",
   "scripts": {
     "build": "node build.js"
   },
   "devDependencies": {
     "sharp": "^0.35.4"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^14.0.1"
   }
 }

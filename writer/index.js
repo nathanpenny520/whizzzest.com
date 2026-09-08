@@ -30,6 +30,8 @@
  * 邮件：验证码经 notifications@whizzzest.com（worker/smtp.js），需 secret SMTP_USER / SMTP_PASS。
  */
 import { sendMail } from '../worker/smtp.js';
+import { authPage, loginPanel, passkeyRowHtml, PASSKEY_DASH_JS, ICO } from '../shared/portal-ui.js';
+import { createWebAuthn } from '../shared/webauthn.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
@@ -48,6 +50,49 @@ const MAX_CHAPTERS = 500;          // 每部作品章节上限
 const MAX_BODY = 30000;            // 单章正文字符上限
 
 const FAVICON_LINK = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBzdGFuZGFsb25lPSJubyI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB0PSIxNzcwNjM5ODE2OTM3IiBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIgdmVyc2lvbj0iMS4xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHAtaWQ9Ijg1MzgiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTUxMi44IDQyMC44Yy0xNTYuOCAyMzQuNC0xNDEuNiA1NzYuOC00OCA1NzguNCA5Ni44IDIuNC0xNC40LTM5NC40IDQ4LTU3OC40ek00ODAuOCAzOTUuMmMtMjI3LjIgNzQuNC0zOTIgMzExLjItMzI4LjggMzYxLjYgNjQuOCA1MiAxOTEuMi0yNzIgMzI4LjgtMzYxLjZ6TTQ4Ny4yIDM3NkMyOTAuNCAyODggMjQgMzMyIDMxLjIgMzk5LjJjNy4yIDY4LjggMzA3LjItNDkuNiA0NTYtMjMuMnpNNTEyLjggMzU0LjRjLTg5LjYtMTY5LjYtMzAwLTMwMC44LTMzMS4yLTI1Ni0zMiA0Ni40IDI0MS42IDE1MiAzMzEuMiAyNTZ6TTUzMS4yIDM1NC40QzYyNi40IDIyOCA2MzIgMzQuNCA1ODAuOCAyOS42Yy01Mi44LTQuOC03LjIgMjIzLjItNDkuNiAzMjQuOHpNNTQ4IDM2Ni40YzE0NC44IDMuMiAyOTUuMi05NC40IDI3Mi0xMzUuMi0yNC00MS42LTE3My42IDExMi0yNzIgMTM1LjJ6TTU2MS42IDM5OS4yYzE2MCAxMTkuMiA0MjAgMTYwLjggNDMxLjIgMTA5LjYgMTEuMi01Mi44LTI5OS4yLTQ4LjgtNDMxLjItMTA5LjZ6TTUzOS4yIDQyNi40YzI5LjYgMjE2IDIxMS4yIDQxNy42IDI2NC44IDM3NS4yIDU1LjItNDMuMi0yMDcuMi0yMzMuNi0yNjQuOC0zNzUuMnoiIGZpbGw9IiNFODM1MTgiIHAtaWQ9Ijg1MzkiPjwvcGF0aD48cGF0aCBkPSJNOTE5LjIgNjIyLjRsMTYgMzIuOCAzNiA0LjgtMjUuNiAyNS42IDUuNiAzNi0zMi0xNi44LTMyIDE2LjggNi40LTM2LTI2LjQtMjUuNiAzNi00Ljh6IiBmaWxsPSIjRjREMzFGIiBwLWlkPSI4NTQwIj48L3BhdGg+PHBhdGggZD0iTTUyMCAzMzkuMmwxNiAzMi44IDM2IDUuNi0yNS42IDI0LjggNS42IDM2LTMyLTE2LjgtMzIgMTYuOCA2LjQtMzYtMjYuNC0yNC44IDM2LTUuNnpNMjM5LjIgNzkyLjhsMTQuNCAzMC40IDM0LjQgNC44LTI0LjggMjQgNS42IDMzLjYtMjkuNi0xNi0zMC40IDE2IDUuNi0zMy42LTI0LjgtMjQgMzQuNC00Ljh6TTE1MS4yIDE4OGgtMzJ2LTMyYzAtMi40LTEuNi00LTQtNHMtNCAxLjYtNCA0djMyaC0zMmMtMi40IDAtNCAxLjYtNCA0czEuNiA0IDQgNGgzMnYzMmMwIDIuNCAxLjYgNCA0IDRzNC0xLjYgNC00di0zMmgzMmMyLjQgMCA0LTEuNiA0LTRzLTEuNi00LTQtNHoiIGZpbGw9IiNGNUUzMjgiIHAtaWQ9Ijg1NDEiPjwvcGF0aD48L3N2Zz4=">';
+// 品牌图标 data URI（认证页共享壳 shared/portal-ui.js 复用：顶栏 logo / 侧栏 / favicon）
+const LOGO_URI = (FAVICON_LINK.match(/href="([^"]+)"/) || [])[1] || '';
+
+/* 认证页门户配置（writer / merchant 各一份，结构一致，文案各自维护） */
+const PORTAL_UI = {
+  brand: '焰境文库',
+  area: '作者中心',
+  home: SITE + '/library/',
+  logoUri: LOGO_URI,
+  slogan: '把你的万载故事，写给每一位读者',
+  highlights: [
+    '免费写作，作品与章节双审核',
+    'Markdown 正文，章节化管理',
+    '审核进度与驳回原因透明可见',
+    '审过即上线 whizzzest.com/library/',
+  ],
+};
+
+/* 通行密钥（WebAuthn/Passkey）：验证逻辑在 shared/webauthn.js，D1 读写留在本 Worker */
+const wa = createWebAuthn({
+  portal: 'writer',
+  rpName: '焰境文库 · 作者中心',
+  secret: (env) => env.WRITER_SESSION_SECRET || null,
+  limited,
+  listCredentials: (env, uid) =>
+    env.DB.prepare('SELECT id, credential_id, public_key, counter, transports FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 ORDER BY id')
+      .bind('writer', uid).all().then((r) => r.results || []),
+  findCredential: (env, credId) =>
+    env.DB.prepare('SELECT id, user_id, credential_id, public_key, counter FROM webauthn_credentials WHERE portal = ?1 AND credential_id = ?2')
+      .bind('writer', credId).first(),
+  insertCredential: (env, uid, c, device) =>
+    env.DB.prepare('INSERT INTO webauthn_credentials (portal, user_id, credential_id, public_key, counter, transports, device) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)')
+      .bind('writer', uid, c.id, c.publicKey, c.counter, JSON.stringify(c.transports || []), device).run(),
+  deleteCredential: (env, uid, rowId) =>
+    env.DB.prepare('DELETE FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 AND id = ?3')
+      .bind('writer', uid, rowId).run(),
+  touchCounter: (env, rowId, counter) =>
+    env.DB.prepare('UPDATE webauthn_credentials SET counter = ?2 WHERE id = ?1').bind(rowId, counter).run(),
+  issueSession: (env, uid) => authedResponse(env.WRITER_SESSION_SECRET, uid),
+  userName: (user) => user.login_email
+    || (user.login_phone ? user.login_phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2') : '作者 ' + user.uid),
+});
+
 
 export default {
   async fetch(request, env) {
@@ -166,6 +211,11 @@ async function handleApi(request, env, path, url) {
     return sendEmailCode(request, env, u);
   }
   if (path === '/api/login/email' && method === 'POST') return handleEmailLogin(request, env);
+  // 通行密钥：login-* 公开（内部限流），reg-*/delete 需登录（shared/webauthn.js 内部判定）
+  if (path.startsWith('/api/webauthn/')) {
+    const u = await currentUser(request, env);
+    return wa.handle(request, env, path, u);
+  }
   if (path === '/api/logout' && method === 'POST') {
     const res = json({ ok: true });
     res.headers.set('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
@@ -1056,43 +1106,42 @@ function errLine(url) {
   return err ? `<div class="err-line">${esc(ERR_TEXT[err] || '提交失败，请重试')}</div>` : '';
 }
 
-/* ---------------- 注册 / 登录页 ---------------- */
+/* ---------------- 注册 / 登录页（shared/portal-ui.js 统一壳，与商户门户同构） ---------------- */
+
+function authNotice(url) {
+  const err = url.searchParams.get('err');
+  return err ? `<div class="aerr" style="display:block">${esc(ERR_TEXT[err] || '提交失败，请重试')}</div>` : '';
+}
 
 function registerHtml(url) {
-  return shell(`
-  <header><h1>焰境文库 · 作者注册</h1><a class="btn-text" href="/login">已有账号，登录</a></header>
-  <div class="wrap">
-    <div class="card" style="display:block">
-      <h2>把你的万载故事，写给每一位读者</h2>
-      <p>注册后在「作品台」新建作品、写章节。作品与章节均需站长审核通过后才会在 whizzzest.com/library/ 上线展示。</p>
-    </div>
-    ${errLine(url)}
-    <form class="card" style="display:block">
-      <input type="hidden" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <h2 style="margin-bottom:12px">作者注册</h2>
-      <div class="ops" style="margin-bottom:16px">
-        <button type="button" class="tabbtn active" id="rt-phone">手机号 + 密码</button>
-        <button type="button" class="tabbtn" id="rt-email">邮箱 + 验证码</button>
-      </div>
-      <div class="fcol" id="fp">
-        <input class="inl" id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号">
-        <input class="inl" id="pw" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）">
-        <button class="primary" id="go" type="submit">注册并进入作品台</button>
-        <p class="err-line" id="err" style="display:none"></p>
-      </div>
-      <div class="fcol" id="fe" style="display:none">
-        <input class="inl" id="email" type="email" placeholder="邮箱">
-        <div style="display:flex;gap:10px">
-          <input class="inl" id="code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
-          <button class="btn" id="send" type="button">发送验证码</button>
-        </div>
-        <input class="inl" id="pw2" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）">
-        <button class="primary" id="goe" type="submit">注册并进入作品台</button>
-        <p class="err-line" id="erre" style="display:none"></p>
-      </div>
-      <p class="tip" style="font-size:12px;margin-top:4px">注册即表示同意站长对投稿内容进行审核；审核结果会显示在作品台。验证码由 notifications@whizzzest.com 发送；邮箱注册的账号可用「邮箱 + 验证码」登录。与商户中心账号相互独立。</p>
-    </form>
+  const panel = `
+  <div class="auth-tabs" role="tablist">
+    <button type="button" class="atab active" id="rt-phone">账密注册</button>
+    <button type="button" class="atab" id="rt-email">邮箱注册</button>
   </div>
+  <form class="afcol" id="fp">
+    <label class="afield"><span class="aico">${ICO.phone}</span>
+      <input id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号"></label>
+    <label class="afield"><span class="aico">${ICO.lock}</span>
+      <input id="pw" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）"></label>
+    <button class="aprimary" id="go" type="submit">注册并进入作品台</button>
+    <p class="aerr" id="err" style="display:none"></p>
+  </form>
+  <form class="afcol" id="fe" hidden>
+    <label class="afield"><span class="aico">${ICO.mail}</span>
+      <input id="email" type="email" autocomplete="email" placeholder="邮箱"></label>
+    <div class="acode">
+      <label class="afield"><span class="aico">${ICO.lock}</span>
+        <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码"></label>
+      <button class="abtn" id="send" type="button">发送验证码</button>
+    </div>
+    <label class="afield"><span class="aico">${ICO.lock}</span>
+      <input id="pw2" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）"></label>
+    <button class="aprimary" id="goe" type="submit">注册并进入作品台</button>
+    <p class="aerr" id="erre" style="display:none"></p>
+  </form>
+  <p class="aentry">已有账号？<a class="alink" href="/login">直接登录</a></p>
+  <p class="ahint" style="text-align:center">注册即表示同意站长对投稿内容进行审核；邮箱注册的账号可用「邮箱 + 验证码」登录，与商户中心账号相互独立。</p>
   <script>
   (function () {
     var ERR = { phone: '手机号格式不正确', email: '邮箱格式不正确', password: '密码至少 8 位',
@@ -1106,18 +1155,17 @@ function registerHtml(url) {
         .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { s: r.status, d: d }; }); });
     }
     function switchMode(email) {
-      document.getElementById('fp').style.display = email ? 'none' : 'flex';
-      document.getElementById('fe').style.display = email ? 'flex' : 'none';
+      document.getElementById('fp').hidden = email;
+      document.getElementById('fe').hidden = !email;
       document.getElementById('rt-phone').classList.toggle('active', !email);
       document.getElementById('rt-email').classList.toggle('active', email);
     }
     document.getElementById('rt-phone').addEventListener('click', function () { switchMode(false); });
     document.getElementById('rt-email').addEventListener('click', function () { switchMode(true); });
 
-    // 手机号注册（表单统一拦截默认提交；邮箱 Tab 由 goe 按钮自己处理）
-    document.querySelector('#fp').closest('form').addEventListener('submit', function (e) {
+    // 手机号注册
+    document.getElementById('fp').addEventListener('submit', function (e) {
       e.preventDefault();
-      if (document.getElementById('fe').style.display !== 'none') return;
       var btn = document.getElementById('go');
       btn.disabled = true;
       fetch('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -1156,8 +1204,9 @@ function registerHtml(url) {
     });
 
     // 邮箱注册
-    document.getElementById('goe').addEventListener('click', function () {
-      var btn = this;
+    document.getElementById('fe').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('goe');
       btn.disabled = true;
       post('/api/register/email', { email: document.getElementById('email').value.trim(),
         code: document.getElementById('code').value.trim(),
@@ -1170,105 +1219,20 @@ function registerHtml(url) {
         .catch(function () { btn.disabled = false; showErr('erre', '网络错误，请重试'); });
     });
   })();
-  </script>
-  `);
+  </script>`;
+  return authPage(PORTAL_UI, {
+    titleTag: '作者注册',
+    noticeHtml: authNotice(url),
+    panelHtml: panel,
+  });
 }
 
 function loginHtml(url) {
-  return shell(`
-  <header><h1>焰境文库 · 作者登录</h1><a class="btn-text" href="/register">没有账号？注册作者</a></header>
-  <div class="wrap">
-    ${errLine(url)}
-    <div class="card" style="display:block">
-      <h2 style="margin-bottom:12px">作者登录</h2>
-      <div class="ops" style="margin-bottom:16px">
-        <button type="button" class="tabbtn active" id="mt-phone">手机号 + 密码</button>
-        <button type="button" class="tabbtn" id="mt-email">邮箱 + 验证码</button>
-      </div>
-      <form class="fcol" id="f">
-        <input class="inl" id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号">
-        <input class="inl" id="pw" type="password" autocomplete="current-password" placeholder="密码">
-        <button class="primary" id="go" type="submit">登 录</button>
-        <p class="err-line" id="err" style="display:none"></p>
-      </form>
-      <form class="fcol" id="fe" style="display:none">
-        <input class="inl" id="email" type="email" placeholder="已绑定的邮箱">
-        <div style="display:flex;gap:10px">
-          <input class="inl" id="code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
-          <button class="btn" id="send" type="button">发送验证码</button>
-        </div>
-        <button class="primary" id="goe" type="submit">登 录</button>
-        <p class="err-line" id="erre" style="display:none"></p>
-        <p class="tip" style="font-size:12px">支持注册时使用邮箱，或已在「作品台 → 账号安全」绑定邮箱的账号；验证码由 notifications@whizzzest.com 发送。与商户中心账号相互独立。</p>
-      </form>
-    </div>
-  </div>
-  <script>
-  (function () {
-    var PHONE_ERR = { bad: '手机号或密码不正确', rate: '尝试过于频繁，请 10 分钟后再试', format: '提交内容格式有误', config: '服务端未配置完成，请联系站长' };
-    var EMAIL_ERR = { bad: '验证码错误或邮箱未绑定', expired: '验证码已过期，请重新发送', rate: '尝试过于频繁，请 10 分钟后再试', too_fast: '发送太频繁，请 1 分钟后再试', send_failed: '邮件发送失败，请稍后再试', format: '请输入邮箱和 6 位验证码', config: '邮件服务未配置，请联系站长' };
-    function showErr(id, text) { var e = document.getElementById(id); e.textContent = text; e.style.display = 'block'; }
-    function post(path, data) {
-      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
-        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { s: r.status, d: d }; }); });
-    }
-    function submitPost(path, data, errId, btn, msgs) {
-      return fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
-        .then(function (r) {
-          if (r.ok) { location.href = '/dashboard'; return; }
-          return r.json().catch(function () { return {}; }).then(function (d) {
-            btn.disabled = false;
-            showErr(errId, (r.status === 429 ? msgs.rate : msgs[d.error]) || '登录失败，请重试');
-          });
-        })
-        .catch(function () { btn.disabled = false; showErr(errId, '网络错误，请重试'); });
-    }
-    function switchMode(email) {
-      document.getElementById('f').style.display = email ? 'none' : 'flex';
-      document.getElementById('fe').style.display = email ? 'flex' : 'none';
-      document.getElementById('mt-phone').classList.toggle('active', !email);
-      document.getElementById('mt-email').classList.toggle('active', email);
-    }
-    document.getElementById('mt-phone').addEventListener('click', function () { switchMode(false); });
-    document.getElementById('mt-email').addEventListener('click', function () { switchMode(true); });
-
-    document.getElementById('f').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var btn = document.getElementById('go');
-      btn.disabled = true;
-      submitPost('/api/login', { phone: document.getElementById('phone').value.trim(), password: document.getElementById('pw').value }, 'err', btn, PHONE_ERR);
-    });
-
-    document.getElementById('send').addEventListener('click', function () {
-      var btn = this;
-      if (btn.disabled) return;
-      post('/api/email-code', { email: document.getElementById('email').value.trim() })
-        .then(function (r) {
-          if (r.s === 200 && r.d.ok) {
-            var n = 60;
-            btn.disabled = true; btn.textContent = n + 's 后重发';
-            var t = setInterval(function () {
-              n--;
-              if (n <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '发送验证码'; return; }
-              btn.textContent = n + 's 后重发';
-            }, 1000);
-            showErr('erre', '✅ 若该邮箱已绑定作者账号，验证码已发送（10 分钟内有效）');
-            return;
-          }
-          showErr('erre', (r.s === 429 ? (r.d.error === 'too_fast' ? EMAIL_ERR.too_fast : EMAIL_ERR.rate) : EMAIL_ERR[r.d.error]) || '发送失败，请重试');
-        })
-        .catch(function () { showErr('erre', '网络错误，请重试'); });
-    });
-
-    document.getElementById('fe').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var btn = document.getElementById('goe');
-      btn.disabled = true;
-      submitPost('/api/login/email', { email: document.getElementById('email').value.trim(), code: document.getElementById('code').value.trim() }, 'erre', btn, EMAIL_ERR);
-    });
-  })();
-  </script>
-  `);
+  return authPage(PORTAL_UI, {
+    titleTag: '作者登录',
+    noticeHtml: authNotice(url),
+    panelHtml: loginPanel({ pwPlaceholder: '密码', entryHref: '/register', entryLabel: '注册作者' }),
+  });
 }
 
 /* ---------------- 作品台 ---------------- */
@@ -1315,14 +1279,19 @@ async function dashboardHtml(env, user, url) {
     </div>`;
   }).join('');
 
+  const { results: pkeys } = await env.DB.prepare(
+    'SELECT id, device, created_at FROM webauthn_credentials WHERE portal = ?1 AND user_id = ?2 ORDER BY id'
+  ).bind('writer', user.uid).all();
+
   const bindEmailPanel = `
     <div class="panel">
       <h3>账号安全</h3>
       <table>
         <tr><th>登录手机号</th><td>${esc(user.login_phone || '—')}</td></tr>
         <tr><th>登录邮箱</th><td>${user.login_email ? esc(maskEmail(user.login_email)) + ' ' : ''}<button type="button" class="btn-text" id="bind-toggle">${user.login_email ? '更换' : '绑定邮箱'}</button></td></tr>
+        ${passkeyRowHtml((pkeys || []).map((k) => ({ ...k, device: esc(k.device || '') })))}
       </table>
-      <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录作者中心。验证码由 notifications@whizzzest.com 发送。</p>
+      <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录作者中心。验证码由 notifications@whizzzest.com 发送。通行密钥（指纹/面容）添加后可免密登录本站。</p>
       <div id="bindbox" style="display:none;margin-top:14px">
         <div class="ops" style="flex-wrap:wrap;align-items:center">
           <input class="inl" id="bind-email" type="email" placeholder="邮箱" style="flex:1;min-width:200px">
@@ -1423,6 +1392,8 @@ async function dashboardHtml(env, user, url) {
         })
         .catch(function () { btn.disabled = false; showErr('#d64524', '网络错误，请重试'); });
     });
+    // 通行密钥添加/删除（shared/portal-ui.js）
+    ${PASSKEY_DASH_JS}
   })();
   </script>
   `);
