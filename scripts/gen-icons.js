@@ -2,18 +2,20 @@
 /**
  * gen-icons.js — PWA 图标一次性生成（产物提交入库，无需每次构建重跑）
  *
- * favicon.svg（红黄火焰，透明底，viewBox 1024）→ public/icons/：
- *   icon-192.png / icon-512.png      常规图标（透明底原样）
+ * favicon.svg（红黄火焰，透明底，viewBox 1024）→ public/：
+ *   favicon.ico                      传统搜索引擎/浏览器兜底（16/32/48 多尺寸，百度等只认 .ico）
+ *   icon-192.png / icon-512.png      常规图标（透明底原样）→ public/icons/
  *   maskable-192.png / maskable-512.png  可掩码图标（浅底 #fbfbfd，火焰缩至 76% 安全区）
  *   apple-touch-icon.png             iOS 主屏图标 180px（不读 manifest 图标，需整幅实底）
  *
- * 运行：node scripts/gen-icons.js （依赖构建期 devDependency sharp）
+ * 运行：node scripts/gen-icons.js （依赖构建期 devDependency sharp + png-to-ico）
  */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
+const pngToIco = require('png-to-ico').default;
 
 const ROOT = path.join(__dirname, '..');
 const SVG = path.join(ROOT, 'public', 'favicon.svg');
@@ -43,6 +45,13 @@ async function renderMaskable(size, dest) {
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
+  // favicon.ico：sharp 不支持 ico 容器，先光栅化多尺寸 PNG 再用 png-to-ico 打包
+  const icoSizes = [16, 32, 48];
+  const pngs = await Promise.all(icoSizes.map((size) =>
+    sharp(SVG, { density: 72 * (size / 200) * 1.02 }).resize(size, size).png().toBuffer()
+  ));
+  const ico = await pngToIco(pngs);
+  fs.writeFileSync(path.join(ROOT, 'public', 'favicon.ico'), ico);
   await renderRegular(192, path.join(OUT, 'icon-192.png'));
   await renderRegular(512, path.join(OUT, 'icon-512.png'));
   await renderMaskable(192, path.join(OUT, 'maskable-192.png'));

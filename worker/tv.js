@@ -476,6 +476,7 @@ function pageShell(chrome, loc, { title, description, url, body, jsonLd, needPla
   <meta property="og:url" content="${esc(url)}">
   <meta property="og:image" content="${SITE_URL}${ogImage}">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="manifest" href="${L.manifest}">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">

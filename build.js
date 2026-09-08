@@ -46,7 +46,7 @@ const DYNAMIC_ZH_ROUTES = ['/merchants', '/tv', '/library', '/music', '/attracti
 const LOOSE = process.argv.includes('--loose');
 
 // 资产/杂项路径前缀：链接巡检时跳过
-const ASSET_PREFIXES = ['/assets/', '/icons/', '/favicon.svg', '/manifest', '/sw.js', '/offline'];
+const ASSET_PREFIXES = ['/assets/', '/icons/', '/favicon.svg', '/favicon.ico', '/manifest', '/sw.js', '/offline'];
 
 /** 页脚社交图标库（SVG innerHTML）：数据驱动页脚（site.footer.socials[].icon → 此表）。
  *  新平台 = 这里加一项 + 数据文件里引用 icon 名。 */
@@ -818,6 +818,7 @@ ${zhPages
     ...LOCALES.map((l) => `${localePrefix(l)}offline.html`),
     ...LOCALES.map((l) => `${localePrefix(l)}manifest.webmanifest`),
     '/favicon.svg',
+    '/favicon.ico',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
     '/icons/maskable-192.png',
