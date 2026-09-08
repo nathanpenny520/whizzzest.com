@@ -3193,7 +3193,12 @@ function renderMerchant(x) {
     ? '<div class="mrow-pay">💰 待核销：申请「' + esc(M_TIER[x.tier_request] || x.tier_request) + '」' +
       (x.paid_requested_at ? '（' + esc(x.paid_requested_at) + ' 提交）' : '') + '</div>'
     : '';
+  var thumb = coverUrl(x.cover)
+    ? '<img class="vthumb" loading="lazy" alt="" src="' + esc(coverUrl(x.cover)) + '">'
+    : '<div class="vthumb"></div>';
   div.innerHTML =
+    '<div class="vrow1">' + thumb +
+    '<div style="min-width:0;flex:1">' +
     '<div class="row1"><span class="name">' + esc(x.name) + '</span>' +
     '<span class="k-badge">' + esc(M_CAT[x.category] || x.category) + '</span>' +
     '<span class="k-badge">' + esc(M_TIER[x.tier] || x.tier) + '</span>' +
@@ -3206,6 +3211,7 @@ function renderMerchant(x) {
     (x.reject_reason ? '<div class="meta">驳回原因：' + esc(x.reject_reason) + '</div>' : '') +
     redeemBadge +
     (meta.length ? '<div class="meta">' + esc(meta.join(' · ')) + '</div>' : '') +
+    '</div></div>' +
     '<div class="ops">' +
     (x.status === 'pending'
       ? '<button type="button" data-act="ok" class="primary">通过上线</button><button type="button" data-act="rej">驳回</button>' : '') +
