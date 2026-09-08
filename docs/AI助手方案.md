@@ -20,10 +20,10 @@
 1. **前置**：Honeypot 无表单不需要；IP 滑动窗口限流（隔离内存 Map，同 [index.js](../worker/index.js) contact 模式）10 条/5 分钟 → 429；question 截断 200 字、history 取最近 6 条（每条 ≤500 字）；**日额度熔断**——当日 `ai_chats` 达 `AI_DAILY_CAP`（默认 500，免费额度 ≈450 问）后降级纯检索模式：跳过模型与语义通道，直接返回 Top-2 知识条目原文（日志 action 记 `capped`），功能不断、成本归零
 2. **RAG 混合检索 v2（Top-3 拼 `[参考知识]` 块）**，三路归并（`worker/ai.js` 纯函数可测，回归集 `scripts/ai-retrieval-test.mjs`）：
    - **关键词计分**：keywords 命中 +1（经泛词映射扩展：好吃→美食、好玩→景点、带孩子→亲子 等口语改写）；类目名两字滑窗 +2；正问两字滑窗（滤「什么/怎么」虚词）与正文互证 +1（独立计分，keywords 挑漏的条目凭正文捞回）
-   - **向量语义**：问题嵌入 `@cf/qwen/qwen3-embedding-0.6b`（1024 维）→ Vectorize `whizzzest-ai-knowledge` 查 Top-5（metadata filter `status='published'`）→ 余弦过地板 0.42 后 ×12 计分（2026-09-08 线上校准：相关 ≥0.45、噪声 ≤0.40，取中）；失败自动退纯关键词
+   - **向量语义**：问题嵌入 `@cf/qwen/qwen3-embedding-0.6b`（1024 维）→ Vectorize `whizzzest-ai-knowledge` 查 Top-5（metadata filter `status='published'`）→ 余弦过地板 0.42 后 ×12 计分（2026-09-08 线上校准：相关 ≥0.45、噪声 ≤0.40，取中）；嵌入/向量查询只依赖问题文本，**与 D1 检索并行点火**不串行排队；失败自动退纯关键词
    - **实体名直配**：全部上线景点/认证商户名称（上限各 100）字面命中问题即以 4 分注入合成条目——修实时数据只注入 Top8 的盲区，问第 9 个之后的景点也能答
    - 命中条目类目去重作为 `sources` 返回（admin「知识缺口」报表按 sources IS NULL 统计）
-3. **站内实时数据注入**（超出旧站的增强）：并行查 D1——上线景点（Top8 名称+简介 + 超 8 个时补全量名称行）、认证商户（同法）、音乐/视频/文库数量，拼 `[站内实时数据]` 块，使「现在有哪些景点/有什么歌」答实时数据
+3. **站内实时数据注入**（超出旧站的增强）：并行查 D1——上线景点（Top8 名称+简介 + 超 8 个时补全量名称行）、认证商户（同法）、音乐/视频/文库数量，拼 `[站内实时数据]` 块，使「现在有哪些景点/有什么歌」答实时数据；**30s 短缓存**（2026-09-08 时延治理，后台增删景点/商户最迟 30s 进问答）
 4. **多轮上下文**：system（人设+规则+JSON 契约+参考块）→ history → user（原始问题）
 5. **Workers AI**：`env.AI.run(model, {messages, max_tokens:1200, temperature:0.6})`，30s 超时；qwen3 系推理模型注入 `chat_template_kwargs:{enable_thinking:false}` 关思考直出（实测快 ~10 倍）；模型名存 `ai_settings` 可后台切换（白名单：qwen3-30b-a3b-fp8（默认）/ glm-4.7-flash / deepseek-v4-flash / qwen3.8-27b）。binding 失败自动切 **OpenAI 兼容 REST 兜底**（secret `AI_API_BASE` + `AI_API_KEY` 可选配置，Cloudflare 自家即 `/ai/v1/chat/completions`）；`AI_PROVIDER=rest` 直走 REST（本地联调 workerd 出站受限时用，.dev.vars 配置）。注意关思考后答案可能落在 `reasoning` 字段，提取链 `response → content → reasoning_content → reasoning` 全兜住
 6. **解析**：剥 ```json 围栏 → `JSON.parse` 取 `{text, action}`；解析失败降级纯文本（同旧站）
