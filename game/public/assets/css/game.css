@@ -443,6 +443,38 @@ dialog::backdrop { background: rgba(10, 5, 3, 0.6); backdrop-filter: blur(4px); 
 }
 .game-card.ghost b { color: var(--c-text-2); font-weight: 600; }
 
+/* 云端畅玩 · 第三方平台入口（docs/游戏整合方案.md §8，决策⑭）
+   外链指路牌，与游戏卡刻意区分：无实底、金色悬停、描边按钮 */
+.cloud {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px 54px;
+}
+.cloud h2 { font-size: 20px; }
+.cloud .cloud-sub { margin-top: 6px; font-size: 13px; color: var(--c-text-2); }
+.cloud-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+.platform-card {
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s var(--ease), border-color 0.2s;
+}
+.platform-card:hover { transform: translateY(-3px); border-color: rgba(244, 211, 31, 0.45); }
+.platform-card .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.platform-card h3 { font-size: 16px; }
+.platform-card .tagline { font-size: 13px; color: var(--c-text-2); line-height: 1.7; flex: 1; }
+.platform-card .meta { font-size: 12px; color: var(--c-text-3); }
+.platform-card .btn { align-self: flex-start; margin-top: 6px; padding: 8px 18px; font-size: 13px; }
+.cloud-note { margin-top: 16px; font-size: 12px; color: var(--c-text-3); }
+
 .site-foot {
   border-top: 1px solid var(--c-hairline);
   padding: 26px 20px calc(30px + env(safe-area-inset-bottom));

@@ -210,5 +210,42 @@
       "version": 1,
       "badge": "收录开源"
     }
+  ],
+  "platforms": [
+    {
+      "id": "cloud-netease",
+      "title": "网易云游戏",
+      "tagline": "网易官方平台，云电脑/云手机，网易系游戏免下载畅玩",
+      "note": "需登录",
+      "url": "https://cg.163.com/#/game-recommend"
+    },
+    {
+      "id": "cloud-taptap",
+      "title": "TapTap 云游戏",
+      "tagline": "TapTap 网页版云玩专区，手游点了就玩",
+      "note": "需登录",
+      "url": "https://www.taptap.cn/web-cloud-game"
+    },
+    {
+      "id": "cloud-migu",
+      "title": "咪咕游戏",
+      "tagline": "中国移动旗下云游戏，PC 网页入口",
+      "note": "需登录",
+      "url": "https://www.migufun.com/middlepc/"
+    },
+    {
+      "id": "cloud-tencent",
+      "title": "腾讯先锋",
+      "tagline": "腾讯官方云游戏平台，新游抢先玩（手游为主）",
+      "note": "需登录",
+      "url": "https://gamer.qq.com/"
+    },
+    {
+      "id": "cloud-start",
+      "title": "START 云游戏",
+      "tagline": "腾讯官方端游云玩，大作免下载一键启动",
+      "note": "需登录 · 建议键鼠",
+      "url": "https://start.qq.com/webgame/home/"
+    }
   ]
 }

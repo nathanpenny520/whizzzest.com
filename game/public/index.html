@@ -30,6 +30,15 @@
     <div class="game-card ghost"><b>游戏加载中…</b></div>
   </main>
 
+  <!-- 云端畅玩 · 第三方平台入口（docs/游戏整合方案.md §8，决策⑭）：外链指路牌，非收录游戏；
+       platforms 缺失/为空时保持 hidden 整节不渲染 -->
+  <section class="cloud" id="cloudSection" hidden>
+    <h2>云端畅玩</h2>
+    <p class="cloud-sub">想玩更大的作品？这些官方云游戏平台免下载、点开即玩。</p>
+    <div class="cloud-grid" id="cloudGrid"></div>
+    <p class="cloud-note">以上为第三方云游戏平台，与本站无关；需注册登录，部分内容有免费时长限制或需付费。</p>
+  </section>
+
   <footer class="site-foot">
     <p>焰境之梦 · game.whizzzest.com ｜ <a href="https://whizzzest.com/">焰境·万载 — 中国花炮之乡的文旅指南</a></p>
     <p>所有游戏均在你的浏览器本地运行，不经任何服务器；进度保存在本机，可随时导出 .wsave 文件备份或分享。</p>
@@ -60,6 +69,25 @@
       ghost.className = 'game-card ghost';
       ghost.innerHTML = '<b>更多游戏陆续上架</b><span>解谜 · 叙事 · 节奏 · 本地题材原创（阶段二）</span>';
       grid.appendChild(ghost);
+
+      // 云端畅玩（决策⑭）：数据驱动外链卡片——新标签打开、不泄露本站 referrer、不传权重
+      const platforms = list.platforms || [];
+      const cloudSection = document.getElementById('cloudSection');
+      if (cloudSection && platforms.length) {
+        const cloudGrid = document.getElementById('cloudGrid');
+        for (const p of platforms) {
+          const card = document.createElement('article');
+          card.className = 'platform-card';
+          card.innerHTML =
+            '<div class="chip-row"><span class="chip chip-accent">第三方平台</span></div>' +
+            `<h3>${p.title}</h3>` +
+            `<p class="tagline">${p.tagline || ''}</p>` +
+            (p.note ? `<div class="meta">ⓘ ${p.note}</div>` : '') +
+            `<a class="btn" href="${p.url}" target="_blank" rel="noopener noreferrer nofollow">前往平台 ↗</a>`;
+          cloudGrid.appendChild(card);
+        }
+        cloudSection.hidden = false;
+      }
     } catch {
       grid.innerHTML = '<div class="game-card ghost"><b>游戏库加载失败</b><span>请刷新重试</span></div>';
     }
