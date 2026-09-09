@@ -251,7 +251,7 @@ function renderStorageLine(el, persist) {
 /* ---------------- 壳主体 ---------------- */
 
 async function boot() {
-  const gameId = (location.pathname.match(/^\/play\/([\w-]+)/) || [])[1] || null;
+  const gameId = (location.pathname.match(/^\/play\/([\w.-]+)/) || [])[1] || null; // 与 worker PLAY_RE 一致：允许 id 含点（minecraft-1.8）
   const shell = { gameId, meta: null, saves: null, gamepad: null, game: null };
 
   /* 顶栏：全屏 + 手柄开关（有手柄配置的游戏才出现） */
