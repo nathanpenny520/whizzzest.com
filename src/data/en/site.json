@@ -32,7 +32,7 @@
         { "href": "/en/industry/", "label": "Fireworks industry" },
         { "href": "/en/spots/", "label": "Viewing spots" },
         { "href": "/en/digital-fireworks/", "label": "Digital fireworks" },
-        { "href": "/en/tv/?cat=fireworks", "label": "Fireworks videos · Wanzai TV" }
+        { "href": "/en/tv/?cat=fireworks", "label": "Fireworks videos · Whizzzest Streaming" }
       ]
     },
     {
@@ -45,10 +45,11 @@
     },
     {
       "href": "/en/tv/",
-      "label": "Wanzai TV",
+      "label": "Whizzzest World",
       "menu": [
-        { "href": "/en/tv/", "label": "Wanzai TV" },
-        { "href": "/en/music/", "label": "Wanzai music" }
+        { "href": "/en/tv/", "label": "Whizzzest Streaming" },
+        { "href": "/en/music/", "label": "Whizzzest Music" },
+        { "href": "https://game.whizzzest.com/en/", "label": "Whizzzest Arcade" }
       ]
     },
     {
@@ -58,10 +59,6 @@
     {
       "href": "/en/merchants/",
       "label": "Merchants"
-    },
-    {
-      "href": "https://game.whizzzest.com/en/",
-      "label": "Whizzzest Arcade"
     }
   ],
   "footer": {
@@ -133,7 +130,7 @@
         "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
       },
       {
-        "name": "Wanzai Music",
+        "name": "Whizzzest Music",
         "url": "/music/",
         "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
       },

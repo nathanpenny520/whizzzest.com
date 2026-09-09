@@ -72,7 +72,7 @@
   "tech": {
     "title": "Under the hood",
     "edgeTitle": "Global edge computing",
-    "edgeDesc": "The whole site runs on Cloudflare's global edge network: static builds are served from 300+ edge locations worldwide, while merchants, the library, Wanzai TV, music and attractions render dynamically on Workers at the edge, with D1 and R2 close by. Even on slow connections, first paint takes about 1.5 seconds.",
+    "edgeDesc": "The whole site runs on Cloudflare's global edge network: static builds are served from 300+ edge locations worldwide, while merchants, the library, Whizzzest Streaming, Whizzzest Music and attractions render dynamically on Workers at the edge, with D1 and R2 close by. Even on slow connections, first paint takes about 1.5 seconds.",
     "zeroTitle": "Zero-dependency engineering",
     "zeroDesc": "No frontend frameworks — the entire site is native HTML/CSS/JavaScript with our own zero-dependency build pipeline. Images are auto-optimized into responsive WebP variants, and AI inference (Workers AI) and email stay closed-loop on the same domain. Fast, secure, and fully under our control."
   },
@@ -122,13 +122,13 @@
       },
       {
         "date": "September 2026",
-        "title": "Wanzai TV on air",
+        "title": "Whizzzest Streaming on air",
         "description": "The video channel launched with streaming uploads from the admin console and Bilibili integration — the full web series \"One Encounter, Ten Thousand Years\" and the city film \"Meet Wanzai\" are now in the library."
       },
       {
         "date": "September 2026",
         "title": "Library & media",
-        "description": "The Whizzzest Library and its author portal (writer.whizzzest.com) went live with two-level review for works and chapters; the Wanzai music player and the attractions gallery arrived in the same wave — the content matrix was complete."
+        "description": "The Whizzzest Library and its author portal (writer.whizzzest.com) went live with two-level review for works and chapters; the Whizzzest Music player and the attractions gallery arrived in the same wave — the content matrix was complete."
       },
       {
         "date": "September 2026",

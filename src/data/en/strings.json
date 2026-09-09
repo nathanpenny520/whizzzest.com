@@ -37,10 +37,10 @@
     "attractKicker": "Attractions · Wanzai scenery",
     "attractTitle": "Explore Wanzai — ancient town, rivers and fireworks",
     "attractMore": "All attractions ›",
-    "tvKicker": "Whizzzest Vision · Wanzai TV",
+    "tvKicker": "Whizzzest Streaming · Whizzzest World",
     "tvTitle": "Start your Wanzai story with an episode",
     "tvMore": "Enter the channel ›",
-    "musicKicker": "Wanzai Music · Sounds of Wanzai",
+    "musicKicker": "Whizzzest Music · Whizzzest World",
     "musicTitle": "Every sound of Wanzai lives here",
     "musicMore": "Enter the music hall ›"
   },
@@ -119,13 +119,13 @@
       "loopOff": "Play in order",
       "loopMode": "Loop mode: ",
       "unnamed": "Unknown artist",
-      "title": "Wanzai Music",
-      "album": "Wanzai Music · Whizzzest",
+      "title": "Whizzzest Music",
+      "album": "Whizzzest Music · Whizzzest",
       "nowPlaying": "Now playing",
       "paused": "Paused",
       "copied": "Link copied — go share it with a friend",
       "copyPrompt": "Long-press or select all to copy the link: ",
-      "shareTitle": "{title} — Wanzai Music · Whizzzest"
+      "shareTitle": "{title} — Whizzzest Music · Whizzzest"
     },
     "form": {
       "needName": "Please fill in your name and message.",
@@ -166,7 +166,7 @@
       "playSong": "▶ Play this song",
       "msgsUnit": "msgs",
       "routes": {
-        "/tv": "Wanzai TV",
+        "/tv": "Whizzzest Streaming",
         "/library": "Library",
         "/music": "Music",
         "/attractions": "Attractions",
