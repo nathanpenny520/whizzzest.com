@@ -76,6 +76,7 @@ export default {
     this.spawn(); this.spawn();
     this.render();
     this.ctx.autosave(this.serialize());
+    this.ctx.toast('滑动合并相同方块，合出「焰火之吻」2048', 'warn');
   },
 
   /* ---------- 状态 ---------- */
@@ -91,7 +92,7 @@ export default {
     const [bg, fg] = TONE[v] || ['#d64524', '#fff'];
     el.style.background = bg;
     el.style.color = fg;
-    el.innerHTML = `<span>${v <= 64 ? v : ''}<small>${LADDER[v] || '传说'}</small></span>`;
+    el.innerHTML = `<span>${v}<small>${LADDER[v] || '传说'}</small></span>`; // 数字全程显示——只显示名字看不出谁大谁小
     this.tileLayer.appendChild(el);
     this.tiles.set(id, { r, c, v, el });
     this.cells[r][c] = id;
