@@ -44,6 +44,7 @@ export default {
       .h-over { position:absolute; inset:0; border-radius:14px; background:rgba(21,10,5,.82);
                 display:grid; place-items:center; gap:14px; align-content:center; text-align:center; }
       .h-over h3 { font-size:22px; } .h-over p { color:#b9b0a6; font-size:14px; }
+      .h-hint { margin-top:10px; font-size:12px; line-height:1.6; color:#857c73; text-align:center; }
       .h-restart { margin-top:4px; padding:9px 22px; border-radius:999px; border:0;
                    background:#d64524; color:#fff; font-size:14px; font-weight:600; }
     `;
@@ -53,7 +54,8 @@ export default {
     wrap.className = 'h-wrap';
     wrap.innerHTML =
       '<div class="h-head"><b>花炮合合</b><div class="h-score">最高 <b class="h-best">0</b><br>得分 <span class="h-cur">0</span></div></div>' +
-      '<div class="h-board"><div class="h-tiles"></div></div>';
+      '<div class="h-board"><div class="h-tiles"></div></div>' +
+      '<p class="h-hint">整盘滑动：所有方块一起动，不能单选某块——相同数字相撞即合并</p>';
     ctx.stage.appendChild(wrap);
     this.board = wrap.querySelector('.h-board');
     for (let i = 0; i < N * N; i++) {
