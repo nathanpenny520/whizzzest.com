@@ -596,7 +596,7 @@ async function main() {
       s.isQr = !s.href && Boolean(s.qr);
       s.isShare = !s.href && !s.qr && Array.isArray(s.qrList) && s.qrList.length > 0;
       if (s.isShare) {
-        s.qrListJson = JSON.stringify(s.qrList.map((q) => (typeof q === 'string' ? { src: q, w: 1 } : { w: 1, ...q })));
+        s.qrListJson = JSON.stringify(s.qrList.map((q) => (typeof q === 'string' ? { src: q } : { ...q })));
       }
     }
     sites[loc.code] = site;

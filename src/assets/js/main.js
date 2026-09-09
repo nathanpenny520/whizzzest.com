@@ -171,7 +171,7 @@ for (const el of document.querySelectorAll('.js-year')) {
   el.textContent = String(new Date().getFullYear());
 }
 
-/* 二维码灯箱：页内 [data-qr] 单码直开；[data-qr-list] 分享二维码组，点击按权重随机展示一张（docs/分享二维码方案.md） */
+/* 二维码灯箱：页内 [data-qr] 单码直开；[data-qr-list] 分享二维码组，固定顺序轮播（首开第 1 张，换一张 1→2→3→4 循环；docs/分享二维码方案.md） */
 const lightbox = document.getElementById('lightbox');
 if (lightbox) {
   const lbImg = lightbox.querySelector('img');
@@ -214,19 +214,7 @@ if (lightbox) {
     showLb();
   };
 
-  // 按 item.w 加权随机（缺省 1）；excludeIdx 供「换一张」避开当前图
-  const pickShare = (excludeIdx) => {
-    const total = shareList.reduce((sum, it, i) => (i === excludeIdx ? sum : sum + (it.w || 1)), 0);
-    let r = Math.random() * total;
-    for (let i = 0; i < shareList.length; i++) {
-      if (i === excludeIdx) continue;
-      r -= shareList[i].w || 1;
-      if (r < 0) return i;
-    }
-    for (let i = 0; i < shareList.length; i++) if (i !== excludeIdx) return i; // 浮点兜底
-    return 0;
-  };
-
+  // 顺序轮播（docs/分享二维码方案.md v1.1）：首开固定第 1 张，「换一张」按 1→2→3→4 循环——顺序可预期，随机盲盒易困惑
   const applyShare = (idx) => {
     shareIdx = idx;
     const item = shareList[idx];
@@ -240,7 +228,7 @@ if (lightbox) {
     shareList = list;
     shareCap = caption;
     lbShare.hidden = false;
-    applyShare(pickShare(-1));
+    applyShare(0);
     lbCap.textContent = caption || '';
     showLb();
   };
@@ -269,7 +257,7 @@ if (lightbox) {
     }
   });
   lbShareShuffle?.addEventListener('click', () => {
-    if (shareList) applyShare(pickShare(shareIdx));
+    if (shareList) applyShare((shareIdx + 1) % shareList.length);
   });
   lightbox.addEventListener('click', (e) => {
     if (!(e.target instanceof Element) || !e.target.closest('.lightbox-body')) closeLb();
