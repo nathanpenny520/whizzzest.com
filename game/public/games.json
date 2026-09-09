@@ -246,6 +246,13 @@
       "tagline": "腾讯官方端游云玩，大作免下载一键启动",
       "note": "需登录 · 建议键鼠",
       "url": "https://start.qq.com/webgame/home/"
+    },
+    {
+      "id": "cloud-mihoyo",
+      "title": "米哈游云游戏",
+      "tagline": "米哈游官方云游戏，原神等大作免下载、点开即玩",
+      "note": "需登录 · 免费时长有限",
+      "url": "https://mhyy.mihoyo.com/"
     }
   ]
 }
