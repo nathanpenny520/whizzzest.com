@@ -746,7 +746,7 @@ ${zhPages
   // 烟花模拟器（/digital-fireworks/）：14 个零依赖 JS 依依赖顺序拼接为单文件
   // （globals 协作，顺序即加载顺序；mid-file 的 "use strict" 字面量无副作用），CSS 一并压缩
   const FIREWORKS_JS_ORDER = [
-    'fscreen', 'Stage', 'MyMath',                                       // lib
+    'fscreen', 'stage', 'my-math',                                      // lib
     'config', 'store', 'background-library', 'background-manager', 'ui', // app
     'runtime', 'shells', 'interaction', 'simulation', 'audio', 'engine', // fireworks
   ];

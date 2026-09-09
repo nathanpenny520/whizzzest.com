@@ -1,12 +1,8 @@
 /*
 数字烟花（/digital-fireworks/）— 页面级样式，仅本页引用
-基于 NianBroken/Firework_Simulator（Apache-2.0）样式改造：
   - .container → .fw-app、.btn → .fw-btn（避开站点同名类）
   - 全局 `*`/body 规则收窄为 .fw-app 作用域与 body.page-sim，避免污染站点样式
   - 华文琥珀（3.7MB TTF）不内嵌，文字烟花走系统字体；Russo One 保留
-Copyright © 2022 NianBroken. All rights reserved.
-Github：https://github.com/NianBroken/Firework_Simulator
-本项目采用 Apache-2.0 许可证
 */
 
 /* Russo One（UI 字体，仅本页） */
@@ -347,7 +343,7 @@ body.page-sim {
 	}
 }
 @media (max-width: 560px) {
-	/* 上游遗留的 margin-right: 80px（为桌面右上角关闭按钮让位）在窄屏会把表单挤出屏左缘
+	/* 原实现遗留的 margin-right: 80px（为桌面右上角关闭按钮让位）在窄屏会把表单挤出屏左缘
 	   （390px 视口左移出屏 40px，标签被裁），小屏回正居中 */
 	.fw-app .menu form {
 		margin-right: 0;
