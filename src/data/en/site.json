@@ -80,6 +80,17 @@
     "beianHref": "https://beian.miit.gov.cn/",
     "socials": [
       {
+        "icon": "share-site",
+        "label": "Share this site",
+        "qrList": [
+          { "src": "/assets/img/qr-share-nuomian.jpg", "w": 4 },
+          { "src": "/assets/img/qr-share-snow.jpg" },
+          { "src": "/assets/img/qr-share-hongyi.jpg" },
+          { "src": "/assets/img/qr-share-baiqun.jpg" }
+        ],
+        "cap": "Scan to visit whizzzest.com"
+      },
+      {
         "icon": "x",
         "label": "X (Twitter)",
         "href": "https://x.com/NathanPenny520"

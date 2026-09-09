@@ -16,7 +16,11 @@
     "qrAria": " (view QR code)",
     "lightboxLabel": "QR code viewer",
     "close": "Close",
-    "qrAlt": "QR code"
+    "qrAlt": "QR code",
+    "shareHint": "In WeChat, long-press to scan or save the image; other browsers can download it",
+    "shareDownload": "Download QR",
+    "shareShuffle": "Shuffle",
+    "shareDlName": "whizzzest-QR.jpg"
   },
   "common": {
     "readMore": "Read more ›",

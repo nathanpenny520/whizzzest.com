@@ -16,7 +16,11 @@
     "qrAria": "（查看二维码）",
     "lightboxLabel": "二维码查看",
     "close": "关闭",
-    "qrAlt": "二维码"
+    "qrAlt": "二维码",
+    "shareHint": "微信内长按识别二维码，或保存/下载图片后分享",
+    "shareDownload": "下载二维码",
+    "shareShuffle": "换一张",
+    "shareDlName": "焰境万载-分享二维码.jpg"
   },
   "common": {
     "readMore": "阅读详情 ›",

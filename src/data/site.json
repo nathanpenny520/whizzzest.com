@@ -71,6 +71,17 @@
     },
     "socials": [
       {
+        "icon": "share-site",
+        "label": "分享本站",
+        "qrList": [
+          { "src": "/assets/img/qr-share-nuomian.jpg", "w": 4 },
+          { "src": "/assets/img/qr-share-snow.jpg" },
+          { "src": "/assets/img/qr-share-hongyi.jpg" },
+          { "src": "/assets/img/qr-share-baiqun.jpg" }
+        ],
+        "cap": "扫码访问 whizzzest.com"
+      },
+      {
         "icon": "bilibili",
         "label": "哔哩哔哩",
         "href": "https://space.bilibili.com/3546949301045835"

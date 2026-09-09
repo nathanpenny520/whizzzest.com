@@ -16,11 +16,13 @@
   <div class="container footer-legal">
     <p>Copyright © <span class="js-year">2026</span> {{site.name}}</p>
     {{#each site.footer.icpLines}}<p><a href="{{site.footer.beianHref}}" target="_blank" rel="noopener">{{item}}</a></p>{{/each}}
-    <!-- 社交图标数据驱动（site.footer.socials → build.js SOCIAL_ICONS），per-locale 列表 -->
+    <!-- 社交图标数据驱动（site.footer.socials → build.js SOCIAL_ICONS），per-locale 列表；
+         三态布尔（isLink/isQr/isShare）由 build.js 预计算——模板条件只支持单路径真值 -->
     <div class="footer-social" role="group" aria-label="{{t.footer.socialLabel}}">
       {{#each site.footer.socials as s}}
-      {{#if s.href}}<a href="{{s.href}}" target="_blank" rel="noopener" aria-label="{{s.label}}" title="{{s.label}}">{{{s.svg}}}</a>{{/if}}
-      {{#unless s.href}}<button type="button" data-qr="{{s.qr}}" data-cap="{{s.cap}}" aria-label="{{s.label}}{{t.footer.qrAria}}" title="{{s.label}}">{{{s.svg}}}</button>{{/unless}}
+      {{#if s.isLink}}<a href="{{s.href}}" target="_blank" rel="noopener" aria-label="{{s.label}}" title="{{s.label}}">{{{s.svg}}}</a>{{/if}}
+      {{#if s.isQr}}<button type="button" data-qr="{{s.qr}}" data-cap="{{s.cap}}" aria-label="{{s.label}}{{t.footer.qrAria}}" title="{{s.label}}">{{{s.svg}}}</button>{{/if}}
+      {{#if s.isShare}}<button type="button" data-qr-list="{{s.qrListJson}}" data-cap="{{s.cap}}" aria-label="{{s.label}}{{t.footer.qrAria}}" title="{{s.label}}">{{{s.svg}}}</button>{{/if}}
       {{/each}}
     </div>
   </div>
@@ -31,6 +33,16 @@
     <button class="lightbox-close" type="button" aria-label="{{t.footer.close}}">✕</button>
     <img src="" alt="{{t.footer.qrAlt}}">
     <figcaption class="lightbox-cap"></figcaption>
+    <!-- 分享操作区：仅 data-qr-list 入口（分享本站）打开时显示，main.js 控显。
+         下载链接 href 由 JS 指向同源 JPG 原图（download 文件名见 t.footer.shareDlName）；微信内浏览器不支持 download，
+         靠提示行走「长按识别/保存」路径（docs/分享二维码方案.md） -->
+    <div class="lightbox-share" hidden>
+      <p class="lightbox-share-hint">{{t.footer.shareHint}}</p>
+      <div class="lightbox-share-actions">
+        <a class="lightbox-share-dl" id="lb-share-dl" href="" download="{{t.footer.shareDlName}}">{{t.footer.shareDownload}}</a>
+        <button class="lightbox-share-shuffle" id="lb-share-shuffle" type="button">{{t.footer.shareShuffle}}</button>
+      </div>
+    </div>
   </div>
 </div>
 <!-- AI 助手「花傩」：全站悬浮入口（docs/AI助手方案.md）；组件 DOM 由 ai-chat.js 构建，无 JS 零侵入。

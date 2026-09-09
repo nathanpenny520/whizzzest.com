@@ -171,15 +171,21 @@ for (const el of document.querySelectorAll('.js-year')) {
   el.textContent = String(new Date().getFullYear());
 }
 
-/* 二维码灯箱：页内 [data-qr] 元素点击弹出大图（合作伙伴公众号等） */
+/* 二维码灯箱：页内 [data-qr] 单码直开；[data-qr-list] 分享二维码组，点击按权重随机展示一张（docs/分享二维码方案.md） */
 const lightbox = document.getElementById('lightbox');
 if (lightbox) {
   const lbImg = lightbox.querySelector('img');
   const lbCap = lightbox.querySelector('.lightbox-cap');
+  const lbShare = lightbox.querySelector('.lightbox-share');
+  const lbShareDl = lightbox.querySelector('#lb-share-dl');
+  const lbShareShuffle = lightbox.querySelector('#lb-share-shuffle');
   let lastFocus = null;
+  let shareList = null; // 非 null = 分享模式（操作区可见）
+  let shareIdx = -1;
+  let shareCap = '';
 
-  const openLb = (src, caption) => {
-    // 优先取 WebP 变体（build.js 生成 <name>-800.webp）；没有该档（源图 <800px）时回退原图
+  // 优先取 WebP 变体（build.js 生成 <name>-800.webp）；没有该档（源图 <800px）时回退原图
+  const setLbImg = (src, caption) => {
     const m = src.match(/^(\/assets\/img\/.+?)\.(jpe?g|png)$/i);
     if (m) {
       lbImg.onerror = () => {
@@ -191,22 +197,79 @@ if (lightbox) {
       lbImg.src = src;
     }
     lbImg.alt = caption || t('qr.defaultAlt', '二维码');
-    lbCap.textContent = caption || '';
+  };
+
+  const showLb = () => {
     lastFocus = document.activeElement;
     lightbox.classList.add('open');
     document.body.style.overflow = 'hidden';
     lightbox.querySelector('.lightbox-close')?.focus();
   };
 
+  const openLb = (src, caption) => {
+    shareList = null;
+    if (lbShare) lbShare.hidden = true;
+    setLbImg(src, caption);
+    lbCap.textContent = caption || '';
+    showLb();
+  };
+
+  // 按 item.w 加权随机（缺省 1）；excludeIdx 供「换一张」避开当前图
+  const pickShare = (excludeIdx) => {
+    const total = shareList.reduce((sum, it, i) => (i === excludeIdx ? sum : sum + (it.w || 1)), 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < shareList.length; i++) {
+      if (i === excludeIdx) continue;
+      r -= shareList[i].w || 1;
+      if (r < 0) return i;
+    }
+    for (let i = 0; i < shareList.length; i++) if (i !== excludeIdx) return i; // 浮点兜底
+    return 0;
+  };
+
+  const applyShare = (idx) => {
+    shareIdx = idx;
+    const item = shareList[idx];
+    setLbImg(item.src, shareCap);
+    // 下载恒指 JPG 原图（非 WebP 变体，通用格式）；文件名重命名在模板 download 属性
+    lbShareDl.href = item.src;
+  };
+
+  const openShare = (list, caption) => {
+    if (!lbShare || !lbShareDl || !Array.isArray(list) || list.length === 0) return;
+    shareList = list;
+    shareCap = caption;
+    lbShare.hidden = false;
+    applyShare(pickShare(-1));
+    lbCap.textContent = caption || '';
+    showLb();
+  };
+
   const closeLb = () => {
     lightbox.classList.remove('open');
     document.body.style.overflow = '';
+    shareList = null;
+    shareIdx = -1;
+    if (lbShare) lbShare.hidden = true;
+    if (lbShareDl) lbShareDl.removeAttribute('href');
     lastFocus?.focus?.();
   };
 
   document.addEventListener('click', (e) => {
-    const trigger = e.target instanceof Element ? e.target.closest('[data-qr]') : null;
-    if (trigger) openLb(trigger.dataset.qr, trigger.dataset.cap || '');
+    const trigger = e.target instanceof Element ? e.target.closest('[data-qr],[data-qr-list]') : null;
+    if (!trigger) return;
+    if (trigger.dataset.qrList) {
+      try {
+        openShare(JSON.parse(trigger.dataset.qrList), trigger.dataset.cap || '');
+      } catch {
+        /* qrList 数据异常不弹窗（构建期已校验非空，此处运行时兜底） */
+      }
+    } else if (trigger.dataset.qr) {
+      openLb(trigger.dataset.qr, trigger.dataset.cap || '');
+    }
+  });
+  lbShareShuffle?.addEventListener('click', () => {
+    if (shareList) applyShare(pickShare(shareIdx));
   });
   lightbox.addEventListener('click', (e) => {
     if (!(e.target instanceof Element) || !e.target.closest('.lightbox-body')) closeLb();
