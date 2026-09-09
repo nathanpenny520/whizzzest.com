@@ -340,6 +340,7 @@ async function boot() {
     $('#btnPad').hidden = false;
     shell.gamepad = mountGamepad($('#padHost'), {
       layout: meta.gamepadLayout || FULL_LAYOUT,
+      keymap: meta.gamepadKeymap, // 键盘向游戏键位不同的收录游戏（如坦克大战 P1=WASD+J）按 games.json 覆盖
     });
     if (matchMedia('(pointer: coarse)').matches) {
       $('#padHost').classList.add('pad-on');

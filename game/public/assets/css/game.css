@@ -122,6 +122,8 @@ button { font-family: inherit; cursor: pointer; }
   background: none; border: 0;
   color: inherit; font-size: 16px;
 }
+/* display:flex 会压过 hidden 属性的 UA 样式（同 .boot/.save-drawer 的配套规则），缺失它 = 横幅永远关不掉 */
+.persist-banner[hidden] { display: none; }
 
 .stage-wrap {
   position: fixed;

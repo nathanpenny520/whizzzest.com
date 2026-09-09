@@ -111,9 +111,24 @@
       "genre": "经典复刻",
       "tier": "补充",
       "duration": "35 关战役 · 约 60–90 分钟",
-      "controls": "方向键移动 · 空格开火（虚拟手柄可用）",
+      "controls": "P1：WASD 移动 · J 开火（虚拟手柄即 P1）｜P2：方向键 · K 开火",
       "gamepad": true,
       "keyboardOnly": true,
+      "gamepadLayout": {
+        "dpad": true,
+        "face": ["b", "a"],
+        "shoulders": [],
+        "system": ["start"]
+      },
+      "gamepadKeymap": {
+        "up": { "key": "w", "code": "KeyW", "keyCode": 87 },
+        "down": { "key": "s", "code": "KeyS", "keyCode": 83 },
+        "left": { "key": "a", "code": "KeyA", "keyCode": 65 },
+        "right": { "key": "d", "code": "KeyD", "keyCode": 68 },
+        "a": { "key": "j", "code": "KeyJ", "keyCode": 74 },
+        "b": { "key": "j", "code": "KeyJ", "keyCode": 74 },
+        "start": { "key": "Escape", "code": "Escape", "keyCode": 27 }
+      },
       "orientation": "any",
       "mode": "iframe",
       "entry": "/g/battle-city/index.html",
