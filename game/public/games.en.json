@@ -1,0 +1,129 @@
+{
+  "_note": "英文覆盖表（docs/游戏英文版方案.md §3.2）：只放「给人看」的字段，按 id 与 games.json 字段级合并，缺字段/缺条目落回中文（决策③）；机制字段（mode/entry/saveMode/saveKeys/gamepad*/orientation/version/tier）以中文母本为准，这里出现即为错误。",
+  "games": {
+    "huapao-2048": {
+      "title": "Firecracker Merge",
+      "tagline": "A fireworks-workshop take on 2048: merge from paper fuses and gunpowder all the way to the Kiss of Flames, and slide out big blooms.",
+      "genre": "Number puzzle",
+      "duration": "About 5–10 min",
+      "controls": "Swipe / arrow keys / on-screen D-pad (gamepad)",
+      "badge": "In-house demo"
+    },
+    "catch-fireworks": {
+      "title": "Firework Catch",
+      "tagline": "Fireworks burst overhead and fall one by one — steady your bowl and catch them; drop three and the show ends.",
+      "genre": "Reflex arcade",
+      "duration": "About 5 min",
+      "controls": "Arrows / drag / virtual gamepad",
+      "badge": "In-house demo"
+    },
+    "hextris": {
+      "title": "Hextris",
+      "tagline": "Spin the hexagon and catch falling blocks on matching sides — three of a color chain-burst. Fast hands and a cool head, both required.",
+      "genre": "Arcade puzzle",
+      "duration": "Score chase · minutes per run",
+      "controls": "Tap left/right side (touch) / arrow keys",
+      "badge": "Open-source classic"
+    },
+    "tetris": {
+      "title": "Falling Blocks",
+      "tagline": "The classic falling-block formula: clear full lines, watch the speed climb — how deep can you go?",
+      "genre": "Puzzle classic",
+      "duration": "Score chase · minutes per run",
+      "controls": "Arrows to move · Space to hard-drop (gamepad works)",
+      "badge": "Open-source classic"
+    },
+    "jump": {
+      "title": "Jump Jump",
+      "tagline": "Hold to charge, release to hop onto the next block — the truer the landing, the higher the score. A classic micro-precision game rebuilt with Three.js.",
+      "genre": "Casual jumping",
+      "duration": "Score chase · minutes per run",
+      "controls": "Hold (touch/mouse) to charge · release to jump",
+      "badge": "Open-source classic"
+    },
+    "pacman": {
+      "title": "Pac-Man",
+      "tagline": "The arcade-era icon: munch every dot, dodge four ghosts with distinct personalities — AI pathfinding recreates the pincer pressure.",
+      "genre": "Arcade classic",
+      "duration": "Score chase · minutes per run",
+      "controls": "Arrow keys · Space to pause (gamepad works)",
+      "badge": "Open-source classic"
+    },
+    "battle-city": {
+      "title": "Battle City",
+      "tagline": "A faithful remake of the NES classic: defend your base, wipe out the enemy tanks — a 35-stage campaign, a level editor and same-screen co-op.",
+      "genre": "Classic remake",
+      "duration": "35-stage campaign · about 60–90 min",
+      "controls": "P1: WASD move · J fire (gamepad = P1) | P2: arrows · K fire",
+      "badge": "Open-source classic"
+    },
+    "win12": {
+      "title": "Windows 12 web edition",
+      "tagline": "A whole \"PC\" running in your browser: desktop, windows, built-in apps and easter eggs — free to explore, no ending.",
+      "genre": "Creative toy",
+      "duration": "Free exploration · no ending",
+      "controls": "Touch / keyboard & mouse",
+      "deviceNote": "Chinese interface. Connects to the original online version (fullest features); this site's local mirror stays as fallback (/g/win12/)",
+      "badge": "Fun project"
+    },
+    "pvz": {
+      "title": "Plants vs. Zombies",
+      "tagline": "The classic lawn defense across five lanes: sunflowers bank sun, peashooters do the damage, wall-nuts take the hits — survive wave after wave of the night raid.",
+      "genre": "Tower-defense classic",
+      "duration": "Long adventure campaign · resume anytime",
+      "controls": "Mouse to plant / collect sun (keyboard & mouse required)",
+      "deviceNote": "Chinese interface. First load is about 65 MB — Wi-Fi or desktop recommended; progress autosaves in this browser, with in-game export",
+      "badge": "Open-source classic"
+    },
+    "minecraft-1.8": {
+      "title": "Minecraft 1.8 (web)",
+      "tagline": "The 1.8 block sandbox, playable straight in the browser: infinite terrain, switch between survival and creative freely, open your world on LAN and play with friends.",
+      "genre": "Sandbox open world",
+      "duration": "Free exploration · no ending",
+      "controls": "Keyboard & mouse: WASD move · mouse look/mine/place · E inventory",
+      "deviceNote": "Needs a recent browser and plenty of memory — iOS is risky; first load about 15 MB; worlds are saved in this browser",
+      "badge": "Open-source classic"
+    },
+    "minecraft-1.12": {
+      "title": "Minecraft 1.12.2 (web)",
+      "tagline": "The 1.12.2 block sandbox on the web: more blocks and mobs, enchanting and achievements fully evolved — LAN co-op works here too.",
+      "genre": "Sandbox open world",
+      "duration": "Free exploration · no ending",
+      "controls": "Keyboard & mouse: WASD move · mouse look/mine/place · E inventory",
+      "deviceNote": "Needs a recent browser and plenty of memory — iOS is risky; first load about 20 MB; worlds are saved in this browser",
+      "badge": "Open-source classic"
+    }
+  },
+  "platforms": {
+    "cloud-netease": {
+      "title": "NetEase Cloud Gaming",
+      "tagline": "NetEase's official platform — cloud PC / cloud phone, NetEase titles without downloads",
+      "note": "Sign-in required · mainland China service"
+    },
+    "cloud-taptap": {
+      "title": "TapTap Cloud Gaming",
+      "tagline": "TapTap's web cloud-play zone — mobile games, tap and play",
+      "note": "Sign-in required · mainland China service"
+    },
+    "cloud-migu": {
+      "title": "Migu Gaming",
+      "tagline": "China Mobile's cloud gaming service — PC web portal",
+      "note": "Sign-in required · mainland China service"
+    },
+    "cloud-tencent": {
+      "title": "Tencent Cloud Gaming",
+      "tagline": "Tencent's official cloud gaming platform — play new titles first (mostly mobile games)",
+      "note": "Sign-in required · mainland China service"
+    },
+    "cloud-start": {
+      "title": "START Cloud Gaming",
+      "tagline": "Tencent's official cloud gaming for PC titles — big games launch instantly, no download",
+      "note": "Sign-in required · keyboard & mouse recommended · mainland China service"
+    },
+    "cloud-mihoyo": {
+      "title": "HoYoverse Cloud Gaming",
+      "tagline": "HoYoverse's official cloud gaming — Genshin Impact and other big titles, tap and play, no download",
+      "note": "Sign-in required · limited free time · mainland China service"
+    }
+  }
+}

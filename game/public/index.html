@@ -4,74 +4,95 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#150a05">
-  <meta name="description" content="焰境之梦 — 纯浏览器单机游戏平台：短篇可通关、打开即玩、无需下载，本地存档可靠，断网也能玩。">
-  <title>焰境之梦 — 短篇可通关的浏览器单机游戏</title>
+  <meta name="description" data-i18n-content="home.metaDesc" content="焰境之梦 — 纯浏览器单机游戏平台：短篇可通关、打开即玩、无需下载，本地存档可靠，断网也能玩。">
+  <title data-i18n="home.title">焰境之梦 — 短篇可通关的浏览器单机游戏</title>
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="stylesheet" href="/assets/css/game.css">
+  <link rel="alternate" hreflang="zh" href="https://game.whizzzest.com/">
+  <link rel="alternate" hreflang="en" href="https://game.whizzzest.com/en/">
+  <link rel="alternate" hreflang="x-default" href="https://game.whizzzest.com/">
 </head>
 <body>
 
   <header class="site-head">
     <a class="site-brand" href="/">
-      <img src="/assets/img/favicon.svg" alt="">焰境之梦
+      <img src="/assets/img/favicon.svg" alt=""><span data-i18n="home.brand">焰境之梦</span>
     </a>
     <span class="spacer"></span>
-    <a class="link" href="https://whizzzest.com/">← 焰境·万载 主站</a>
+    <a class="link" id="langSwitch" href="/en/">English</a>
+    <a class="link" href="https://whizzzest.com/" data-i18n="home.mainSite">← 焰境·万载 主站</a>
   </header>
 
   <section class="hero">
-    <div class="kicker">短篇可通关</div>
-    <h1>一节课、一班车里<br>能<em>通关</em>的精品游戏</h1>
-    <p>纯浏览器运行，打开即玩、无需下载、断网可玩。每款 20–90 分钟、有结局、一次玩完。
+    <div class="kicker" data-i18n="home.kicker">短篇可通关</div>
+    <h1 data-i18n-html="home.heroTitle">一节课、一班车里<br>能<em>通关</em>的精品游戏</h1>
+    <p data-i18n="home.heroDesc">纯浏览器运行，打开即玩、无需下载、断网可玩。每款 20–90 分钟、有结局、一次玩完。
        存档三重保障：浏览器持久化 + 一键导出 .wsave 文件 + 云端备份（即将上线）。</p>
   </section>
 
   <main class="games-grid" id="gamesGrid">
-    <div class="game-card ghost"><b>游戏加载中…</b></div>
+    <div class="game-card ghost"><b data-i18n="home.loading">游戏加载中…</b></div>
   </main>
 
   <!-- 云端畅玩 · 第三方平台入口（docs/游戏整合方案.md §8，决策⑭）：外链指路牌，非收录游戏；
-       platforms 缺失/为空时保持 hidden 整节不渲染 -->
+       platforms 缺失/为空时保持 hidden 整节不渲染；EN 版保留并标注面向中国大陆（游戏英文版方案 决策②） -->
   <section class="cloud" id="cloudSection" hidden>
-    <h2>云端畅玩</h2>
-    <p class="cloud-sub">想玩更大的作品？这些官方云游戏平台免下载、点开即玩。</p>
+    <h2 data-i18n="cloud.title">云端畅玩</h2>
+    <p class="cloud-sub" data-i18n="cloud.sub">想玩更大的作品？这些官方云游戏平台免下载、点开即玩。</p>
     <div class="cloud-grid" id="cloudGrid"></div>
-    <p class="cloud-note">以上为第三方云游戏平台，与本站无关；需注册登录，部分内容有免费时长限制或需付费。</p>
+    <p class="cloud-note" data-i18n="cloud.note">以上为第三方云游戏平台，与本站无关；需注册登录，部分内容有免费时长限制或需付费。</p>
   </section>
 
   <footer class="site-foot">
-    <p>焰境之梦 · game.whizzzest.com ｜ <a href="https://whizzzest.com/">焰境·万载 — 中国花炮之乡的文旅指南</a></p>
-    <p>所有游戏均在你的浏览器本地运行，不经任何服务器；进度保存在本机，可随时导出 .wsave 文件备份或分享。</p>
+    <p><span data-i18n="home.footBrand">焰境之梦</span> · game.whizzzest.com ｜ <a href="https://whizzzest.com/" data-i18n="home.footMain">焰境·万载 — 中国花炮之乡的文旅指南</a></p>
+    <p data-i18n="home.footPrivacy">所有游戏均在你的浏览器本地运行，不经任何服务器；进度保存在本机，可随时导出 .wsave 文件备份或分享。</p>
   </footer>
 
   <script type="module">
+    import { t, applyStatic, LANG } from '/assets/js/i18n.js';
+
+    // 语言切换器（规则 = 路径前缀增删，docs/游戏英文版方案.md §3.1）；标签用目标语言书写
+    const langSwitch = document.getElementById('langSwitch');
+    if (langSwitch) {
+      langSwitch.href = LANG === 'zh' ? '/en/' : '/';
+      langSwitch.textContent = LANG === 'zh' ? 'English' : '中文';
+    }
+    applyStatic();
+
     const grid = document.getElementById('gamesGrid');
     try {
       const list = await (await fetch('/games.json', { cache: 'no-cache' })).json();
-      const games = list.games || [];
+      // 英文覆盖表（games.en.json，字段级合并：缺字段/缺条目落回中文——决策③中文兜底；
+      // 表内只放展示字段，机制字段永远以中文母本为准）
+      let en = null;
+      if (LANG === 'en') {
+        try { en = await (await fetch('/games.en.json', { cache: 'no-cache' })).json(); } catch { /* 无覆盖表按 zh 兜底 */ }
+      }
+      const overlay = (section, item) => (en && en[section] && en[section][item.id]) || {};
+      const games = (list.games || []).map((g) => ({ ...g, ...overlay('games', g) }));
       grid.innerHTML = '';
       for (const g of games) {
         const card = document.createElement('article');
         card.className = 'game-card';
         card.innerHTML =
           '<div class="chip-row">' +
-          `<span class="chip">${g.genre || '游戏'}</span>` +
+          `<span class="chip">${g.genre || t('chip.game', '游戏')}</span>` +
           (g.badge ? `<span class="chip chip-accent">${g.badge}</span>` : '') +
           '</div>' +
           `<h3>${g.title}</h3>` +
           `<p class="tagline">${g.tagline || ''}</p>` +
-          `<div class="meta">⏱ ${g.duration || '短篇'} · 🎮 ${g.controls || '触屏/键盘'}</div>` +
+          `<div class="meta">⏱ ${g.duration || t('card.short', '短篇')} · 🎮 ${g.controls || t('card.controlsDefault', '触屏/键盘')}</div>` +
           (g.deviceNote ? `<div class="meta">ⓘ ${g.deviceNote}</div>` : '') +
-          `<a class="btn btn-primary" href="/play/${g.id}/">进入游戏</a>`;
+          `<a class="btn btn-primary" href="${LANG === 'en' ? '/en' : ''}/play/${g.id}/">${t('card.play', '进入游戏')}</a>`;
         grid.appendChild(card);
       }
       const ghost = document.createElement('article');
       ghost.className = 'game-card ghost';
-      ghost.innerHTML = '<b>更多游戏陆续上架</b><span>解谜 · 叙事 · 节奏 · 本地题材原创（阶段二）</span>';
+      ghost.innerHTML = `<b>${t('home.moreTitle', '更多游戏陆续上架')}</b><span>${t('home.moreSub', '解谜 · 叙事 · 节奏 · 本地题材原创（阶段二）')}</span>`;
       grid.appendChild(ghost);
 
       // 云端畅玩（决策⑭）：数据驱动外链卡片——新标签打开、不泄露本站 referrer、不传权重
-      const platforms = list.platforms || [];
+      const platforms = (list.platforms || []).map((p) => ({ ...p, ...overlay('platforms', p) }));
       const cloudSection = document.getElementById('cloudSection');
       if (cloudSection && platforms.length) {
         const cloudGrid = document.getElementById('cloudGrid');
@@ -79,17 +100,17 @@
           const card = document.createElement('article');
           card.className = 'platform-card';
           card.innerHTML =
-            '<div class="chip-row"><span class="chip chip-accent">第三方平台</span></div>' +
+            `<div class="chip-row"><span class="chip chip-accent">${t('chip.thirdParty', '第三方平台')}</span></div>` +
             `<h3>${p.title}</h3>` +
             `<p class="tagline">${p.tagline || ''}</p>` +
             (p.note ? `<div class="meta">ⓘ ${p.note}</div>` : '') +
-            `<a class="btn" href="${p.url}" target="_blank" rel="noopener noreferrer nofollow">前往平台 ↗</a>`;
+            `<a class="btn" href="${p.url}" target="_blank" rel="noopener noreferrer nofollow">${t('cloud.visit', '前往平台 ↗')}</a>`;
           cloudGrid.appendChild(card);
         }
         cloudSection.hidden = false;
       }
     } catch {
-      grid.innerHTML = '<div class="game-card ghost"><b>游戏库加载失败</b><span>请刷新重试</span></div>';
+      grid.innerHTML = `<div class="game-card ghost"><b>${t('home.loadFail', '游戏库加载失败')}</b><span>${t('home.loadFailHint', '请刷新重试')}</span></div>`;
     }
   </script>
 </body>

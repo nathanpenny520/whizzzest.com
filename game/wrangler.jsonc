@@ -24,8 +24,10 @@
     // 导致 /play/<id> 重写拿不到运行页内容（ASSETS.fetch 不跟随重定向）。
     // 路由全部显式化：/ 与 /play/* 由 worker/index.js 重写，其余资产按原路径命中。
     "html_handling": "none",
-    // 根路径、运行页与 /g/* 强制先过 Worker（显式路由 + R2 反代），杜绝资产层直接应答引发的缓存/路由竞态
-    "run_worker_first": ["/", "/play", "/play/*", "/g", "/g/*"]
+    // 根路径、运行页、/en/*（英文路由，docs/游戏英文版方案.md §3.3）与 /g/* 强制先过 Worker
+    // （显式路由 + R2 反代），杜绝资产层直接应答引发的缓存/路由竞态；
+    // /en/* 不补的话英文路径直达边缘，miss 落中文 404——主站英文版踩过的同款坑
+    "run_worker_first": ["/", "/play", "/play/*", "/g", "/g/*", "/en", "/en/*"]
   },
   "routes": [
     { "pattern": "game.whizzzest.com", "custom_domain": true }

@@ -7,11 +7,16 @@
  *   ASSETS.fetch 不跟随，故 / 与 /play/* 必须在这里重写）：
  *   - /            → /index.html（游戏库列表页）
  *   - /play/<id>/  → /play/app.html（统一运行页壳；游戏 id 由前端 JS 校验并渲染「未找到」态）
+ *   - /en、/en/    → /index.html（英文列表页；同一份页面，前端 i18n 按路径切文案）
+ *   - /en/play/<id>/ → /play/app.html（英文运行页，同上）
+ *   - 其余 /en/*   → 直接交还资产层：miss 时 not_found_handling 返回 /404.html（404 状态），
+ *                    页面 JS 按浏览器地址的 /en 前缀自动渲染英文 404（docs/游戏英文版方案.md §3.3）
  *   - /g/*         → R2 桶 whizzzest-game 反代（第三方游戏包托管，docs/游戏整合方案.md §1.1/§1.7）
  *   - 其余         → 交还资产层（无匹配时按 not_found_handling 返回 /404.html）
  * 阶段二绑定：R2（第三方游戏包，后续模拟器内核/ROM 同桶）；D1（云存档）仍按方案 §6 后置。
  */
 const PLAY_RE = /^\/play\/(?:[\w.-]+)?\/?$/; // 允许 id 含点（minecraft-1.8）；仍不含斜杠，防路径穿越
+const PLAY_RE_EN = /^\/en\/play\/(?:[\w.-]+)?\/?$/; // 英文运行页同规则（前端 boot 的 id 提取正则允许 /en 前缀）
 
 /* /g/* Content-Type 兜底表（正常情况上传时已带 metadata，这里只兜漏网之鱼） */
 const MIME = {
@@ -73,7 +78,14 @@ export default {
       asset = new Request(new URL('/index.html', url.origin), request);
     } else if (PLAY_RE.test(url.pathname)) {
       asset = new Request(new URL('/play/app.html', url.origin), request);
+    } else if (url.pathname === '/en' || url.pathname === '/en/') {
+      // 英文列表页：同一份 index.html，前端 i18n 按 /en 前缀切换文案（零英文页面副本）
+      asset = new Request(new URL('/index.html', url.origin), request);
+    } else if (PLAY_RE_EN.test(url.pathname)) {
+      asset = new Request(new URL('/play/app.html', url.origin), request);
     }
+    // 其余 /en/* 不拦：交还资产层后 miss → not_found_handling 返回 /404.html（404 状态），
+    // 404 页里的 i18n.js 读浏览器地址栏前缀自动出英文
     return env.ASSETS.fetch(asset);
   },
 };

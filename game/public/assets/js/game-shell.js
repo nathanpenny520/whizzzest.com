@@ -22,6 +22,7 @@
  */
 import { createSaveLayer, SaveError } from './game-save.js';
 import { mountGamepad, FULL_LAYOUT } from './virtual-gamepad.js';
+import { t, applyStatic, LANG } from './i18n.js';
 
 const AUTO_SLOT = 1; // 槽位 1 = 自动档
 const $ = (sel) => document.querySelector(sel);
@@ -39,7 +40,7 @@ function toast(msg, kind = 'ok') {
 }
 
 /** Promise 化确认框（原生 <dialog>，Esc 取消 = false） */
-function confirmDlg(title, body, okText = '确定') {
+function confirmDlg(title, body, okText = t('play.ok', '确定')) {
   return new Promise((resolve) => {
     const dlg = $('#confirmDlg');
     $('#dlgTitle').textContent = title;
@@ -203,9 +204,9 @@ function wireDrawer(shell) {
     try {
       const out = await shell.saves.exportSlots(); // 全部已有槽位
       download(out.blob, out.filename);
-      toast(`已导出 ${out.filename}`);
+      toast(t('s.exported', '已导出 {name}', { name: out.filename }));
     } catch (e) {
-      toast(e.code === 'empty' ? '还没有任何存档可导出' : '导出失败：' + e.message, 'err');
+      toast(e.code === 'empty' ? t('s.exportEmpty', '还没有任何存档可导出') : t('s.exportFail', '导出失败：{msg}', { msg: e.message }), 'err');
     }
   });
 
@@ -216,21 +217,21 @@ function wireDrawer(shell) {
     if (!file) return;
     try {
       const r = await shell.saves.importFile(file);
-      toast(`已导入 ${r.imported} 个槽位` + (r.checksumBad ? `（${r.checksumBad} 个槽位校验不符被跳过）` : ''), r.checksumBad ? 'warn' : 'ok');
+      toast(t('s.imported', '已导入 {n} 个槽位', { n: r.imported }) + (r.checksumBad ? t('s.importedBad', '（{n} 个槽位校验不符被跳过）', { n: r.checksumBad }) : ''), r.checksumBad ? 'warn' : 'ok');
       shell.refreshSlots();
     } catch (err) {
       if (err.code === 'wrong-game') {
-        const ok = await confirmDlg('存档来自其他游戏', `该 .wsave 来自「${err.info.fromGameTitle}」，与当前游戏不符。仍要强行导入吗？`, '强行导入');
+        const ok = await confirmDlg(t('s.wrongGameTitle', '存档来自其他游戏'), t('s.wrongGameBody', '该 .wsave 来自「{name}」，与当前游戏不符。仍要强行导入吗？', { name: err.info.fromGameTitle }), t('s.forceImport', '强行导入'));
         if (!ok) return;
         try {
           const r = await shell.saves.importFile(file, { allowForeign: true });
-          toast(`已强行导入 ${r.imported} 个槽位（来源：${r.fromGameTitle}）`, 'warn');
+          toast(t('s.forcedImported', '已强行导入 {n} 个槽位（来源：{name}）', { n: r.imported, name: r.fromGameTitle }), 'warn');
           shell.refreshSlots();
         } catch (e2) {
-          toast('导入失败：' + e2.message, 'err');
+          toast(t('s.importFail', '导入失败：{msg}', { msg: e2.message }), 'err');
         }
       } else {
-        toast('导入失败：' + err.message, 'err');
+        toast(t('s.importFail', '导入失败：{msg}', { msg: err.message }), 'err');
       }
     }
   });
@@ -239,19 +240,20 @@ function wireDrawer(shell) {
 function renderStorageLine(el, persist) {
   if (!el) return;
   if (!persist.supported) {
-    el.textContent = '当前浏览器不支持存储持久化，建议勤用「导出存档」备份。';
+    el.textContent = t('persist.unsupported', '当前浏览器不支持存储持久化，建议勤用「导出存档」备份。');
     return;
   }
   el.textContent =
-    (persist.persisted ? '已授予持久化存储，日常清缓存不会清掉游戏存档。' : '未授予持久化存储：浏览器空间紧张时可能清理存档。') +
-    (persist.quota ? ` 已用 ${fmtBytes(persist.usage)} / 配额 ${fmtBytes(persist.quota)}。` : '');
+    (persist.persisted ? t('persist.granted', '已授予持久化存储，日常清缓存不会清掉游戏存档。') : t('persist.denied', '未授予持久化存储：浏览器空间紧张时可能清理存档。')) +
+    (persist.quota ? t('persist.quota', ' 已用 {used} / 配额 {quota}。', { used: fmtBytes(persist.usage), quota: fmtBytes(persist.quota) }) : '');
   el.classList.toggle('warn', !persist.persisted);
 }
 
 /* ---------------- 壳主体 ---------------- */
 
 async function boot() {
-  const gameId = (location.pathname.match(/^\/play\/([\w.-]+)/) || [])[1] || null; // 与 worker PLAY_RE 一致：允许 id 含点（minecraft-1.8）
+  applyStatic(); // 静态页文案（app.html 顶栏/抽屉/横幅）：EN 路径按字典替换，zh 免动 DOM
+  const gameId = (location.pathname.match(/^\/(?:en\/)?play\/([\w.-]+)/) || [])[1] || null; // 与 worker PLAY_RE(_EN) 一致：允许 id 含点（minecraft-1.8），允许 /en 前缀
   const shell = { gameId, meta: null, saves: null, gamepad: null, game: null };
 
   /* 顶栏：全屏 + 手柄开关（有手柄配置的游戏才出现） */
@@ -266,7 +268,7 @@ async function boot() {
     }
   });
   document.addEventListener('fullscreenchange', () => {
-    $('#btnFullscreen').textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+    $('#btnFullscreen').textContent = document.fullscreenElement ? t('play.exitFullscreen', '退出全屏') : t('play.fullscreen', '全屏');
   });
 
   /* 键盘防误滚（方向键/空格在游玩时不滚页面；游戏自己 preventDefault 的先行） */
@@ -279,25 +281,31 @@ async function boot() {
   if (!gameId) {
     $('#btnSaves').disabled = true;
     $('#btnFullscreen').disabled = true;
-    showBootState('err', '没有指定游戏', '从游戏库选择一款游戏开始玩。', [{ label: '返回游戏库', href: '/' }]);
+    showBootState('err', t('b.noGameTitle', '没有指定游戏'), t('b.noGameDesc', '从游戏库选择一款游戏开始玩。'), [{ label: t('b.back', '返回游戏库'), href: '/' }]);
     return;
   }
 
   /* 元信息 + 游戏模块 */
-  showBootState('loading', '加载中…', '正在启动游戏引擎（全程本地运行，不依赖服务器）。');
+  showBootState('loading', t('b.loading', '加载中…'), t('b.loadingDesc', '正在启动游戏引擎（全程本地运行，不依赖服务器）。'));
   let meta;
   try {
     const list = await (await fetch('/games.json', { cache: 'no-cache' })).json();
+    // EN 路径：叠加 games.en.json 展示字段（缺省落回中文——决策③；机制字段以母本为准）
+    let en = null;
+    if (LANG === 'en') {
+      try { en = await (await fetch('/games.en.json', { cache: 'no-cache' })).json(); } catch { /* 无覆盖表按 zh 兜底 */ }
+    }
     meta = (list.games || []).find((g) => g.id === gameId);
+    if (meta && en && en.games && en.games[meta.id]) meta = { ...meta, ...en.games[meta.id] };
   } catch {
     meta = null;
   }
   if (!meta) {
-    showBootState('err', '没有找到这款游戏', `游戏 id「${gameId}」不在游戏库里（可能已下架或链接有误）。`, [{ label: '返回游戏库', href: '/' }]);
+    showBootState('err', t('b.notFoundTitle', '没有找到这款游戏'), t('b.notFoundDesc', '游戏 id「{id}」不在游戏库里（可能已下架或链接有误）。', { id: gameId }), [{ label: t('b.back', '返回游戏库'), href: '/' }]);
     return;
   }
   shell.meta = meta;
-  document.title = `${meta.title} — 焰境之梦`;
+  document.title = `${meta.title} — ${t('ui.brandSuffix', '焰境之梦')}`;
   $('#tbTitle').textContent = meta.title;
   // 存档三档（docs/游戏整合方案.md §1.4）：module 游戏=自研适配器；iframe 游戏=keys 键快照｜none 不接管
   shell.saveMode = meta.mode === 'iframe' ? (meta.saveMode === 'keys' ? 'keys' : 'none') : 'adapter';
@@ -308,15 +316,15 @@ async function boot() {
     // iframe 模式（第三方游戏包）不走模块 import，由适配器装载（docs/游戏整合方案.md §1.3）
     game = meta.mode === 'iframe' ? createIframeGame(meta) : (await import(meta.entry)).default; // 动态 import 给的是命名空间，游戏本体在 .default
   } catch (e) {
-    showBootState('err', '游戏加载失败', '资源下载中断或浏览器不支持所需能力，可重试。', [
-      { label: '重新加载', onclick: () => location.reload() },
-      { label: '返回游戏库', href: '/' },
+    showBootState('err', t('b.loadFailTitle', '游戏加载失败'), t('b.loadFailDesc', '资源下载中断或浏览器不支持所需能力，可重试。'), [
+      { label: t('b.reload', '重新加载'), onclick: () => location.reload() },
+      { label: t('b.back', '返回游戏库'), href: '/' },
     ]);
     console.error('[game] import failed:', e);
     return;
   }
   if (!game || typeof game.mount !== 'function' || typeof game.serialize !== 'function' || typeof game.deserialize !== 'function') {
-    showBootState('err', '游戏模块不完整', '该游戏未实现平台要求的存档适配器（serialize/deserialize），按方案 §2 不得上架。');
+    showBootState('err', t('b.incompleteTitle', '游戏模块不完整'), t('b.incompleteDesc', '该游戏未实现平台要求的存档适配器（serialize/deserialize），按方案 §2 不得上架。'));
     return;
   }
   shell.game = game;
@@ -347,7 +355,7 @@ async function boot() {
     } else {
       $('#btnPad').addEventListener('click', () => {
         const on = $('#padHost').classList.toggle('pad-on');
-        toast(on ? '虚拟手柄已开启' : '虚拟手柄已关闭');
+        toast(on ? t('pad.on', '虚拟手柄已开启') : t('pad.off', '虚拟手柄已关闭'));
       });
     }
     document.addEventListener('visibilitychange', () => {
@@ -375,7 +383,7 @@ async function boot() {
       card.className = 'slot-card' + (m ? '' : ' slot-empty');
       const head = document.createElement('div');
       head.className = 'slot-head';
-      head.innerHTML = `<b>${slot === AUTO_SLOT ? '自动档' : '槽位 ' + slot}</b><span>${m ? `v${m.version} · ${fmtTime(m.savedAt)}` : '空'}</span>`;
+      head.innerHTML = `<b>${slot === AUTO_SLOT ? t('sl.auto', '自动档') : t('sl.slot', '槽位 {n}', { n: slot })}</b><span>${m ? `v${m.version} · ${fmtTime(m.savedAt)}` : t('sl.empty', '空')}</span>`;
       card.appendChild(head);
       const row = document.createElement('div');
       row.className = 'slot-ops';
@@ -386,9 +394,9 @@ async function boot() {
         b.onclick = fn;
         return b;
       };
-      row.appendChild(mk('载入', () => shell.loadSlot(slot)));
-      if (slot !== AUTO_SLOT) row.appendChild(mk('保存', () => shell.saveSlot(slot)));
-      if (m) row.appendChild(mk('删除', () => shell.removeSlot(slot), 'btn-mini btn-danger'));
+      row.appendChild(mk(t('sl.load', '载入'), () => shell.loadSlot(slot)));
+      if (slot !== AUTO_SLOT) row.appendChild(mk(t('sl.save', '保存'), () => shell.saveSlot(slot)));
+      if (m) row.appendChild(mk(t('sl.del', '删除'), () => shell.removeSlot(slot), 'btn-mini btn-danger'));
       card.appendChild(row);
       grid.appendChild(card);
     });
@@ -401,10 +409,10 @@ async function boot() {
   shell.saveSlot = async (slot) => {
     try {
       await shell.saves.save(slot, shell.game.serialize());
-      toast(`已保存到槽位 ${slot}`);
+      toast(t('sl.saved', '已保存到槽位 {n}', { n: slot }));
       refreshSlots();
     } catch (e) {
-      toast('保存失败：' + e.message, 'err');
+      toast(t('sl.saveFail', '保存失败：{msg}', { msg: e.message }), 'err');
     }
   };
   shell.loadSlot = async (slot) => {
@@ -412,36 +420,36 @@ async function boot() {
     try {
       r = await shell.saves.load(slot);
     } catch (e) {
-      toast('读取失败：' + e.message, 'err');
+      toast(t('sl.loadFail', '读取失败：{msg}', { msg: e.message }), 'err');
       return;
     }
-    if (r.status === 'empty') return toast('该槽位还没有存档', 'warn');
+    if (r.status === 'empty') return toast(t('sl.emptySlot', '该槽位还没有存档'), 'warn');
     if (r.status === 'newer-version') {
-      const ok = await confirmDlg('存档来自更新版本', `该存档版本 v${r.meta.version} 高于当前游戏 v${shell.game.version}，载入可能出现异常。仍要载入吗？`, '仍要载入');
+      const ok = await confirmDlg(t('sl.newerTitle', '存档来自更新版本'), t('sl.newerBody', '该存档版本 v{save} 高于当前游戏 v{cur}，载入可能出现异常。仍要载入吗？', { save: r.meta.version, cur: shell.game.version }), t('sl.loadAnyway', '仍要载入'));
       if (!ok) return;
     }
     if (r.status === 'migrate-failed') {
-      const ok = await confirmDlg('旧版存档迁移失败', `存档是 v${r.meta.version}，自动迁移失败：${r.error ? r.error.message : '游戏未提供迁移函数'}。仍要按旧格式载入吗？`, '仍要载入');
+      const ok = await confirmDlg(t('sl.migrateFailTitle', '旧版存档迁移失败'), t('sl.migrateFailBody', '存档是 v{v}，自动迁移失败：{reason}。仍要按旧格式载入吗？', { v: r.meta.version, reason: r.error ? r.error.message : t('sl.noMigrate', '游戏未提供迁移函数') }), t('sl.loadAnyway', '仍要载入'));
       if (!ok) return;
     }
     try {
       shell.game.deserialize(structuredClone(r.data), r.meta.version);
       toast(
-        r.status === 'migrated' ? `已载入并迁移到 v${shell.game.version}`
-        : r.status === 'ok' ? '已载入'
-        : '已按旧格式载入',
+        r.status === 'migrated' ? t('sl.loadedMigrated', '已载入并迁移到 v{v}', { v: shell.game.version })
+        : r.status === 'ok' ? t('sl.loaded', '已载入')
+        : t('sl.loadedOld', '已按旧格式载入'),
         r.status === 'ok' ? 'ok' : 'warn'
       );
       if (r.status === 'migrated') refreshSlots();
     } catch (e) {
-      toast('载入失败（存档数据无法应用）：' + e.message, 'err');
+      toast(t('sl.applyFail', '载入失败（存档数据无法应用）：{msg}', { msg: e.message }), 'err');
     }
   };
   shell.removeSlot = async (slot) => {
-    const ok = await confirmDlg('删除存档', `确定删除槽位 ${slot === AUTO_SLOT ? '1（自动档）' : slot} 的存档？此操作不可恢复。`, '删除');
+    const ok = await confirmDlg(t('sl.delTitle', '删除存档'), t('sl.delBody', '确定删除槽位 {slot} 的存档？此操作不可恢复。', { slot: slot === AUTO_SLOT ? t('sl.autoSlot', '1（自动档）') : slot }), t('sl.del', '删除'));
     if (!ok) return;
     await shell.saves.remove(slot);
-    toast('已删除');
+    toast(t('sl.deleted', '已删除'));
     refreshSlots();
   };
 
@@ -486,16 +494,36 @@ async function boot() {
     }
   });
 
+  /* 自动档回放（仅 module 游戏；iframe B 档在 createIframeGame.mount 内自行回写）：
+     mount 建局后把槽位 1 的自动档回放进棋盘——此前壳对自动档只写不读，
+     自研游戏刷新即丢进度（2026-09-09 i18n 验收发现的预存在缺口，顺手修复）。
+     回放失败不硬拒载：按新档开局（对齐方案 §2 版本策略）。 */
+  let autoRestore = null;
+  if (shell.saveMode === 'adapter') {
+    try {
+      const r = await shell.saves.load(AUTO_SLOT);
+      if (r.status !== 'empty' && r.data) autoRestore = r;
+    } catch { /* 无档或读失败：按新档开局 */ }
+  }
+
   try {
     await game.mount(ctx);
+    if (autoRestore) {
+      try {
+        game.deserialize(structuredClone(autoRestore.data), autoRestore.meta.version);
+        ctx.autosave(game.serialize()); // 回放后立即落盘，压掉 mount 时的新局去抖写（600ms 内生效）
+      } catch (e) {
+        console.warn('[game] autosave restore failed, starting fresh:', e);
+      }
+    }
     $('#bootState').hidden = true;
     if (meta.gamepad) $('#padHost').classList.add('ready');
-    if (shell.saveMode === 'none') toast('该游戏使用浏览器自带存储，进度保存在本机。');
+    if (shell.saveMode === 'none') toast(t('sl.cStorage', '该游戏使用浏览器自带存储，进度保存在本机。'));
   } catch (e) {
     console.error('[game] mount failed:', e);
-    showBootState('err', '游戏启动失败', String((e && e.message) || e), [
-      { label: '重新加载', onclick: () => location.reload() },
-      { label: '返回游戏库', href: '/' },
+    showBootState('err', t('b.mountFailTitle', '游戏启动失败'), String((e && e.message) || e), [
+      { label: t('b.reload', '重新加载'), onclick: () => location.reload() },
+      { label: t('b.back', '返回游戏库'), href: '/' },
     ]);
   }
 }

@@ -15,7 +15,11 @@
  *  - 本模块不碰 DOM（顶层无浏览器 API），可在 Node 里 import 做冒烟测试。
  *
  * 阶段三扩展点：save()/load() 挂云同步钩子（R2 备份），本层 API 不变。
+ *
+ * i18n（docs/游戏英文版方案.md §3.2）：本层错误消息会经运行页壳 toast 透出给玩家，
+ * 统一走 i18n.js 取串（en 缺条目落回中文兜底）；顶层不碰浏览器 API 的纪律不变。
  */
+import { t } from './i18n.js';
 
 const DB_NAME = 'whizzzest-game';
 const DB_VERSION = 1;
@@ -38,7 +42,7 @@ export class SaveError extends Error {
 let dbPromise = null;
 
 function openDb() {
-  if (!globalThis.indexedDB) throw new SaveError('db', '当前环境无 IndexedDB');
+  if (!globalThis.indexedDB) throw new SaveError('db', t('e.noIdb', '当前环境无 IndexedDB'));
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -50,7 +54,7 @@ function openDb() {
         }
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(new SaveError('db', 'IndexedDB 打开失败', req.error));
+      req.onerror = () => reject(new SaveError('db', t('e.idbOpen', 'IndexedDB 打开失败'), req.error));
     });
   }
   return dbPromise;
@@ -66,12 +70,12 @@ function tx(mode, fn) {
         try {
           result = fn(st); // 若是 IDBRequest，事务 complete 时其 .result 已就绪
         } catch (e) {
-          reject(e instanceof SaveError ? e : new SaveError('db', '存档事务失败', e));
+          reject(e instanceof SaveError ? e : new SaveError('db', t('e.tx', '存档事务失败'), e));
           return;
         }
         t.oncomplete = () => resolve(result instanceof IDBRequest ? result.result : result);
-        t.onabort = () => reject(new SaveError('db', '存档事务中止', t.error));
-        t.onerror = () => reject(new SaveError('db', '存档事务失败', t.error));
+        t.onabort = () => reject(new SaveError('db', t('e.txAbort', '存档事务中止'), t.error));
+        t.onerror = () => reject(new SaveError('db', t('e.tx', '存档事务失败'), t.error));
       })
   );
 }
@@ -131,7 +135,7 @@ export function createSaveLayer(config) {
   return {
     /** 存：写入指定槽位（自动算校验和与时间戳），返回槽位元信息 */
     async save(slot, data) {
-      if (!Number.isInteger(slot) || slot < 1) throw new SaveError('db', `非法槽位 ${slot}`);
+      if (!Number.isInteger(slot) || slot < 1) throw new SaveError('db', t('e.badSlot', '非法槽位 {n}', { n: slot }));
       return writeRecord(slot, data);
     },
 
@@ -187,7 +191,7 @@ export function createSaveLayer(config) {
     async exportSlots(slots) {
       const all = await tx('readonly', (st) => st.index('byGame').getAll(cfg.gameId));
       const picked = slots && slots.length ? all.filter((r) => slots.includes(r.slot)) : all;
-      if (!picked.length) throw new SaveError('empty', '没有可导出的存档');
+      if (!picked.length) throw new SaveError('empty', t('e.exportEmpty', '没有可导出的存档'));
       const payload = {
         magic: WSAVE_MAGIC,
         format: WSAVE_FORMAT,
@@ -222,18 +226,18 @@ export function createSaveLayer(config) {
       try {
         payload = JSON.parse(await file.text());
       } catch {
-        throw new SaveError('bad-file', '不是有效的 .wsave 文件（JSON 解析失败）');
+        throw new SaveError('bad-file', t('e.badJson', '不是有效的 .wsave 文件（JSON 解析失败）'));
       }
       if (!payload || payload.magic !== WSAVE_MAGIC || payload.format !== WSAVE_FORMAT) {
-        throw new SaveError('bad-file', '不是有效的 .wsave 文件（magic/format 不符）');
+        throw new SaveError('bad-file', t('e.badMagic', '不是有效的 .wsave 文件（magic/format 不符）'));
       }
       if (payload.gameId !== cfg.gameId && !allowForeign) {
-        throw new SaveError('wrong-game', `该存档来自「${payload.gameTitle || payload.gameId}」`, {
+        throw new SaveError('wrong-game', t('e.wrongGame', '该存档来自「{name}」', { name: payload.gameTitle || payload.gameId }), {
           fromGameTitle: payload.gameTitle || payload.gameId,
         });
       }
       if (!Array.isArray(payload.saves) || !payload.saves.length) {
-        throw new SaveError('bad-file', '存档文件里没有槽位数据');
+        throw new SaveError('bad-file', t('e.noSlots', '存档文件里没有槽位数据'));
       }
       let imported = 0;
       let checksumBad = 0;

@@ -4,7 +4,11 @@
  * 验收点：虚拟手柄合成键盘事件驱动（方向键移动 + 空格开始/重来）、Canvas 渲染
  * （DPR 自适应）、拖动触屏输入、自动档（最高分落盘）、serialize/deserialize 适配器。
  * 玩法：接住落下的烟花，漏三颗散场；越接越快。
+ *
+ * i18n（docs/游戏英文版方案.md §3.2）：canvas 文字逐帧取串（t() 为纯查表，帧内开销可忽略）。
  */
+import { t } from '../i18n.js';
+
 export default {
   version: 1,
 
@@ -41,7 +45,7 @@ export default {
       this.raf = requestAnimationFrame(this.loop);
     };
     this.raf = requestAnimationFrame(this.loop);
-    this.ctx.toast('方向键 / 拖动移动 · 空格开始', 'warn');
+    this.ctx.toast(t('c.how', '方向键 / 拖动移动 · 空格开始'), 'warn');
   },
 
   reset() {
@@ -149,26 +153,26 @@ export default {
     // 记分 / 状态
     g.fillStyle = '#f4f1ec';
     g.font = `600 16px ${this.font}`;
-    g.fillText(`得分 ${this.score}  最佳 ${this.best}`, 16, 30);
+    g.fillText(t('c.score', '得分 {s}  最佳 {b}', { s: this.score, b: this.best }), 16, 30);
     g.fillText('🧨'.repeat(Math.max(this.lives, 0)), w - 16 - this.lives * 22, 30);
 
     g.textAlign = 'center';
     if (this.mode === 'idle') {
       g.font = `700 22px ${this.font}`;
-      g.fillText('夜空开始掉烟花了', w / 2, h * 0.42);
+      g.fillText(t('c.idle1', '夜空开始掉烟花了'), w / 2, h * 0.42);
       g.fillStyle = '#b9b0a6';
       g.font = `14px ${this.font}`;
-      g.fillText('接住它们！漏三颗就散场', w / 2, h * 0.42 + 30);
+      g.fillText(t('c.idle2', '接住它们！漏三颗就散场'), w / 2, h * 0.42 + 30);
       g.fillStyle = '#f4d31f';
-      g.fillText('点击画面 或 按 空格 开始', w / 2, h * 0.42 + 62);
+      g.fillText(t('c.start', '点击画面 或 按 空格 开始'), w / 2, h * 0.42 + 62);
     } else if (this.mode === 'over') {
       g.font = `700 24px ${this.font}`;
-      g.fillText('散场！', w / 2, h * 0.42);
+      g.fillText(t('c.over', '散场！'), w / 2, h * 0.42);
       g.fillStyle = '#b9b0a6';
       g.font = `15px ${this.font}`;
-      g.fillText(`本次 ${this.score} · 最佳 ${this.best}`, w / 2, h * 0.42 + 32);
+      g.fillText(t('c.result', '本次 {s} · 最佳 {b}', { s: this.score, b: this.best }), w / 2, h * 0.42 + 32);
       g.fillStyle = '#f4d31f';
-      g.fillText('点击画面 或 按 空格 再来', w / 2, h * 0.42 + 64);
+      g.fillText(t('c.again', '点击画面 或 按 空格 再来'), w / 2, h * 0.42 + 64);
     }
     g.textAlign = 'left';
   },

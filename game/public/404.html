@@ -5,17 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#150a05">
   <meta name="robots" content="noindex">
-  <title>404 — 焰境之梦</title>
+  <title data-i18n="nf.title">404 — 焰境之梦</title>
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="stylesheet" href="/assets/css/game.css">
 </head>
 <body>
   <main class="boot" style="position:fixed">
     <div class="boot-card">
-      <h2>这一页没点上火</h2>
-      <p>你要找的页面不存在或已被移除。</p>
-      <a class="btn btn-primary" href="/">返回游戏库</a>
+      <h2 data-i18n="nf.h">这一页没点上火</h2>
+      <p data-i18n="nf.p">你要找的页面不存在或已被移除。</p>
+      <a class="btn btn-primary" href="/" data-i18n="nf.back">返回游戏库</a>
     </div>
   </main>
+  <script type="module">
+    // i18n（docs/游戏英文版方案.md §3.3）：worker 把 /en/* miss 原样交还资产层，
+    // not_found_handling 返回本页（404 状态），浏览器地址仍是 /en/... → 按前缀自动出英文
+    import { applyStatic } from '/assets/js/i18n.js';
+    applyStatic();
+  </script>
 </body>
 </html>

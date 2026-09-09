@@ -4,7 +4,12 @@
  * 验收点：滑动输入（触屏原生）、自动档存档（每步落盘）、刷新不丢档、
  * serialize/deserialize 适配器、游戏结束/通关提示。玩法即标准 2048，
  * 皮是花炮工坊：纸捻一路合到「焰火之吻」。
+ *
+ * i18n（docs/游戏英文版方案.md §3.2 + 术语表 §7）：烟花阶梯名走字典键 g.t<v>
+ * （EN 译名见 i18n.js，如锦冠=Brocade Crown、焰火之吻=Kiss of Flames），zh 名保留本文件兜底。
  */
+import { t } from '../i18n.js';
+
 const N = 4;
 const LADDER = {
   2: '纸捻', 4: '火药', 8: '小鞭炮', 16: '大地红', 32: '双响', 64: '冲天炮',
@@ -53,9 +58,9 @@ export default {
     const wrap = document.createElement('div');
     wrap.className = 'h-wrap';
     wrap.innerHTML =
-      '<div class="h-head"><b>花炮合合</b><div class="h-score">最高 <b class="h-best">0</b><br>得分 <span class="h-cur">0</span></div></div>' +
+      `<div class="h-head"><b>${t('g.title', '花炮合合')}</b><div class="h-score">${t('g.best', '最高')} <b class="h-best">0</b><br>${t('g.score', '得分')} <span class="h-cur">0</span></div></div>` +
       '<div class="h-board"><div class="h-tiles"></div></div>' +
-      '<p class="h-hint">整盘滑动：所有方块一起动，不能单选某块——相同数字相撞即合并</p>';
+      `<p class="h-hint">${t('g.hint', '整盘滑动：所有方块一起动，不能单选某块——相同数字相撞即合并')}</p>`;
     ctx.stage.appendChild(wrap);
     this.board = wrap.querySelector('.h-board');
     for (let i = 0; i < N * N; i++) {
@@ -80,7 +85,7 @@ export default {
     this.spawn(); this.spawn();
     this.render();
     this.ctx.autosave(this.serialize());
-    this.ctx.toast('滑动 / 方向键 / 屏幕方向键（顶栏「手柄」）：合并相同方块，合出「焰火之吻」2048', 'warn');
+    this.ctx.toast(t('g.howToast', '滑动 / 方向键 / 屏幕方向键（顶栏「手柄」）：合并相同方块，合出「焰火之吻」2048'), 'warn');
   },
 
   /* ---------- 状态 ---------- */
@@ -96,7 +101,7 @@ export default {
     const [bg, fg] = TONE[v] || ['#d64524', '#fff'];
     el.style.background = bg;
     el.style.color = fg;
-    el.innerHTML = `<span>${v}<small>${LADDER[v] || '传说'}</small></span>`; // 数字全程显示——只显示名字看不出谁大谁小
+    el.innerHTML = `<span>${v}<small>${t('g.t' + v, LADDER[v] || t('g.legendary', '传说'))}</small></span>`; // 数字全程显示——只显示名字看不出谁大谁小；EN 名走字典（g.t<v>）
     this.tileLayer.appendChild(el);
     this.tiles.set(id, { r, c, v, el });
     this.cells[r][c] = id;
@@ -170,7 +175,7 @@ export default {
 
     if (!this.won && this.gridValues().flat().includes(2048)) {
       this.won = true;
-      this.ctx.toast('合成「焰火之吻」！可以继续往上合 🔥', 'warn');
+      this.ctx.toast(t('g.wonToast', '合成「焰火之吻」！可以继续往上合 🔥'), 'warn');
     }
     if (!this.canMove()) this.showOver();
     this.ctx.autosave(this.serialize());
@@ -189,10 +194,10 @@ export default {
   showOver() {
     const over = document.createElement('div');
     over.className = 'h-over';
-    over.innerHTML = `<h3>火药受潮，散场</h3><p>得分 ${this.score} · 最高 ${this.best}</p>`;
+    over.innerHTML = `<h3>${t('g.overTitle', '火药受潮，散场')}</h3><p>${t('g.overStats', '得分 {s} · 最高 {b}', { s: this.score, b: this.best })}</p>`;
     const btn = document.createElement('button');
     btn.className = 'h-restart';
-    btn.textContent = '再来一炉';
+    btn.textContent = t('g.again', '再来一炉');
     btn.onclick = () => { over.remove(); this.restart(); };
     over.appendChild(btn);
     this.board.appendChild(over);
@@ -209,7 +214,7 @@ export default {
     this.spawn(); this.spawn();
     this.render();
     this.ctx.autosave(this.serialize());
-    this.ctx.toast('新的一炉，开合！');
+    this.ctx.toast(t('g.newBatch', '新的一炉，开合！'));
   },
 
   /* ---------- 输入：方向键/WASD + 触屏滑动 ---------- */
@@ -243,7 +248,7 @@ export default {
   },
 
   deserialize(data) {
-    if (!data || !Array.isArray(data.grid) || data.grid.length !== N) throw new Error('存档棋盘尺寸不符');
+    if (!data || !Array.isArray(data.grid) || data.grid.length !== N) throw new Error(t('g.badGrid', '存档棋盘尺寸不符'));
     for (const t of [...this.tiles.values()]) t.el.remove();
     this.tiles.clear();
     this.cells = Array.from({ length: N }, () => Array(N).fill(0));
