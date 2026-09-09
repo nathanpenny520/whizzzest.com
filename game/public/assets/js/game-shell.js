@@ -207,7 +207,7 @@ async function boot() {
 
   let game;
   try {
-    game = await import(meta.entry);
+    game = (await import(meta.entry)).default; // 动态 import 给的是命名空间，游戏本体在 .default
   } catch (e) {
     showBootState('err', '游戏加载失败', '资源下载中断或浏览器不支持所需能力，可重试。', [
       { label: '重新加载', onclick: () => location.reload() },

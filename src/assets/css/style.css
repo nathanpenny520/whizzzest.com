@@ -2748,9 +2748,9 @@ a.feature-card:hover {
   .tv-facade:hover .tv-play::after { transition: none; transform: none; }
 }
 
-/* 首页媒体条浅色化（#tv-strip「焰境流光」）：背景与白卡对齐「焰境仙曲」条同韵，消除深色带突兀感；/tv/ 频道页仍为影院深色 */
+/* 首页媒体条浅色化（#tv-strip「焰境流光」）：板块白灰交替节奏中取白底（前后商户/仙曲条均为灰），卡片反用 bg-alt 浅灰 + 发丝线；/tv/ 频道页仍为影院深色 */
 .tv-strip-wrap {
-  background: var(--c-bg-alt);
+  background: var(--c-bg);
   color: var(--c-text);
 }
 
@@ -2807,14 +2807,14 @@ a.feature-card:hover {
 .tv-strip-row .tv-card { scroll-snap-align: start; }
 .tv-strip-wrap .tv-card {
   padding: 10px 10px 2px;
-  background: var(--c-bg);
+  background: var(--c-bg-alt);
   border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 0 0 1px var(--c-hairline);
   transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
 }
 .tv-strip-wrap .tv-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 1px var(--c-hairline), 0 12px 36px rgba(0, 0, 0, 0.1);
 }
 .tv-strip-wrap .tv-media { border-radius: 10px; }
 .tv-strip-wrap .tv-card h3 { margin: 10px 6px 4px; }
