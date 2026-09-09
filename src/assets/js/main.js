@@ -59,6 +59,7 @@ const navThemeItems = [...document.querySelectorAll('.nav-item.has-menu')];
 function hereMatches(href, strictPath) {
   try {
     const u = new URL(href || '', location.origin);
+    if (u.origin !== location.origin) return false; // 外链（如 game.whizzzest.com）不参与当前页归属——其 pathname 可能恰为 /
     if (strictPath && u.search) return false;
     return u.pathname.replace(/\/index\.html$/, '/') === here;
   } catch {
