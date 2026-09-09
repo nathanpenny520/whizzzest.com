@@ -7,10 +7,10 @@
  *   ASSETS.fetch 不跟随，故 / 与 /play/* 必须在这里重写）：
  *   - /            → /index.html（游戏库列表页）
  *   - /play/<id>/  → /play/app.html（统一运行页壳；游戏 id 由前端 JS 校验并渲染「未找到」态）
- *   - /en、/en/    → /index.html（英文列表页；同一份页面，前端 i18n 按路径切文案）
- *   - /en/play/<id>/ → /play/app.html（英文运行页，同上）
- *   - 其余 /en/*   → 直接交还资产层：miss 时 not_found_handling 返回 /404.html（404 状态），
- *                    页面 JS 按浏览器地址的 /en 前缀自动渲染英文 404（docs/游戏英文版方案.md §3.3）
+ *   - /en、/en/    → /en/index.html（英文列表页——构建期烘出的英文静态件，源码级统一主站，§8.7）
+ *   - /en/play/<id>/ → /en/play/app.html（英文运行页，同上）
+ *   - 其余 /en/*   → 交还资产层：真静态件直接命中；miss 时改送 /en/404.html（英文 404，
+ *                    保留原生 404 状态码，docs/游戏英文版方案.md §8.7）
  *   - /g/*         → R2 桶 whizzzest-game 反代（第三方游戏包托管，docs/游戏整合方案.md §1.1/§1.7）
  *   - 其余         → 交还资产层（无匹配时按 not_found_handling 返回 /404.html）
  * 阶段二绑定：R2（第三方游戏包，后续模拟器内核/ROM 同桶）；D1（云存档）仍按方案 §6 后置。
@@ -79,13 +79,20 @@ export default {
     } else if (PLAY_RE.test(url.pathname)) {
       asset = new Request(new URL('/play/app.html', url.origin), request);
     } else if (url.pathname === '/en' || url.pathname === '/en/') {
-      // 英文列表页：同一份 index.html，前端 i18n 按 /en 前缀切换文案（零英文页面副本）
-      asset = new Request(new URL('/index.html', url.origin), request);
+      // 英文列表页：构建期产物静态件（templates + strings → public/en/，docs/游戏英文版方案.md §8.7）
+      asset = new Request(new URL('/en/index.html', url.origin), request);
     } else if (PLAY_RE_EN.test(url.pathname)) {
-      asset = new Request(new URL('/play/app.html', url.origin), request);
+      asset = new Request(new URL('/en/play/app.html', url.origin), request);
     }
-    // 其余 /en/* 不拦：交还资产层后 miss → not_found_handling 返回 /404.html（404 状态），
-    // 404 页里的 i18n.js 读浏览器地址栏前缀自动出英文
-    return env.ASSETS.fetch(asset);
+    const res = await env.ASSETS.fetch(asset);
+    // /en/* miss → 英文 404 静态件，保留原生 404 状态码（资产层把 body 解码后重包，剥编码头防错位）
+    if (res.status === 404 && (url.pathname === '/en' || url.pathname.startsWith('/en/'))) {
+      const nf = await env.ASSETS.fetch(new Request(new URL('/en/404.html', url.origin), request));
+      const headers = new Headers(nf.headers);
+      headers.delete('content-encoding');
+      headers.delete('content-length');
+      return new Response(nf.body, { status: 404, headers });
+    }
+    return res;
   },
 };

@@ -1,20 +1,23 @@
 /**
- * i18n 欠账检查（docs/游戏英文版方案.md §6.3，决策③配套）：只报告、不拦截。
+ * i18n 欠账检查（docs/游戏英文版方案.md §6.3/§8.7，决策③配套）：只报告、不拦截（漂移检查除外）。
  *
  *  1) 元数据覆盖：games.json 每个游戏 / 平台在 games.en.json 是否有覆盖表，
  *     并列出缺的展示字段（EN 列表页会以中文兜底显示这些字段）；
- *  2) 字典欠账：源码 t('key') 调用与 data-i18n* 标记引用的键是否都在 i18n.js 的
- *     EN 字典里（缺 → EN 界面该处静默显示中文）；
- *  3) 孤儿键：字典里从未被引用的键（多为调用点改名后的遗留，宜清理）。
+ *  2) 字典欠账：模板 {{t.key}} 占位符与 JS t('key') 调用引用的键是否都在字典里——
+ *     模板键须 zh/en 双字典齐备（两边都要烘），JS 键须 en 字典齐备（zh 兜底在代码调用点）；
+ *  3) 孤儿键：en 字典里从未被引用的键（多为调用点改名后的遗留，宜清理）；
+ *  4) 产物漂移：模板/字典改了但没跑 build-game.mjs → 报错退出（此项拦截，防部署过期产物）。
  *
  * 运行：node game/scripts/check-i18n.mjs   （无依赖，仅 Node 内置模块）
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const pub = path.join(here, '..', 'public');
+const gameDir = path.join(here, '..');
+const pub = path.join(gameDir, 'public');
 
 const DISPLAY_FIELDS = ['title', 'tagline', 'genre', 'duration', 'controls', 'deviceNote', 'badge'];
 const PLATFORM_FIELDS = ['title', 'tagline', 'note'];
@@ -22,19 +25,19 @@ const PLATFORM_FIELDS = ['title', 'tagline', 'note'];
 let problems = 0;
 
 /* ---------- 1) 元数据覆盖 ---------- */
-const zh = JSON.parse(fs.readFileSync(path.join(pub, 'games.json'), 'utf8'));
-let en = null;
+const zhGames = JSON.parse(fs.readFileSync(path.join(pub, 'games.json'), 'utf8'));
+let enGames = null;
 try {
-  en = JSON.parse(fs.readFileSync(path.join(pub, 'games.en.json'), 'utf8'));
+  enGames = JSON.parse(fs.readFileSync(path.join(pub, 'games.en.json'), 'utf8'));
 } catch {
   console.error('✗ games.en.json 无法读取（EN 全量中文兜底）');
   problems++;
 }
 
 console.log('== 元数据覆盖（games.en.json）==');
-if (en) {
-  for (const g of zh.games || []) {
-    const ov = (en.games || {})[g.id];
+if (enGames) {
+  for (const g of zhGames.games || []) {
+    const ov = (enGames.games || {})[g.id];
     if (!ov) {
       console.log(`○ ${g.id}：无覆盖表（EN 显示中文卡）`);
       continue;
@@ -42,8 +45,8 @@ if (en) {
     const missing = DISPLAY_FIELDS.filter((f) => g[f] != null && ov[f] == null);
     console.log(missing.length ? `△ ${g.id}：缺 ${missing.join(', ')}` : `✓ ${g.id}`);
   }
-  for (const p of zh.platforms || []) {
-    const ov = (en.platforms || {})[p.id];
+  for (const p of zhGames.platforms || []) {
+    const ov = (enGames.platforms || {})[p.id];
     if (!ov) {
       console.log(`○ ${p.id}：无覆盖表`);
       continue;
@@ -53,7 +56,7 @@ if (en) {
   }
   // 机制字段混入覆盖表 → 数据分叉风险（方案 §3.2 字段边界）
   const MECH = ['mode', 'entry', 'saveMode', 'saveKeys', 'keyboardOnly', 'gamepad', 'gamepadLayout', 'gamepadKeymap', 'orientation', 'version', 'tier'];
-  for (const [id, ov] of Object.entries(en.games || {})) {
+  for (const [id, ov] of Object.entries(enGames.games || {})) {
     const bad = MECH.filter((f) => f in ov);
     if (bad.length) {
       console.error(`✗ ${id}：覆盖表混入机制字段 ${bad.join(', ')}（违反字段边界，会覆盖母本行为）`);
@@ -62,53 +65,71 @@ if (en) {
   }
 }
 
-/* ---------- 2) 字典欠账（t() 调用 + data-i18n 标记） ---------- */
-// i18n.js 是浏览器 ES module（仓库无 "type":"module"），Node 侧经 data: URL 导入
-const i18nSrc = fs.readFileSync(path.join(pub, 'assets', 'js', 'i18n.js'), 'utf8');
-const { EN_STRINGS } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(i18nSrc));
-const dictKeys = new Set(Object.keys(EN_STRINGS));
+/* ---------- 2) 字典欠账（模板 {{t.key}} + JS t() 调用） ---------- */
+const dictZh = JSON.parse(fs.readFileSync(path.join(gameDir, 'strings', 'strings.zh.json'), 'utf8'));
+const dictEn = JSON.parse(fs.readFileSync(path.join(gameDir, 'strings', 'strings.en.json'), 'utf8'));
 
-const SOURCES = [
-  'index.html',
-  'play/app.html',
-  '404.html',
-  'assets/js/game-shell.js',
-  'assets/js/game-save.js',
-  'assets/js/games/huapao2048.js',
-  'assets/js/games/catch-fireworks.js',
-];
+// 模板里的静态键：{{t.key}} 占位符；模板内联脚本里的动态键：t('key') 调用
+const TEMPLATES = ['index.html', 'app.html', '404.html'];
+const JS_SOURCES = ['assets/js/game-shell.js', 'assets/js/game-save.js', 'assets/js/games/huapao2048.js', 'assets/js/games/catch-fireworks.js'];
 
+const templateKeys = new Set();
 const used = new Set();
 const dynPrefixes = new Set(); // 动态拼接键：t('g.t' + v, ...) —— 基前缀之下的字典键视为已引用
-console.log('\n== 字典欠账（引用了但 EN 字典没有的键）==');
-for (const rel of SOURCES) {
+
+console.log('\n== 字典欠账（引用了但字典没有的键）==');
+for (const rel of TEMPLATES) {
+  const text = fs.readFileSync(path.join(gameDir, 'templates', rel), 'utf8');
+  for (const m of text.matchAll(/\{\{t\.([\w.]+)\}\}/g)) templateKeys.add(m[1]);
+  for (const m of text.matchAll(/\bt\(\s*'([^']*)'\s*([,)+])/g)) {
+    if (m[2] === '+') dynPrefixes.add(m[1]);
+    else used.add(m[1]);
+  }
+}
+for (const rel of JS_SOURCES) {
   const text = fs.readFileSync(path.join(pub, rel), 'utf8');
   for (const m of text.matchAll(/\bt\(\s*'([^']*)'\s*([,)+])/g)) {
     if (m[2] === '+') dynPrefixes.add(m[1]);
     else used.add(m[1]);
   }
-  for (const m of text.matchAll(/data-i18n(?:-html|-aria|-content|-href)?="([^"]+)"/g)) used.add(m[1]);
 }
 for (const p of dynPrefixes) {
-  for (const k of dictKeys) if (k.startsWith(p)) used.add(k);
-  console.log(`ℹ 动态键前缀「${p}」：字典中 ${[...dictKeys].filter((k) => k.startsWith(p)).length} 个键视为已引用`);
+  for (const k of Object.keys(dictEn)) if (k.startsWith(p)) used.add(k);
+  console.log(`ℹ 动态键前缀「${p}」：字典中 ${Object.keys(dictEn).filter((k) => k.startsWith(p)).length} 个键视为已引用`);
 }
-const missingKeys = [...used].filter((k) => !dictKeys.has(k));
-if (missingKeys.length) {
-  for (const k of missingKeys) console.error(`✗ 缺字典键：${k}（EN 处将显示中文兜底）`);
-  problems += missingKeys.length;
-} else {
-  console.log('✓ 无——所有引用键都有 EN 译文');
+
+const missingEn = [...new Set([...templateKeys, ...used])].filter((k) => dictEn[k] == null);
+const missingZhTpl = [...templateKeys].filter((k) => dictZh[k] == null);
+if (missingEn.length) {
+  for (const k of missingEn) console.error(`✗ en 字典缺键：${k}`);
+  problems += missingEn.length;
+}
+if (missingZhTpl.length) {
+  for (const k of missingZhTpl) console.error(`✗ zh 字典缺模板键：${k}（zh 产物烘不出）`);
+  problems += missingZhTpl.length;
+}
+if (!missingEn.length && !missingZhTpl.length) {
+  console.log(`✓ 无——模板键 ${templateKeys.size} 个（双语齐备）+ JS 键（en 齐备）全部覆盖`);
 }
 
 /* ---------- 3) 孤儿键 ---------- */
-console.log('\n== 孤儿键（字典里没人引用）==');
-const orphans = [...dictKeys].filter((k) => !used.has(k));
+console.log('\n== 孤儿键（en 字典里没人引用）==');
+const orphans = Object.keys(dictEn).filter((k) => k !== '_note' && !templateKeys.has(k) && !used.has(k));
 if (orphans.length) {
   for (const k of orphans) console.log(`△ ${k}`);
 } else {
   console.log('✓ 无');
 }
 
-console.log(`\n欠账检查完成：${problems ? `${problems} 项待补（只提醒不拦截）` : '全部干净'}`);
+/* ---------- 4) 产物漂移（拦截项） ---------- */
+console.log('\n== 产物漂移（--check）==');
+try {
+  const out = execFileSync(process.execPath, [path.join(gameDir, 'scripts', 'build-game.mjs'), '--check'], { encoding: 'utf8' });
+  console.log(out.trim());
+} catch (e) {
+  console.error(e.stdout ? e.stdout.trim() : e.message);
+  problems++;
+}
+
+console.log(`\n欠账检查完成：${problems ? `${problems} 项待处理` : '全部干净'}`);
 process.exit(0);

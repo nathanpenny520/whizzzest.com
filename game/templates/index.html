@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#150a05">
-  <meta name="description" content="焰境之梦 — 纯浏览器单机游戏平台：短篇可通关、打开即玩、无需下载，本地存档可靠，断网也能玩。">
-  <title>焰境之梦 — 短篇可通关的浏览器单机游戏</title>
+  <meta name="description" content="{{t.home.metaDesc}}">
+  <title>{{t.home.title}}</title>
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="stylesheet" href="/assets/css/game.css">
   <link rel="alternate" hreflang="zh" href="https://game.whizzzest.com/">
@@ -15,36 +15,36 @@
 <body>
 
   <header class="site-head">
-    <a class="site-brand" href="/">
-      <img src="/assets/img/favicon.svg" alt=""><span>焰境之梦</span>
+    <a class="site-brand" href="{{t.home.brandHref}}">
+      <img src="/assets/img/favicon.svg" alt=""><span>{{t.home.brand}}</span>
     </a>
     <span class="spacer"></span>
-    <a class="link" id="langSwitch" href="/en/">English</a>
-    <a class="link" href="https://whizzzest.com/">← 焰境·万载 主站</a>
+    <a class="link" id="langSwitch" href="{{t.home.langSwitchHref}}">{{t.home.langSwitch}}</a>
+    <a class="link" href="{{t.home.mainSiteHref}}">{{t.home.mainSite}}</a>
   </header>
 
   <section class="hero">
-    <div class="kicker">短篇可通关</div>
-    <h1>一节课、一班车里<br>能<em>通关</em>的精品游戏</h1>
-    <p>纯浏览器运行，打开即玩、无需下载、断网可玩。每款 20–90 分钟、有结局、一次玩完。 存档三重保障：浏览器持久化 + 一键导出 .wsave 文件 + 云端备份（即将上线）。</p>
+    <div class="kicker">{{t.home.kicker}}</div>
+    <h1>{{t.home.heroTitle}}</h1>
+    <p>{{t.home.heroDesc}}</p>
   </section>
 
   <main class="games-grid" id="gamesGrid">
-    <div class="game-card ghost"><b>游戏加载中…</b></div>
+    <div class="game-card ghost"><b>{{t.home.loading}}</b></div>
   </main>
 
   <!-- 云端畅玩 · 第三方平台入口（docs/游戏整合方案.md §8，决策⑭）：外链指路牌，非收录游戏；
        platforms 缺失/为空时保持 hidden 整节不渲染；EN 版保留并标注面向中国大陆（游戏英文版方案 决策②） -->
   <section class="cloud" id="cloudSection" hidden>
-    <h2>云端畅玩</h2>
-    <p class="cloud-sub">想玩更大的作品？这些官方云游戏平台免下载、点开即玩。</p>
+    <h2>{{t.cloud.title}}</h2>
+    <p class="cloud-sub">{{t.cloud.sub}}</p>
     <div class="cloud-grid" id="cloudGrid"></div>
-    <p class="cloud-note">以上为第三方云游戏平台，与本站无关；需注册登录，部分内容有免费时长限制或需付费。</p>
+    <p class="cloud-note">{{t.cloud.note}}</p>
   </section>
 
   <footer class="site-foot">
-    <p>焰境之梦 · game.whizzzest.com ｜ <a href="https://whizzzest.com/">焰境·万载 — 中国花炮之乡的文旅指南</a></p>
-    <p>所有游戏均在你的浏览器本地运行，不经任何服务器；进度保存在本机，可随时导出 .wsave 文件备份或分享。</p>
+    <p>{{t.home.footBrand}} · game.whizzzest.com ｜ <a href="{{t.home.footMainHref}}">{{t.home.footMain}}</a></p>
+    <p>{{t.home.footPrivacy}}</p>
   </footer>
 
   <script type="module">

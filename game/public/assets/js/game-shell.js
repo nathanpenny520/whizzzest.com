@@ -22,7 +22,7 @@
  */
 import { createSaveLayer, SaveError } from './game-save.js';
 import { mountGamepad, FULL_LAYOUT } from './virtual-gamepad.js';
-import { t, applyStatic, LANG } from './i18n.js';
+import { t, LANG } from './i18n.js';
 
 const AUTO_SLOT = 1; // 槽位 1 = 自动档
 const $ = (sel) => document.querySelector(sel);
@@ -252,7 +252,6 @@ function renderStorageLine(el, persist) {
 /* ---------------- 壳主体 ---------------- */
 
 async function boot() {
-  applyStatic(); // 静态页文案（app.html 顶栏/抽屉/横幅）：EN 路径按字典替换，zh 免动 DOM
   const gameId = (location.pathname.match(/^\/(?:en\/)?play\/([\w.-]+)/) || [])[1] || null; // 与 worker PLAY_RE(_EN) 一致：允许 id 含点（minecraft-1.8），允许 /en 前缀
   const shell = { gameId, meta: null, saves: null, gamepad: null, game: null };
 

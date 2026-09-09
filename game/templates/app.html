@@ -5,23 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#150a05">
   <meta name="robots" content="noindex"><!-- 运行页无独立内容，收录集中在游戏库 -->
-  <title>焰境之梦</title>
+  <title>{{t.play.title}}</title>
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="stylesheet" href="/assets/css/game.css">
 </head>
 <body>
 
   <header class="topbar">
-    <a class="back" href="/" aria-label="返回游戏库">←</a>
-    <div class="tb-title" id="tbTitle">焰境游戏</div>
-    <button class="tb-btn" id="btnPad" hidden>手柄</button>
-    <button class="tb-btn" id="btnSaves">存档</button>
-    <button class="tb-btn" id="btnFullscreen">全屏</button>
+    <a class="back" href="{{t.play.backHref}}" aria-label="{{t.play.back}}">←</a>
+    <div class="tb-title" id="tbTitle">{{t.play.tbTitle}}</div>
+    <button class="tb-btn" id="btnPad" hidden>{{t.play.pad}}</button>
+    <button class="tb-btn" id="btnSaves">{{t.play.saves}}</button>
+    <button class="tb-btn" id="btnFullscreen">{{t.play.fullscreen}}</button>
   </header>
 
   <div class="persist-banner" id="persistBanner" hidden>
-    <span>浏览器未授予持久化存储：空间紧张时本地存档可能被清理，建议定期「导出存档」备份。</span>
-    <button id="persistClose" aria-label="关闭提醒">✕</button>
+    <span>{{t.play.persistBanner}}</span>
+    <button id="persistClose" aria-label="{{t.play.closeHint}}">✕</button>
   </div>
 
   <main class="stage-wrap">
@@ -29,14 +29,14 @@
     <div id="padHost"></div>
   </main>
 
-  <div id="orientHint" hidden>建议横屏游玩<br>（横屏可获得完整视野与操作空间）</div>
+  <div id="orientHint" hidden>{{t.play.orient}}</div>
 
   <aside class="save-drawer" id="saveDrawer" hidden>
-    <h3>存档 <small>本地 IndexedDB · 断网可玩 · 云备份即将上线</small></h3>
+    <h3>{{t.play.saveDrawer}}</h3>
     <div id="slotGrid"></div>
     <div class="drawer-io">
-      <button class="btn-mini" id="btnExport">导出全部（.wsave）</button>
-      <button class="btn-mini" id="btnImport">导入 .wsave</button>
+      <button class="btn-mini" id="btnExport">{{t.play.exportAll}}</button>
+      <button class="btn-mini" id="btnImport">{{t.play.import}}</button>
     </div>
     <p class="storage-line" id="storageLine"></p>
   </aside>
@@ -47,8 +47,8 @@
     <h4 id="dlgTitle"></h4>
     <p id="dlgBody"></p>
     <div class="dlg-ops">
-      <button class="btn-mini" id="dlgCancel">取消</button>
-      <button class="btn-mini btn-danger" id="dlgOk" style="color:#fff;background:var(--c-accent);border-color:transparent">确定</button>
+      <button class="btn-mini" id="dlgCancel">{{t.play.cancel}}</button>
+      <button class="btn-mini btn-danger" id="dlgOk" style="color:#fff;background:var(--c-accent);border-color:transparent">{{t.play.ok}}</button>
     </div>
   </dialog>
 
