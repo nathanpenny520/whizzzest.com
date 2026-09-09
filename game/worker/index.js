@@ -1,5 +1,5 @@
 /**
- * 焰境游戏 — game.whizzzest.com Worker（docs/游戏方案.md §1）
+ * 焰境游戏 — game.whizzzest.com Worker（docs/游戏方案.md §1，docs/游戏整合方案.md §1.7）
  *
  * 静态资产优先：命中资产的请求由 Workers Static Assets 直接服务（不过 Worker，省调用，
  * 安全头由 public/_headers 统一补）；未命中的进到这里做显式路由
@@ -7,14 +7,60 @@
  *   ASSETS.fetch 不跟随，故 / 与 /play/* 必须在这里重写）：
  *   - /            → /index.html（游戏库列表页）
  *   - /play/<id>/  → /play/app.html（统一运行页壳；游戏 id 由前端 JS 校验并渲染「未找到」态）
+ *   - /g/*         → R2 桶 whizzzest-game 反代（第三方游戏包托管，docs/游戏整合方案.md §1.1/§1.7）
  *   - 其余         → 交还资产层（无匹配时按 not_found_handling 返回 /404.html）
- * 阶段一零后端逻辑、零绑定；阶段二/三再加 R2 / D1（docs/游戏方案.md §5/§6）。
+ * 阶段二绑定：R2（第三方游戏包，后续模拟器内核/ROM 同桶）；D1（云存档）仍按方案 §6 后置。
  */
 const PLAY_RE = /^\/play\/(?:[\w-]+)?\/?$/;
+
+/* /g/* Content-Type 兜底表（正常情况上传时已带 metadata，这里只兜漏网之鱼） */
+const MIME = {
+  html: 'text/html; charset=utf-8',
+  js: 'text/javascript; charset=utf-8',
+  mjs: 'text/javascript; charset=utf-8',
+  css: 'text/css; charset=utf-8',
+  json: 'application/json; charset=utf-8',
+  webmanifest: 'application/manifest+json',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+  svg: 'image/svg+xml', ico: 'image/x-icon',
+  woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', otf: 'font/otf',
+  wasm: 'application/wasm',
+  mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
+  txt: 'text/plain; charset=utf-8', xml: 'application/xml',
+};
+
+/* 第三方游戏包反代（R2 直读，对标主站 /assets-merchant/ 实现）：
+ * 键 = pathname 去掉 /g/ 前缀（上传脚本 game/scripts/upload-games.mjs 与此约定一致）；
+ * HTML/JSON 短缓存（收录更新及时生效），其余日级缓存；nosniff 对齐 _headers 规范。
+ * 注意：游戏包会被自家 iframe 引用，绝不能在这里补 X-Frame-Options。 */
+async function handleGameAsset(url, env) {
+  let key;
+  try {
+    key = decodeURIComponent(url.pathname.slice('/g/'.length));
+  } catch {
+    return new Response(null, { status: 404 });
+  }
+  if (!key || key.endsWith('/') || key.includes('..') || key.includes('\\')) {
+    return new Response(null, { status: 404 });
+  }
+  const obj = await env.GAMEDATA.get(key);
+  if (!obj) return new Response(null, { status: 404 });
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  const ext = (key.split('.').pop() || '').toLowerCase();
+  if (!headers.has('content-type')) headers.set('content-type', MIME[ext] || 'application/octet-stream');
+  headers.set('etag', obj.httpEtag);
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('cache-control', ext === 'html' || ext === 'json' ? 'public, max-age=300' : 'public, max-age=86400');
+  return new Response(obj.body, { headers });
+}
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/g/')) {
+      return handleGameAsset(url, env);
+    }
     let asset = request;
     if (url.pathname === '/' || url.pathname === '') {
       asset = new Request(new URL('/index.html', url.origin), request);

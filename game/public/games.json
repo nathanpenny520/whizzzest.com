@@ -7,12 +7,18 @@
       "genre": "数字逻辑谜题",
       "tier": "填充",
       "duration": "约 5–10 分钟",
-      "controls": "滑动 / 方向键",
-      "gamepad": false,
+      "controls": "滑动 / 方向键 / 屏幕方向键（手柄）",
+      "gamepad": true,
       "orientation": "any",
       "entry": "/assets/js/games/huapao2048.js",
       "version": 1,
-      "badge": "阶段一验收 Demo"
+      "badge": "阶段一验收 Demo",
+      "gamepadLayout": {
+        "dpad": true,
+        "face": [],
+        "shoulders": [],
+        "system": []
+      }
     },
     {
       "id": "catch-fireworks",
@@ -27,6 +33,113 @@
       "entry": "/assets/js/games/catch-fireworks.js",
       "version": 1,
       "badge": "阶段一验收 Demo"
+    },
+    {
+      "id": "hextris",
+      "title": "六边形消除 Hextris",
+      "tagline": "旋转六边形炮台，把下落的方块接进同色边——三块同色连锁爆裂，手速与判断缺一不可。",
+      "genre": "街机益智",
+      "tier": "填充",
+      "duration": "分数挑战 · 单局数分钟",
+      "controls": "触屏点按左右侧 / 方向键",
+      "gamepad": true,
+      "orientation": "any",
+      "mode": "iframe",
+      "entry": "/g/hextris/index.html",
+      "saveMode": "keys",
+      "saveKeys": [
+        "saveState",
+        "highscores"
+      ],
+      "version": 1,
+      "badge": "收录开源"
+    },
+    {
+      "id": "tetris",
+      "title": "俄罗斯方块",
+      "tagline": "最经典的落块玩法：满行消除、逐级加速，看看你能撑到多少层。",
+      "genre": "益智经典",
+      "tier": "填充",
+      "duration": "分数挑战 · 单局数分钟",
+      "controls": "方向键移动 · 空格直落（虚拟手柄可用）",
+      "gamepad": true,
+      "keyboardOnly": true,
+      "orientation": "any",
+      "mode": "iframe",
+      "entry": "/g/tetris/index.html",
+      "saveMode": "none",
+      "version": 1,
+      "badge": "收录开源"
+    },
+    {
+      "id": "jump",
+      "title": "跳一跳",
+      "tagline": "按住蓄力、松手起跳，落在下一个方块上——越准分越高，Three.js 重制的经典微操小游戏。",
+      "genre": "休闲跳跃",
+      "tier": "填充",
+      "duration": "分数挑战 · 单局数分钟",
+      "controls": "触屏/鼠标按住蓄力 · 松手起跳",
+      "gamepad": false,
+      "orientation": "any",
+      "mode": "iframe",
+      "entry": "/g/jump/index.html",
+      "saveMode": "none",
+      "version": 1,
+      "badge": "收录开源"
+    },
+    {
+      "id": "pacman",
+      "title": "吃豆人",
+      "tagline": "街机时代的国民 IP：吃豆过关、躲避四只各有性格的幽灵，AI 寻路还原「围堵」压迫感。",
+      "genre": "街机经典",
+      "tier": "填充",
+      "duration": "分数挑战 · 单局数分钟",
+      "controls": "方向键 · 空格暂停（虚拟手柄可用）",
+      "gamepad": true,
+      "keyboardOnly": true,
+      "orientation": "any",
+      "mode": "iframe",
+      "entry": "/g/pacman/index.html",
+      "saveMode": "none",
+      "version": 1,
+      "badge": "收录开源"
+    },
+    {
+      "id": "battle-city",
+      "title": "坦克大战",
+      "tagline": "经典 FC《Battle City》复刻：守卫基地、全歼敌军，35 关战役 + 关卡编辑器 + 同屏双人。",
+      "genre": "经典复刻",
+      "tier": "补充",
+      "duration": "35 关战役 · 约 60–90 分钟",
+      "controls": "方向键移动 · 空格开火（虚拟手柄可用）",
+      "gamepad": true,
+      "keyboardOnly": true,
+      "orientation": "any",
+      "mode": "iframe",
+      "entry": "/g/battle-city/index.html",
+      "saveMode": "keys",
+      "saveKeys": [
+        "custom-stages"
+      ],
+      "version": 1,
+      "badge": "收录开源"
+    },
+    {
+      "id": "win12",
+      "title": "Windows 12 网页版",
+      "tagline": "整台「电脑」跑在浏览器里：桌面、窗口、内置应用与彩蛋一应俱全，自由探索没有结局。",
+      "genre": "创意互动玩具",
+      "tier": "填充",
+      "duration": "自由探索 · 无结局",
+      "controls": "触屏 / 键鼠",
+      "gamepad": false,
+      "orientation": "any",
+      "mode": "iframe",
+      "entry": "/g/win12/index.html",
+      "saveMode": "none",
+      "deviceNote": "部分内置应用（代码编辑器/Python 等）依赖在线组件，断网只影响这些应用",
+      "version": 1,
+      "badge": "趣味项目"
     }
   ]
 }

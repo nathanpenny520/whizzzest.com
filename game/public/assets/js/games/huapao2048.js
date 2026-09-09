@@ -76,7 +76,7 @@ export default {
     this.spawn(); this.spawn();
     this.render();
     this.ctx.autosave(this.serialize());
-    this.ctx.toast('滑动合并相同方块，合出「焰火之吻」2048', 'warn');
+    this.ctx.toast('滑动 / 方向键 / 屏幕方向键（顶栏「手柄」）：合并相同方块，合出「焰火之吻」2048', 'warn');
   },
 
   /* ---------- 状态 ---------- */

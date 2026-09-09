@@ -37,10 +37,11 @@ export const FULL_LAYOUT = {
 
 const LABELS = { a: 'A', b: 'B', l: 'L', r: 'R', start: 'START', select: 'SELECT' };
 
-function synthKey(type, name, keymap) {
+function synthKey(type, name, keymap, getTarget) {
   const k = keymap[name] || DEFAULT_KEYMAP[name];
   if (!k) return;
-  // 合成事件 isTrusted=false，但对 addEventListener 完全可达；游戏侧无需区分来源
+  // 合成事件 isTrusted=false，但对 addEventListener 完全可达；游戏侧无需区分来源。
+  // 个别游戏校验 isTrusted 的无法支持虚拟手柄，属「尽力支持」，验收时逐款确认。
   const ev = new KeyboardEvent(type, {
     key: k.key,
     code: k.code,
@@ -49,11 +50,15 @@ function synthKey(type, name, keymap) {
     bubbles: true,
     cancelable: true,
   });
-  (document.activeElement || window).dispatchEvent(ev);
+  // 默认派发到宿主页；iframe 游戏由运行页壳注入派发函数，把事件送进游戏文档内部
+  // （body 起 bubbling → body/document/window 三种监听位置全部可达）
+  const target = getTarget ? getTarget() : document.activeElement || window;
+  if (!target) return;
+  target.dispatchEvent(ev);
 }
 
-function fire(type, name, keymap) {
-  synthKey(type, name, keymap);
+function fire(type, name, keymap, getTarget) {
+  synthKey(type, name, keymap, getTarget);
   if (type === 'keydown' && navigator.vibrate) {
     try { navigator.vibrate(8); } catch { /* 桌面无视 */ }
   }
@@ -63,6 +68,8 @@ export function mountGamepad(container, opts = {}) {
   const layout = opts.layout || FULL_LAYOUT;
   const keymap = opts.keymap || DEFAULT_KEYMAP;
   const pointers = new Map(); // pointerId -> button name（每指独立跟踪）
+  // 事件派发目标（iframe 转发用）：()=>EventTarget，返回 null 表示当前不可派发（如 iframe 未就绪）
+  let dispatchTarget = null;
 
   const root = document.createElement('div');
   root.className = 'gp';
@@ -72,13 +79,13 @@ export function mountGamepad(container, opts = {}) {
     if (el.dataset.held) return;
     el.dataset.held = '1';
     el.classList.add('gp-on');
-    fire('keydown', name, keymap);
+    fire('keydown', name, keymap, dispatchTarget);
   };
   const release = (name, el) => {
     if (!el.dataset.held) return;
     delete el.dataset.held;
     el.classList.remove('gp-on');
-    fire('keyup', name, keymap);
+    fire('keyup', name, keymap, dispatchTarget);
   };
   const bindBtn = (el, name) => {
     el.addEventListener('pointerdown', (e) => {
@@ -198,6 +205,13 @@ export function mountGamepad(container, opts = {}) {
   return {
     el: root,
     setVisible(v) { root.classList.toggle('gp-hidden', !v); },
+    /**
+     * 供运行页壳注入派发目标（docs/游戏整合方案.md §1.5）：iframe 游戏传
+     * ()=>iframe.contentDocument?.body（合成键盘事件送进游戏文档内部）；传 null 恢复宿主页默认。
+     */
+    setDispatchTarget(fn) {
+      dispatchTarget = fn;
+    },
     /** 供切换前后台时兜底：清掉所有按住的键（防「键卡死」） */
     releaseAll() {
       for (const { name, el } of pointers.values()) release(name, el);

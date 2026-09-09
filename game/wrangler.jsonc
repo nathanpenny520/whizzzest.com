@@ -1,12 +1,21 @@
 {
-  // 焰境·万载 — 游戏平台 Worker（game.whizzzest.com，docs/游戏方案.md §1/§7）
+  // 焰境·万载 — 游戏平台 Worker（game.whizzzest.com，docs/游戏方案.md §1/§7，docs/游戏整合方案.md §1.7）
   // 职责（阶段一）：纯静态托管游戏站 + /play/<游戏id>/ 重写到统一运行页壳；零后端逻辑、零绑定
+  // 职责（阶段二收录向，2026-09-09）：/g/* 反代 R2 桶 whizzzest-game（第三方游戏包托管）
   // 安全：请求统一补 X-Content-Type-Options / Referrer-Policy
-  // 后续（阶段二/三）：R2 绑定（模拟器内核/ROM/大游戏包）、D1 + 会话（云存档）——按方案 §5/§6 追加
+  // 后续（阶段三）：D1 + 会话（云存档）——按方案 §6 追加
   "name": "whizzzest-game",
   "compatibility_date": "2026-09-01",
   "main": "worker/index.js",
   "observability": { "enabled": true },
+  // 第三方游戏包桶（收录产物经 game/scripts/upload-games.mjs 上传；模拟器内核/ROM 后续同桶）
+  // 部署前先创建：npx wrangler r2 bucket create whizzzest-game
+  "r2_buckets": [
+    {
+      "binding": "GAMEDATA",
+      "bucket_name": "whizzzest-game"
+    }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -15,8 +24,8 @@
     // 导致 /play/<id> 重写拿不到运行页内容（ASSETS.fetch 不跟随重定向）。
     // 路由全部显式化：/ 与 /play/* 由 worker/index.js 重写，其余资产按原路径命中。
     "html_handling": "none",
-    // 根路径与运行页强制先过 Worker（显式路由），杜绝资产层直接应答引发的缓存/路由竞态
-    "run_worker_first": ["/", "/play", "/play/*"]
+    // 根路径、运行页与 /g/* 强制先过 Worker（显式路由 + R2 反代），杜绝资产层直接应答引发的缓存/路由竞态
+    "run_worker_first": ["/", "/play", "/play/*", "/g", "/g/*"]
   },
   "routes": [
     { "pattern": "game.whizzzest.com", "custom_domain": true }

@@ -52,6 +52,7 @@
           `<h3>${g.title}</h3>` +
           `<p class="tagline">${g.tagline || ''}</p>` +
           `<div class="meta">⏱ ${g.duration || '短篇'} · 🎮 ${g.controls || '触屏/键盘'}</div>` +
+          (g.deviceNote ? `<div class="meta">ⓘ ${g.deviceNote}</div>` : '') +
           `<a class="btn btn-primary" href="/play/${g.id}/">进入游戏</a>`;
         grid.appendChild(card);
       }

@@ -14,6 +14,10 @@
  *     migrate(data, fromVersion) { return newData } // 可选：旧档迁移；返回 null/抛错 = 迁移失败
  *   }
  *
+ * iframe 运行模式（第三方游戏包，docs/游戏整合方案.md §1.3/§1.4）：games.json 里
+ *   mode="iframe" + entry="/g/<id>/..." —— 壳不 import 模块，改由 createIframeGame 生成适配器：
+ *   同源 iframe 装载游戏包；存档按 saveMode 三档（keys=B 档键快照 ｜ none=C 档不接管）。
+ *
  * 本文件顶层只在浏览器环境执行 boot()（Node import 冒烟测试安全）。
  */
 import { createSaveLayer, SaveError } from './game-save.js';
@@ -93,6 +97,97 @@ function showBootState(kind, title, desc, actions) {
     h.appendChild(b);
   }
   host.appendChild(h);
+}
+
+/* ---------------- iframe 游戏适配器（docs/游戏整合方案.md §1.3/§1.4） ---------------- */
+
+/**
+ * 第三方游戏以同源 iframe 运行（R2 反代 /g/*，与宿主同源 → 可直接读写游戏用的 localStorage，
+ * 手柄合成键盘事件也能送进游戏文档内部）。存档三档：
+ *  - keys（B 档）：saveKeys 登记的 localStorage 键做快照——进入时先回写自动档再开 iframe，
+ *    玩耍中周期/切后台/关页时快照进自动档；「载入槽位」= 回写键值并重载 iframe。零改游戏代码。
+ *  - none（C 档）：平台不接管，游戏自带浏览器存储（存档面板隐藏，进入时 toast 说明）。
+ * 注意：不同收录游戏若用了同名通用键（如 hextris 的 highscores），快照模型下互不污染
+ * （各游戏槽位各存各的、进入先回写），但同一浏览器同一时刻只应玩一款——这是 B 档的模型前提。
+ */
+function createIframeGame(meta) {
+  const useKeys = meta.saveMode === 'keys' && Array.isArray(meta.saveKeys) && meta.saveKeys.length > 0;
+  const SNAPSHOT_MS = 10000; // 周期快照节奏（游戏自身写档的时机无法感知，周期兜底）
+
+  const snapshotKeys = () => {
+    const keys = {};
+    for (const k of meta.saveKeys) {
+      try {
+        const v = localStorage.getItem(k);
+        if (v != null) keys[k] = v;
+      } catch { /* 隐私模式等场景 localStorage 不可用，按无档处理 */ }
+    }
+    return { keys };
+  };
+  const writeKeys = (data) => {
+    const map = (data && data.keys) || {};
+    try {
+      for (const k of meta.saveKeys) {
+        if (k in map) localStorage.setItem(k, map[k]);
+        else localStorage.removeItem(k);
+      }
+    } catch { /* 同上 */ }
+  };
+
+  let iframe = null;
+  let snapTimer = 0;
+  let ctxRef = null; // mount 时捕获（存档层在适配器创建之后才建好）
+  const onLeave = () => {
+    if (!useKeys || !iframe || !ctxRef) return;
+    try { ctxRef.saves.save(AUTO_SLOT, snapshotKeys()).catch(() => {}); } catch { /* 不阻塞 */ }
+  };
+
+  return {
+    version: meta.version || 1,
+    async mount(ctx) {
+      ctxRef = ctx;
+      // 进入前先回写自动档（快照模型：先回写、再开游戏）
+      if (useKeys) {
+        try {
+          const r = await ctx.saves.load(AUTO_SLOT);
+          if (r.status !== 'empty') writeKeys(r.data);
+        } catch { /* 无档或读失败：按新档开局 */ }
+      }
+      iframe = document.createElement('iframe');
+      iframe.className = 'game-frame';
+      // 收录游戏均经人工核对上架（同源可控）；sandbox 收掉 top-navigation/popups 防游戏包逃逸
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-modals allow-pointer-lock');
+      iframe.allow = 'fullscreen';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.src = meta.entry;
+      ctx.stage.appendChild(iframe);
+
+      // 虚拟手柄：合成键盘事件跨不进 iframe，转发派发到游戏文档内部（body 起冒泡，
+      // body/document/window 三种监听位置全部可达；个别校验 isTrusted 的游戏不支持，逐款验收）
+      if (ctx.gamepad) {
+        ctx.gamepad.setDispatchTarget(() => {
+          const d = iframe && iframe.contentDocument;
+          return d ? d.body || d.documentElement : null;
+        });
+      }
+
+      if (useKeys) {
+        snapTimer = setInterval(() => ctx.autosave(snapshotKeys()), SNAPSHOT_MS);
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) onLeave();
+        });
+        addEventListener('pagehide', onLeave); // 直接关页时的最后快照（尽力而为）
+      }
+    },
+    serialize() {
+      return useKeys ? snapshotKeys() : null;
+    },
+    async deserialize(data) {
+      if (!useKeys) return;
+      writeKeys(data);
+      if (iframe) iframe.src = meta.entry; // 重载 iframe，让游戏以存档状态重启
+    },
+  };
 }
 
 /* ---------------- 存档面板 ---------------- */
@@ -204,10 +299,14 @@ async function boot() {
   shell.meta = meta;
   document.title = `${meta.title} — 焰境之梦`;
   $('#tbTitle').textContent = meta.title;
+  // 存档三档（docs/游戏整合方案.md §1.4）：module 游戏=自研适配器；iframe 游戏=keys 键快照｜none 不接管
+  shell.saveMode = meta.mode === 'iframe' ? (meta.saveMode === 'keys' ? 'keys' : 'none') : 'adapter';
+  if (shell.saveMode === 'none') $('#btnSaves').hidden = true; // C 档：游戏自带浏览器存储，面板不适用
 
   let game;
   try {
-    game = (await import(meta.entry)).default; // 动态 import 给的是命名空间，游戏本体在 .default
+    // iframe 模式（第三方游戏包）不走模块 import，由适配器装载（docs/游戏整合方案.md §1.3）
+    game = meta.mode === 'iframe' ? createIframeGame(meta) : (await import(meta.entry)).default; // 动态 import 给的是命名空间，游戏本体在 .default
   } catch (e) {
     showBootState('err', '游戏加载失败', '资源下载中断或浏览器不支持所需能力，可重试。', [
       { label: '重新加载', onclick: () => location.reload() },
@@ -378,9 +477,9 @@ async function boot() {
     gamepad: shell.gamepad,
   };
 
-  /* 前后台兜底：切后台把自动档落盘 */
+  /* 前后台兜底：切后台把自动档落盘（C 档无平台存档，跳过） */
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && shell.game) {
+    if (document.hidden && shell.game && shell.saveMode !== 'none') {
       clearTimeout(autosaveTimer);
       try { shell.saves.save(AUTO_SLOT, shell.game.serialize()).catch(() => {}); } catch { /* 不阻塞 */ }
     }
@@ -390,6 +489,7 @@ async function boot() {
     await game.mount(ctx);
     $('#bootState').hidden = true;
     if (meta.gamepad) $('#padHost').classList.add('ready');
+    if (shell.saveMode === 'none') toast('该游戏使用浏览器自带存储，进度保存在本机。');
   } catch (e) {
     console.error('[game] mount failed:', e);
     showBootState('err', '游戏启动失败', String((e && e.message) || e), [
