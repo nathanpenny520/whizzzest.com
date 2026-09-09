@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#150a05">
+  <meta name="description" content="焰境游戏 — 纯浏览器单机游戏平台：短篇可通关、打开即玩、无需下载，本地存档可靠，断网也能玩。">
+  <title>焰境游戏 — 短篇可通关的浏览器单机游戏</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
+  <link rel="stylesheet" href="/assets/css/game.css">
+</head>
+<body>
+
+  <header class="site-head">
+    <a class="site-brand" href="/">
+      <img src="/assets/img/favicon.svg" alt="">焰境游戏
+    </a>
+    <span class="spacer"></span>
+    <a class="link" href="https://whizzzest.com/">← 焰境·万载 主站</a>
+  </header>
+
+  <section class="hero">
+    <div class="kicker">短篇可通关</div>
+    <h1>一节课、一班车里<br>能<em>通关</em>的精品游戏</h1>
+    <p>纯浏览器运行，打开即玩、无需下载、断网可玩。每款 20–90 分钟、有结局、一次玩完。
+       存档三重保障：浏览器持久化 + 一键导出 .wsave 文件 + 云端备份（即将上线）。</p>
+  </section>
+
+  <main class="games-grid" id="gamesGrid">
+    <div class="game-card ghost"><b>游戏加载中…</b></div>
+  </main>
+
+  <footer class="site-foot">
+    <p>焰境游戏 · game.whizzzest.com ｜ <a href="https://whizzzest.com/">焰境·万载 — 中国花炮之乡的文旅指南</a></p>
+    <p>所有游戏均在你的浏览器本地运行，不经任何服务器；进度保存在本机，可随时导出 .wsave 文件备份或分享。</p>
+  </footer>
+
+  <script type="module">
+    const grid = document.getElementById('gamesGrid');
+    try {
+      const list = await (await fetch('/games.json', { cache: 'no-cache' })).json();
+      const games = list.games || [];
+      grid.innerHTML = '';
+      for (const g of games) {
+        const card = document.createElement('article');
+        card.className = 'game-card';
+        card.innerHTML =
+          '<div class="chip-row">' +
+          `<span class="chip">${g.genre || '游戏'}</span>` +
+          (g.badge ? `<span class="chip chip-accent">${g.badge}</span>` : '') +
+          '</div>' +
+          `<h3>${g.title}</h3>` +
+          `<p class="tagline">${g.tagline || ''}</p>` +
+          `<div class="meta">⏱ ${g.duration || '短篇'} · 🎮 ${g.controls || '触屏/键盘'}</div>` +
+          `<a class="btn btn-primary" href="/play/${g.id}/">进入游戏</a>`;
+        grid.appendChild(card);
+      }
+      const ghost = document.createElement('article');
+      ghost.className = 'game-card ghost';
+      ghost.innerHTML = '<b>更多游戏陆续上架</b><span>解谜 · 叙事 · 节奏 · 本地题材原创（阶段二）</span>';
+      grid.appendChild(ghost);
+    } catch {
+      grid.innerHTML = '<div class="game-card ghost"><b>游戏库加载失败</b><span>请刷新重试</span></div>';
+    }
+  </script>
+</body>
+</html>

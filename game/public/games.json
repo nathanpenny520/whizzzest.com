@@ -1,0 +1,32 @@
+{
+  "games": [
+    {
+      "id": "huapao-2048",
+      "title": "花炮合合",
+      "tagline": "花炮工坊版 2048：从火药纸捻一路合出「焰火之吻」，滑出大朵的花。",
+      "genre": "数字逻辑谜题",
+      "tier": "填充",
+      "duration": "约 5–10 分钟",
+      "controls": "滑动 / 方向键",
+      "gamepad": false,
+      "orientation": "any",
+      "entry": "/assets/js/games/huapao2048.js",
+      "version": 1,
+      "badge": "阶段一验收 Demo"
+    },
+    {
+      "id": "catch-fireworks",
+      "title": "接烟花",
+      "tagline": "夜空绽放的烟花一颗颗落下，端稳你的碗接住它们——手滑三颗就散场。",
+      "genre": "体育小游戏",
+      "tier": "填充",
+      "duration": "约 5 分钟",
+      "controls": "方向键 / 拖动 / 虚拟手柄",
+      "gamepad": true,
+      "orientation": "any",
+      "entry": "/assets/js/games/catch-fireworks.js",
+      "version": 1,
+      "badge": "阶段一验收 Demo"
+    }
+  ]
+}

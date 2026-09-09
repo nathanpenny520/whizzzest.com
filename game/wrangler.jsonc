@@ -1,0 +1,22 @@
+{
+  // 焰境·万载 — 游戏平台 Worker（game.whizzzest.com，docs/游戏方案.md §1/§7）
+  // 职责（阶段一）：纯静态托管游戏站 + /play/<游戏id>/ 重写到统一运行页壳；零后端逻辑、零绑定
+  // 安全：请求统一补 X-Content-Type-Options / Referrer-Policy
+  // 后续（阶段二/三）：R2 绑定（模拟器内核/ROM/大游戏包）、D1 + 会话（云存档）——按方案 §5/§6 追加
+  "name": "whizzzest-game",
+  "compatibility_date": "2026-09-01",
+  "main": "worker/index.js",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // 关闭 HTML 自动美化：默认 auto-trailing-slash 会对 *.html 直接取用返回 307，
+    // 导致 /play/<id> 重写拿不到运行页内容（ASSETS.fetch 不跟随重定向）。
+    // 路由全部显式化：/ 与 /play/* 由 worker/index.js 重写，其余资产按原路径命中。
+    "html_handling": "none"
+  },
+  "routes": [
+    { "pattern": "game.whizzzest.com", "custom_domain": true }
+  ]
+}

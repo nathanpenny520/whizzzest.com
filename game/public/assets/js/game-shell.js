@@ -1,0 +1,404 @@
+/**
+ * 焰境游戏 — 统一运行页壳（docs/游戏方案.md §1/§2/§4，阶段一）
+ *
+ * 职责：/play/<gameId>/ 的运行容器 —— 加载 games.json 元信息 → 动态 import 游戏模块 →
+ * 注入 ctx（存档层/自动档/toast/音频解锁/虚拟手柄）→ 承担存档面板、全屏、横竖屏提示、
+ * 防误滚、前后台兜底等平台级体验。游戏本体只写玩法与 serialize/deserialize 适配器。
+ *
+ * 游戏模块契约（ES module 默认导出）：
+ *   export default {
+ *     version: 1,                                  // 存档版本号（升级时 +1）
+ *     async mount(ctx) {},                         // 挂载玩法；ctx.stage 为容器
+ *     serialize() { return {...} },                // 存档适配器：导出当前进度（结构化克隆兼容）
+ *     deserialize(data, fromVersion) {},           // 存档适配器：载入进度（fromVersion=存档版本）
+ *     migrate(data, fromVersion) { return newData } // 可选：旧档迁移；返回 null/抛错 = 迁移失败
+ *   }
+ *
+ * 本文件顶层只在浏览器环境执行 boot()（Node import 冒烟测试安全）。
+ */
+import { createSaveLayer, SaveError } from './game-save.js';
+import { mountGamepad, FULL_LAYOUT } from './virtual-gamepad.js';
+
+const AUTO_SLOT = 1; // 槽位 1 = 自动档
+const $ = (sel) => document.querySelector(sel);
+
+/* ---------------- 小工具 ---------------- */
+
+function toast(msg, kind = 'ok') {
+  const box = $('#toastBox');
+  const el = document.createElement('div');
+  el.className = `toast toast-${kind}`;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => el.classList.add('toast-out'), 2200);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/** Promise 化确认框（原生 <dialog>，Esc 取消 = false） */
+function confirmDlg(title, body, okText = '确定') {
+  return new Promise((resolve) => {
+    const dlg = $('#confirmDlg');
+    $('#dlgTitle').textContent = title;
+    $('#dlgBody').textContent = body;
+    $('#dlgOk').textContent = okText;
+    const done = (v) => {
+      dlg.close();
+      resolve(v);
+    };
+    $('#dlgOk').onclick = () => done(true);
+    $('#dlgCancel').onclick = () => done(false);
+    dlg.oncancel = () => resolve(false);
+    dlg.showModal();
+  });
+}
+
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+const fmtTime = (iso) => {
+  const d = new Date(iso);
+  const p = (x) => String(x).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+/** 覆盖层（加载中/未找到/崩溃） */
+function showBootState(kind, title, desc, actions) {
+  const host = $('#bootState');
+  host.innerHTML = '';
+  host.hidden = false;
+  host.className = `boot boot-${kind}`;
+  const h = document.createElement('div');
+  h.className = 'boot-card';
+  const h2 = document.createElement('h2');
+  h2.textContent = title;
+  h.appendChild(h2);
+  if (desc) {
+    const p = document.createElement('p');
+    p.textContent = desc;
+    h.appendChild(p);
+  }
+  for (const a of actions || []) {
+    const b = document.createElement('a');
+    b.className = 'btn btn-primary';
+    b.href = a.href || '#';
+    b.textContent = a.label;
+    if (a.onclick) b.onclick = a.onclick;
+    h.appendChild(b);
+  }
+  host.appendChild(h);
+}
+
+/* ---------------- 存档面板 ---------------- */
+
+function wireDrawer(shell) {
+  const drawer = $('#saveDrawer');
+  $('#btnSaves').addEventListener('click', () => {
+    drawer.hidden = !drawer.hidden;
+    if (!drawer.hidden) shell.refreshSlots();
+  });
+
+  $('#btnExport').addEventListener('click', async () => {
+    try {
+      const out = await shell.saves.exportSlots(); // 全部已有槽位
+      download(out.blob, out.filename);
+      toast(`已导出 ${out.filename}`);
+    } catch (e) {
+      toast(e.code === 'empty' ? '还没有任何存档可导出' : '导出失败：' + e.message, 'err');
+    }
+  });
+
+  $('#btnImport').addEventListener('click', () => $('#importFile').click());
+  $('#importFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const r = await shell.saves.importFile(file);
+      toast(`已导入 ${r.imported} 个槽位` + (r.checksumBad ? `（${r.checksumBad} 个槽位校验不符被跳过）` : ''), r.checksumBad ? 'warn' : 'ok');
+      shell.refreshSlots();
+    } catch (err) {
+      if (err.code === 'wrong-game') {
+        const ok = await confirmDlg('存档来自其他游戏', `该 .wsave 来自「${err.info.fromGameTitle}」，与当前游戏不符。仍要强行导入吗？`, '强行导入');
+        if (!ok) return;
+        try {
+          const r = await shell.saves.importFile(file, { allowForeign: true });
+          toast(`已强行导入 ${r.imported} 个槽位（来源：${r.fromGameTitle}）`, 'warn');
+          shell.refreshSlots();
+        } catch (e2) {
+          toast('导入失败：' + e2.message, 'err');
+        }
+      } else {
+        toast('导入失败：' + err.message, 'err');
+      }
+    }
+  });
+}
+
+function renderStorageLine(el, persist) {
+  if (!el) return;
+  if (!persist.supported) {
+    el.textContent = '当前浏览器不支持存储持久化，建议勤用「导出存档」备份。';
+    return;
+  }
+  el.textContent =
+    (persist.persisted ? '已授予持久化存储，日常清缓存不会清掉游戏存档。' : '未授予持久化存储：浏览器空间紧张时可能清理存档。') +
+    (persist.quota ? ` 已用 ${fmtBytes(persist.usage)} / 配额 ${fmtBytes(persist.quota)}。` : '');
+  el.classList.toggle('warn', !persist.persisted);
+}
+
+/* ---------------- 壳主体 ---------------- */
+
+async function boot() {
+  const gameId = (location.pathname.match(/^\/play\/([\w-]+)/) || [])[1] || null;
+  const shell = { gameId, meta: null, saves: null, gamepad: null, game: null };
+
+  /* 顶栏：全屏 + 手柄开关（有手柄配置的游戏才出现） */
+  $('#btnFullscreen').addEventListener('click', async () => {
+    const wrap = document.documentElement;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (document.fullscreenEnabled) await wrap.requestFullscreen();
+      else document.body.classList.toggle('pseudo-full'); // iOS Safari 无元素全屏：藏掉顶栏顶一格
+    } catch {
+      document.body.classList.toggle('pseudo-full');
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    $('#btnFullscreen').textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+  });
+
+  /* 键盘防误滚（方向键/空格在游玩时不滚页面；游戏自己 preventDefault 的先行） */
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && e.target === document.body) {
+      e.preventDefault();
+    }
+  });
+
+  if (!gameId) {
+    $('#btnSaves').disabled = true;
+    $('#btnFullscreen').disabled = true;
+    showBootState('err', '没有指定游戏', '从游戏库选择一款游戏开始玩。', [{ label: '返回游戏库', href: '/' }]);
+    return;
+  }
+
+  /* 元信息 + 游戏模块 */
+  showBootState('loading', '加载中…', '正在启动游戏引擎（全程本地运行，不依赖服务器）。');
+  let meta;
+  try {
+    const list = await (await fetch('/games.json', { cache: 'no-cache' })).json();
+    meta = (list.games || []).find((g) => g.id === gameId);
+  } catch {
+    meta = null;
+  }
+  if (!meta) {
+    showBootState('err', '没有找到这款游戏', `游戏 id「${gameId}」不在游戏库里（可能已下架或链接有误）。`, [{ label: '返回游戏库', href: '/' }]);
+    return;
+  }
+  shell.meta = meta;
+  document.title = `${meta.title} — 焰境游戏`;
+  $('#tbTitle').textContent = meta.title;
+
+  let game;
+  try {
+    game = await import(meta.entry);
+  } catch (e) {
+    showBootState('err', '游戏加载失败', '资源下载中断或浏览器不支持所需能力，可重试。', [
+      { label: '重新加载', onclick: () => location.reload() },
+      { label: '返回游戏库', href: '/' },
+    ]);
+    console.error('[game] import failed:', e);
+    return;
+  }
+  if (!game || typeof game.mount !== 'function' || typeof game.serialize !== 'function' || typeof game.deserialize !== 'function') {
+    showBootState('err', '游戏模块不完整', '该游戏未实现平台要求的存档适配器（serialize/deserialize），按方案 §2 不得上架。');
+    return;
+  }
+  shell.game = game;
+
+  /* 存档层（每游戏一个实例 = 方案 §2 的 adapter）+ 持久化申请 */
+  shell.saves = createSaveLayer({
+    gameId,
+    gameTitle: meta.title,
+    version: game.version || 1,
+    migrate: game.migrate,
+  });
+  const persist = await shell.saves.requestPersist();
+  if (persist.supported && !persist.persisted) {
+    const banner = $('#persistBanner');
+    banner.hidden = false;
+    $('#persistClose').onclick = () => (banner.hidden = true);
+  }
+
+  /* 虚拟手柄：meta.gamepad 为 true 时装配（粗指针设备默认可见，细指针可从顶栏开） */
+  if (meta.gamepad) {
+    $('#btnPad').hidden = false;
+    shell.gamepad = mountGamepad($('#padHost'), {
+      layout: meta.gamepadLayout || FULL_LAYOUT,
+    });
+    if (matchMedia('(pointer: coarse)').matches) {
+      $('#padHost').classList.add('pad-on');
+    } else {
+      $('#btnPad').addEventListener('click', () => {
+        const on = $('#padHost').classList.toggle('pad-on');
+        toast(on ? '虚拟手柄已开启' : '虚拟手柄已关闭');
+      });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) shell.gamepad.releaseAll(); // 防切后台键卡死
+    });
+  }
+
+  /* 横竖屏提示 */
+  const checkOrient = () => {
+    const want = meta.orientation;
+    const bad = want === 'landscape' && innerHeight > innerWidth;
+    $('#orientHint').hidden = !bad;
+  };
+  addEventListener('resize', checkOrient);
+  checkOrient();
+
+  /* 存档面板 */
+  const refreshSlots = async () => {
+    shell.slotMetas = await shell.saves.listSlots(3);
+    const grid = $('#slotGrid');
+    grid.innerHTML = '';
+    shell.slotMetas.forEach((m, i) => {
+      const slot = i + 1;
+      const card = document.createElement('div');
+      card.className = 'slot-card' + (m ? '' : ' slot-empty');
+      const head = document.createElement('div');
+      head.className = 'slot-head';
+      head.innerHTML = `<b>${slot === AUTO_SLOT ? '自动档' : '槽位 ' + slot}</b><span>${m ? `v${m.version} · ${fmtTime(m.savedAt)}` : '空'}</span>`;
+      card.appendChild(head);
+      const row = document.createElement('div');
+      row.className = 'slot-ops';
+      const mk = (label, fn, cls = 'btn-mini') => {
+        const b = document.createElement('button');
+        b.className = cls;
+        b.textContent = label;
+        b.onclick = fn;
+        return b;
+      };
+      row.appendChild(mk('载入', () => shell.loadSlot(slot)));
+      if (slot !== AUTO_SLOT) row.appendChild(mk('保存', () => shell.saveSlot(slot)));
+      if (m) row.appendChild(mk('删除', () => shell.removeSlot(slot), 'btn-mini btn-danger'));
+      card.appendChild(row);
+      grid.appendChild(card);
+    });
+    renderStorageLine($('#storageLine'), persist);
+  };
+  shell.refreshSlots = refreshSlots;
+  wireDrawer(shell);
+
+  /* 槽位操作（版本策略：警告+尝试迁移，禁止硬拒载 —— 方案 §2） */
+  shell.saveSlot = async (slot) => {
+    try {
+      await shell.saves.save(slot, shell.game.serialize());
+      toast(`已保存到槽位 ${slot}`);
+      refreshSlots();
+    } catch (e) {
+      toast('保存失败：' + e.message, 'err');
+    }
+  };
+  shell.loadSlot = async (slot) => {
+    let r;
+    try {
+      r = await shell.saves.load(slot);
+    } catch (e) {
+      toast('读取失败：' + e.message, 'err');
+      return;
+    }
+    if (r.status === 'empty') return toast('该槽位还没有存档', 'warn');
+    if (r.status === 'newer-version') {
+      const ok = await confirmDlg('存档来自更新版本', `该存档版本 v${r.meta.version} 高于当前游戏 v${shell.game.version}，载入可能出现异常。仍要载入吗？`, '仍要载入');
+      if (!ok) return;
+    }
+    if (r.status === 'migrate-failed') {
+      const ok = await confirmDlg('旧版存档迁移失败', `存档是 v${r.meta.version}，自动迁移失败：${r.error ? r.error.message : '游戏未提供迁移函数'}。仍要按旧格式载入吗？`, '仍要载入');
+      if (!ok) return;
+    }
+    try {
+      shell.game.deserialize(structuredClone(r.data), r.meta.version);
+      toast(
+        r.status === 'migrated' ? `已载入并迁移到 v${shell.game.version}`
+        : r.status === 'ok' ? '已载入'
+        : '已按旧格式载入',
+        r.status === 'ok' ? 'ok' : 'warn'
+      );
+      if (r.status === 'migrated') refreshSlots();
+    } catch (e) {
+      toast('载入失败（存档数据无法应用）：' + e.message, 'err');
+    }
+  };
+  shell.removeSlot = async (slot) => {
+    const ok = await confirmDlg('删除存档', `确定删除槽位 ${slot === AUTO_SLOT ? '1（自动档）' : slot} 的存档？此操作不可恢复。`, '删除');
+    if (!ok) return;
+    await shell.saves.remove(slot);
+    toast('已删除');
+    refreshSlots();
+  };
+
+  /* 注入游戏 ctx */
+  const stage = $('#stage');
+  let audioReady = false;
+  const audioCbs = [];
+  const unlockAudio = () => {
+    if (audioReady) return;
+    audioReady = true;
+    for (const cb of audioCbs) { try { cb(); } catch { /* 游戏侧自兜 */ } }
+  };
+  addEventListener('pointerdown', unlockAudio, { once: true });
+  addEventListener('keydown', unlockAudio, { once: true });
+
+  let autosaveTimer = 0;
+  const ctx = {
+    meta,
+    stage,
+    saves: shell.saves,
+    toast,
+    /** 音频解锁（iOS 需用户手势后才能出声）：回调里创建/恢复 AudioContext */
+    onFirstGesture(cb) {
+      if (audioReady) cb();
+      else audioCbs.push(cb);
+    },
+    /** 自动档：去抖写入槽位 1（游戏在关键节点调用，如每步/每关） */
+    autosave(data) {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        shell.saves.save(AUTO_SLOT, data).catch(() => {});
+      }, 600);
+    },
+    gamepad: shell.gamepad,
+  };
+
+  /* 前后台兜底：切后台把自动档落盘 */
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && shell.game) {
+      clearTimeout(autosaveTimer);
+      try { shell.saves.save(AUTO_SLOT, shell.game.serialize()).catch(() => {}); } catch { /* 不阻塞 */ }
+    }
+  });
+
+  try {
+    await game.mount(ctx);
+    $('#bootState').hidden = true;
+    if (meta.gamepad) $('#padHost').classList.add('ready');
+  } catch (e) {
+    console.error('[game] mount failed:', e);
+    showBootState('err', '游戏启动失败', String((e && e.message) || e), [
+      { label: '重新加载', onclick: () => location.reload() },
+      { label: '返回游戏库', href: '/' },
+    ]);
+  }
+}
+
+if (typeof document !== 'undefined') {
+  boot();
+}
