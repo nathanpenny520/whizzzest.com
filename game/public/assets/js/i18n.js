@@ -6,7 +6,8 @@
  *  - zh 文案留在调用点（HTML 原文 / t() 第二参兜底），EN 译文集中在本文件字典；
  *  - en 缺条目自动落回 zh（决策③「英文优先、中文温和兜底」），任何语言 UI 永远完整；
  *  - 静态页标记：data-i18n（textContent）/ data-i18n-html（innerHTML，<br><em> 等富文本）/
- *    data-i18n-aria（aria-label）/ data-i18n-content（content 属性，meta description 用）；
+ *    data-i18n-aria（aria-label）/ data-i18n-content（content 属性，meta description 用）/
+ *    data-i18n-href（链接目标，跨站语言连续性：EN 回主站 / 各页返回键落对应语言版）；
  *  - EN 404：worker 把 /en/* miss 重写到 /404.html，浏览器地址仍是 /en/...，
  *    pathname 前缀判定天然成立，无需语言标记参数；
  *  - 顶层不碰浏览器 API —— Node import 冒烟测试安全（game-save 依赖）。
@@ -19,7 +20,9 @@ const EN_STRINGS = {
   'home.title': 'Whizzzest Arcade — short, finishable browser games',
   'home.metaDesc': 'Whizzzest Arcade — a browser game platform: short games you can finish, play instantly, no downloads, reliable local saves, works offline.',
   'home.brand': 'Whizzzest Arcade',
+  'home.brandHref': '/en/',
   'home.mainSite': '← Whizzzest main site',
+  'home.mainSiteHref': 'https://whizzzest.com/en/',
   'home.kicker': 'Short & finishable',
   'home.heroTitle': 'Quality games you can <em>finish</em><br>in a class break or a bus ride',
   'home.heroDesc': 'Runs entirely in your browser — play instantly, no downloads, works offline. Every game is 20–90 minutes, has an ending and can be finished in one sitting. Saves are triple-protected: browser persistence + one-click .wsave export + cloud backup (coming soon).',
@@ -30,6 +33,7 @@ const EN_STRINGS = {
   'home.loadFailHint': 'Please refresh and try again',
   'home.footBrand': 'Whizzzest Arcade',
   'home.footMain': 'Whizzzest — visitor guide to Wanzai, home of Chinese fireworks',
+  'home.footMainHref': 'https://whizzzest.com/en/',
   'home.footPrivacy': 'All games run locally in your browser, with no server involved; progress stays on your device and can be exported as a .wsave file for backup or sharing.',
 
   /* 云端畅玩（决策②：EN 保留分区，标注面向中国大陆） */
@@ -48,6 +52,7 @@ const EN_STRINGS = {
   /* 运行页壳 app.html */
   'play.title': 'Whizzzest Arcade',
   'play.back': 'Back to the game library',
+  'play.backHref': '/en/',
   'play.tbTitle': 'Whizzzest Arcade',
   'play.pad': 'Pad',
   'play.saves': 'Saves',
@@ -181,6 +186,7 @@ const EN_STRINGS = {
   'nf.h': 'This page never caught fire',
   'nf.p': "The page you're looking for doesn't exist or has been removed.",
   'nf.back': 'Back to the game library',
+  'nf.backHref': '/en/',
 };
 
 /* ================= 引擎 ================= */
@@ -221,6 +227,12 @@ export function applyStatic(root = document) {
   for (const el of root.querySelectorAll('[data-i18n-content]')) {
     const v = EN_STRINGS[el.dataset.i18nContent];
     if (v != null) el.setAttribute('content', v);
+  }
+  // 跨页/跨站链接的语言连续性（2026-09-09 上线后修订）：EN 模式改写 href，
+  // 让「返回游戏库」「回主站」等导航落在对应语言版本，而不是把英文用户送回中文页
+  for (const el of root.querySelectorAll('[data-i18n-href]')) {
+    const v = EN_STRINGS[el.dataset.i18nHref];
+    if (v != null) el.setAttribute('href', v);
   }
 }
 

@@ -87,7 +87,7 @@ for (const rel of SOURCES) {
     if (m[2] === '+') dynPrefixes.add(m[1]);
     else used.add(m[1]);
   }
-  for (const m of text.matchAll(/data-i18n(?:-html|-aria|-content)?="([^"]+)"/g)) used.add(m[1]);
+  for (const m of text.matchAll(/data-i18n(?:-html|-aria|-content|-href)?="([^"]+)"/g)) used.add(m[1]);
 }
 for (const p of dynPrefixes) {
   for (const k of dictKeys) if (k.startsWith(p)) used.add(k);
