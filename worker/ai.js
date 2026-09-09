@@ -65,7 +65,7 @@ const SETTINGS_DEFAULTS = {
 
 /** 用户当前路径 → 板块语境（system 注入用，帮助手理解「这里/本页」指代） */
 const PAGE_LABELS = [
-  ['/tv', '万载TV 视频频道'], ['/library', '焰境文库'], ['/music', '万载音乐'],
+  ['/tv', '焰境流光 视频频道'], ['/library', '焰境文库'], ['/music', '焰境仙曲'],
   ['/attractions', '旅游景点'], ['/merchants', '商户名录'], ['/spots', '烟花观赏点专题'],
   ['/cuisine', '美食专题'], ['/heritage', '非遗文化专题'], ['/industry', '花炮产业专题'],
   ['/tourism', '旅游线路专题'], ['/digital-fireworks', '数字烟花模拟器'],
@@ -532,7 +532,7 @@ async function loadLiveData(env) {
       }
     }
     if (counts) {
-      lines.push(`站内板块：万载音乐 ${counts.music} 首、万载TV ${counts.tv} 条视频、焰境文库 ${counts.books} 部作品（/music/ /tv/ /library/）`);
+      lines.push(`站内板块：焰境仙曲 ${counts.music} 首、焰境流光 ${counts.tv} 条视频、焰境文库 ${counts.books} 部作品（/music/ /tv/ /library/）`);
     }
 
     const entities = [

@@ -33,10 +33,10 @@
     "attractKicker": "旅游景点 · 万载山水",
     "attractTitle": "游万载，古城山水焰火间",
     "attractMore": "全部景点 ›",
-    "tvKicker": "焰境影像 · 万载TV",
+    "tvKicker": "焰境流光 · 万载影音",
     "tvTitle": "看万载，从一集短剧开始",
     "tvMore": "进入频道 ›",
-    "musicKicker": "万载音乐 · 听见万载",
+    "musicKicker": "焰境仙曲 · 听见万载",
     "musicTitle": "万载的声音，都在这里",
     "musicMore": "进入音乐馆 ›"
   },
@@ -115,13 +115,13 @@
       "loopOff": "顺序播放",
       "loopMode": "循环模式：",
       "unnamed": "佚名",
-      "title": "万载音乐",
-      "album": "万载音乐 · 焰境万载",
+      "title": "焰境仙曲",
+      "album": "焰境仙曲 · 焰境万载",
       "nowPlaying": "正在播放",
       "paused": "已暂停",
       "copied": "链接已复制，去分享给朋友吧",
       "copyPrompt": "长按/全选复制链接：",
-      "shareTitle": "{title} — 万载音乐 · 焰境万载"
+      "shareTitle": "{title} — 焰境仙曲 · 焰境万载"
     },
     "form": {
       "needName": "请填写姓名和留言内容。",
@@ -162,9 +162,9 @@
       "playSong": "▶ 播放这首歌",
       "msgsUnit": "条",
       "routes": {
-        "/tv": "万载TV",
+        "/tv": "焰境流光",
         "/library": "焰境文库",
-        "/music": "万载音乐",
+        "/music": "焰境仙曲",
         "/attractions": "旅游景点",
         "/merchants": "商户名录",
         "/spots": "观赏 spots",

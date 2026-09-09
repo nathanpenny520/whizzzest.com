@@ -128,7 +128,7 @@ sleep 5
 # --- 主站页面（全部走 Worker 或静态资产，200 = Worker 未 5xx）---
 check "首页 /"                       "$BASE_URL/"                       200
 check "商户 /merchants"              "$BASE_URL/merchants"              200
-check "万载TV /tv"                   "$BASE_URL/tv"                     200
+check "焰境流光 /tv"                   "$BASE_URL/tv"                     200
 check "文库 /library"                "$BASE_URL/library"                200
 check "音乐 /music"                  "$BASE_URL/music"                  200
 check "景点 /attractions"            "$BASE_URL/attractions"            200

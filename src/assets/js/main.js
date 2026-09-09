@@ -264,7 +264,7 @@ if (carousel && !reduceMotion) {
   carousel?.querySelector('.hero-slide')?.classList.add('active');
 }
 
-/* 首页媒体条（焰境影像 / 景点精选 / 万载音乐）共用工具与拉取：
+/* 首页媒体条（焰境影像 / 景点精选 / 焰境仙曲）共用工具与拉取：
    失败或空数据回调 null，整块保持 hidden 不占位 */
 const escT = (s) =>
   String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -326,7 +326,7 @@ if (attractStrip) {
   });
 }
 
-/* 首页「万载音乐」条：拉 /api/music/latest（编辑 sort 排序前 6），点击深链 /music/?t= 直达播放 */
+/* 首页「焰境仙曲」条：拉 /api/music/latest（编辑 sort 排序前 6），点击深链 /music/?t= 直达播放 */
 const musicStrip = document.getElementById('music-strip');
 if (musicStrip) {
   stripFetch('/api/music/latest').then((items) => {
@@ -403,7 +403,7 @@ if (statsRow) {
     .catch(() => {});
 }
 
-/* 万载音乐播放器（/music/，Worker SSR 出曲目 data-*；单 <audio> 复用 + MediaSession 锁屏控制） */
+/* 焰境仙曲播放器（/music/，Worker SSR 出曲目 data-*；单 <audio> 复用 + MediaSession 锁屏控制） */
 const musicPage = document.querySelector('.music-page');
 if (musicPage) {
   const audio = document.getElementById('music-audio');
@@ -505,8 +505,8 @@ if (musicPage) {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: tr.dataset.title,
-          artist: tr.dataset.artist || t('music.title', '万载音乐'),
-          album: t('music.album', '万载音乐 · 焰境万载'),
+          artist: tr.dataset.artist || t('music.title', '焰境仙曲'),
+          album: t('music.album', '焰境仙曲 · 焰境万载'),
           artwork: tr.dataset.cover ? [{ src: tr.dataset.cover, sizes: '512x512', type: 'image/jpeg' }] : [],
         });
       }
@@ -583,7 +583,7 @@ if (musicPage) {
       if (navigator.share) {
         try {
           await navigator.share({
-            title: t('music.shareTitle', '{title} — 万载音乐 · 焰境万载').replace('{title}', tr.dataset.title),
+            title: t('music.shareTitle', '{title} — 焰境仙曲 · 焰境万载').replace('{title}', tr.dataset.title),
             url: shareUrl,
           });
           return;

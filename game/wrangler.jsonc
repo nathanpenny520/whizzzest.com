@@ -14,7 +14,9 @@
     // 关闭 HTML 自动美化：默认 auto-trailing-slash 会对 *.html 直接取用返回 307，
     // 导致 /play/<id> 重写拿不到运行页内容（ASSETS.fetch 不跟随重定向）。
     // 路由全部显式化：/ 与 /play/* 由 worker/index.js 重写，其余资产按原路径命中。
-    "html_handling": "none"
+    "html_handling": "none",
+    // 根路径与运行页强制先过 Worker（显式路由），杜绝资产层直接应答引发的缓存/路由竞态
+    "run_worker_first": ["/", "/play", "/play/*"]
   },
   "routes": [
     { "pattern": "game.whizzzest.com", "custom_domain": true }

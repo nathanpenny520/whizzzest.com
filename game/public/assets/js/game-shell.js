@@ -1,5 +1,5 @@
 /**
- * 焰境游戏 — 统一运行页壳（docs/游戏方案.md §1/§2/§4，阶段一）
+ * 焰境之梦 — 统一运行页壳（docs/游戏方案.md §1/§2/§4，阶段一）
  *
  * 职责：/play/<gameId>/ 的运行容器 —— 加载 games.json 元信息 → 动态 import 游戏模块 →
  * 注入 ctx（存档层/自动档/toast/音频解锁/虚拟手柄）→ 承担存档面板、全屏、横竖屏提示、
@@ -202,7 +202,7 @@ async function boot() {
     return;
   }
   shell.meta = meta;
-  document.title = `${meta.title} — 焰境游戏`;
+  document.title = `${meta.title} — 焰境之梦`;
   $('#tbTitle').textContent = meta.title;
 
   let game;

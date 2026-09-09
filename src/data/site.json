@@ -32,7 +32,7 @@
         { "href": "/industry/", "label": "烟花产业" },
         { "href": "/spots/", "label": "赏烟地点" },
         { "href": "/digital-fireworks/", "label": "数字烟花" },
-        { "href": "/tv/?cat=fireworks", "label": "烟花视频 · 万载TV" }
+        { "href": "/tv/?cat=fireworks", "label": "烟花视频 · 焰境流光" }
       ]
     },
     {
@@ -45,10 +45,11 @@
     },
     {
       "href": "/tv/",
-      "label": "万载TV",
+      "label": "焰境万象",
       "menu": [
-        { "href": "/tv/", "label": "万载TV" },
-        { "href": "/music/", "label": "万载音乐" }
+        { "href": "/tv/", "label": "焰境流光" },
+        { "href": "/music/", "label": "焰境仙曲" },
+        { "href": "https://game.whizzzest.com/", "label": "焰境之梦" }
       ]
     },
     {
