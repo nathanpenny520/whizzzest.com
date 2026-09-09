@@ -116,9 +116,15 @@ export const AUTH_CSS = `
   .afield input { flex:1; min-width:0; height:100%; border:0; outline:0; background:transparent;
     padding:0 14px 0 0; font-size:15px; color:var(--aink); font-family:inherit; }
   .afield input::placeholder { color:#abaab0; }
-  /* 区号选择器（docs/手机号国际化方案.md §5）：国旗+区号原生下拉，与号码输入同栏 */
-  .afield select.acc { flex:0 0 106px; min-width:0; height:100%; border:0; outline:0; background:transparent;
-    font-size:14px; color:var(--aink); font-family:inherit; cursor:pointer; padding:0 0 0 2px; }
+  /* 区号选择器（docs/手机号国际化方案.md §5 v1.1）：原生 select 透明覆盖在自绘短标签上，
+     闭合态仅显示区号；点开仍为原生下拉列表（区号 + 全量中文名）。无国旗——Windows 不渲染旗帜 emoji */
+  .afield .acc-wrap { position:relative; flex:0 0 84px; height:100%; }
+  .afield .acc-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    gap:5px; font-size:14.5px; color:var(--aink); pointer-events:none; }
+  .afield .acc-label::after { content:''; width:0; height:0; border:4px solid transparent;
+    border-top:5px solid #a8a7ad; margin-top:4px; }
+  .afield select.acc { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer;
+    border:0; font-size:16px; }
   .afield .adiv { flex:0 0 1px; height:22px; background:rgba(0,0,0,.12); margin-right:12px; }
   .acode { display:flex; gap:10px; }
   .acode .afield { flex:1; }
@@ -299,7 +305,10 @@ export function loginPanel(opts) {
   </div>
   <form class="afcol" id="f">
     <label class="afield"><span class="aico">${ICO.phone}</span>
-      <select id="cc" class="acc" aria-label="国家地区">${phoneCountryOptionsHtml()}</select>
+      <span class="acc-wrap">
+        <span class="acc-label" id="cc-label">+86</span>
+        <select id="cc" class="acc" aria-label="国家地区">${phoneCountryOptionsHtml()}</select>
+      </span>
       <span class="adiv"></span>
       <input id="phone" maxlength="15" inputmode="tel" autocomplete="username" placeholder="手机号"></label>
     <label class="afield"><span class="aico">${ICO.lock}</span>
@@ -353,10 +362,15 @@ export function loginPanel(opts) {
     }
     TABS.forEach(function (id, i) { document.getElementById(id).addEventListener('click', function () { switchMode(i); }); });
 
-    // 区号记忆（docs/手机号国际化方案.md §5）：选择写 localStorage，下次免选
-    var cc = document.getElementById('cc');
+    // 区号记忆（docs/手机号国际化方案.md §5 v1.1）：选择写 localStorage 下次免选；闭合态只显示区号短标签
+    var cc = document.getElementById('cc'), ccLabel = document.getElementById('cc-label');
+    function ccSync() { ccLabel.textContent = cc.options[cc.selectedIndex].getAttribute('data-dial'); }
     try { var savedCc = localStorage.getItem('wxz_phone_country'); if (savedCc) cc.value = savedCc; } catch (e) {}
-    cc.addEventListener('change', function () { try { localStorage.setItem('wxz_phone_country', cc.value); } catch (e) {} });
+    ccSync();
+    cc.addEventListener('change', function () {
+      ccSync();
+      try { localStorage.setItem('wxz_phone_country', cc.value); } catch (e) {}
+    });
 
     document.getElementById('f').addEventListener('submit', function (e) {
       e.preventDefault();

@@ -6,22 +6,33 @@
  *
  * libphonenumber-js/mobile 元数据仅含手机号规则：CN 自动收紧为真实号段（1[3-9]），
  * 各国按各自编号计划校验；两门户 Worker 共用（wrangler 打包，对标 shared/portal-ui.js）。
+ *
+ * 国家中文名：Intl.DisplayNames 运行时生成 245 国（V8 内置 ICU，零数据表），
+ * 常用 12 国用手工短名覆盖（Intl 全称过长，如 HK→「中国香港特别行政区」）；
+ * DisplayNames 不可用时名字降级为 ISO 码，功能不受影响。
+ * 不用国旗 emoji——Windows 全系不渲染旗帜（会显示成 ISO 字母）。
  */
 import { parsePhoneNumberFromString, getCountries, getCountryCallingCode } from 'libphonenumber-js/mobile';
 
 const ISO_SET = new Set(getCountries());
 
-// 门户选择器置顶的常用国家/地区（CN 首位带中文名；其余按 ISO 码字母序排全量组）
+// 门户选择器置顶的常用国家/地区（短名手工定；其余按 ISO 码字母序排全量组）
 const PREFERRED_ZH = {
   CN: '中国大陆', HK: '中国香港', MO: '中国澳门', TW: '中国台湾', JP: '日本', KR: '韩国',
   SG: '新加坡', MY: '马来西亚', TH: '泰国', US: '美国', GB: '英国', AU: '澳大利亚',
 };
 const PREFERRED = Object.keys(PREFERRED_ZH);
 
-/** ISO 国家码 → 国旗 emoji（区域指示符） */
-function flag(iso) {
-  return iso.replace(/[A-Z]/g, (c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65));
-}
+let regionZh = null;
+try {
+  regionZh = new Intl.DisplayNames(['zh-CN'], { type: 'region' });
+} catch { /* Intl.DisplayNames 不可用 → 名字降级为 ISO 码 */ }
+const zhName = (iso) => {
+  try {
+    const n = regionZh && regionZh.of(iso);
+    return n && n !== iso ? n : iso;
+  } catch { return iso; }
+};
 
 /**
  * 归一化：raw 为用户输入（可含空格/点/括号/连字符），country 为 ISO 码
@@ -37,19 +48,22 @@ export function normalizePhone(raw, country) {
   return { ok: true, e164: parsed.number, country: parsed.country || iso };
 }
 
-/** 全量国家清单（常用置顶）：[{ iso, dial, flag }] */
+/** 全量国家清单（常用置顶）：[{ iso, dial, name }]，name 为中文名（无国旗，Windows 不渲染旗帜 emoji） */
 export function phoneCountryOptions() {
   const rest = getCountries().filter((iso) => !PREFERRED.includes(iso));
-  return [...PREFERRED, ...rest].map((iso) => ({ iso, dial: '+' + getCountryCallingCode(iso), flag: flag(iso) }));
+  return [...PREFERRED, ...rest].map((iso) => ({
+    iso,
+    dial: '+' + getCountryCallingCode(iso),
+    name: PREFERRED_ZH[iso] || zhName(iso),
+  }));
 }
 
-/** 门户表单的 <option> 列表（服务端渲染，客户端零数据）：常用组带中文名，缺省选中 CN */
+/** 门户表单的 <option> 列表（服务端渲染，客户端零数据）：data-dial 供闭合态区号短标签用，缺省选中 CN */
 export function phoneCountryOptionsHtml(selectedIso) {
   return phoneCountryOptions()
-    .map(({ iso, dial, flag: f }) => {
-      const zh = PREFERRED_ZH[iso];
-      return `<option value="${iso}"${iso === (selectedIso || 'CN') ? ' selected' : ''}>${zh ? `${f} ${dial} ${zh}` : `${f} ${dial}`}</option>`;
-    })
+    .map(({ iso, dial, name }) =>
+      `<option value="${iso}" data-dial="${dial}"${iso === (selectedIso || 'CN') ? ' selected' : ''}>${dial} ${name}</option>`
+    )
     .join('');
 }
 

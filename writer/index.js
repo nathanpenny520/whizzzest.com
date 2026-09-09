@@ -1122,7 +1122,10 @@ function registerHtml(url) {
   </div>
   <form class="afcol" id="fp">
     <label class="afield"><span class="aico">${ICO.phone}</span>
-      <select id="cc" class="acc" aria-label="国家地区">${phoneCountryOptionsHtml()}</select>
+      <span class="acc-wrap">
+        <span class="acc-label" id="cc-label">+86</span>
+        <select id="cc" class="acc" aria-label="国家地区">${phoneCountryOptionsHtml()}</select>
+      </span>
       <span class="adiv"></span>
       <input id="phone" maxlength="15" inputmode="tel" autocomplete="username" placeholder="手机号"></label>
     <label class="afield"><span class="aico">${ICO.lock}</span>
@@ -1167,10 +1170,15 @@ function registerHtml(url) {
     document.getElementById('rt-phone').addEventListener('click', function () { switchMode(false); });
     document.getElementById('rt-email').addEventListener('click', function () { switchMode(true); });
 
-    // 区号记忆（docs/手机号国际化方案.md §5）：选择写 localStorage，下次免选
-    var cc = document.getElementById('cc');
+    // 区号记忆（docs/手机号国际化方案.md §5 v1.1）：选择写 localStorage 下次免选；闭合态只显示区号短标签
+    var cc = document.getElementById('cc'), ccLabel = document.getElementById('cc-label');
+    function ccSync() { ccLabel.textContent = cc.options[cc.selectedIndex].getAttribute('data-dial'); }
     try { var savedCc = localStorage.getItem('wxz_phone_country'); if (savedCc) cc.value = savedCc; } catch (e) {}
-    cc.addEventListener('change', function () { try { localStorage.setItem('wxz_phone_country', cc.value); } catch (e) {} });
+    ccSync();
+    cc.addEventListener('change', function () {
+      ccSync();
+      try { localStorage.setItem('wxz_phone_country', cc.value); } catch (e) {}
+    });
 
     // 手机号注册
     document.getElementById('fp').addEventListener('submit', function (e) {
