@@ -11,7 +11,7 @@
  *   - 其余         → 交还资产层（无匹配时按 not_found_handling 返回 /404.html）
  * 阶段二绑定：R2（第三方游戏包，后续模拟器内核/ROM 同桶）；D1（云存档）仍按方案 §6 后置。
  */
-const PLAY_RE = /^\/play\/(?:[\w-]+)?\/?$/;
+const PLAY_RE = /^\/play\/(?:[\w.-]+)?\/?$/; // 允许 id 含点（minecraft-1.8）；仍不含斜杠，防路径穿越
 
 /* /g/* Content-Type 兜底表（正常情况上传时已带 metadata，这里只兜漏网之鱼） */
 const MIME = {
