@@ -14,6 +14,7 @@
  *
  * 约定：worker 传入 cfg.logoUri（与 <link rel=icon> 同源 data URI）；本模块不感知 D1/R2。
  */
+import { phoneCountryOptionsHtml } from './phone.js';
 
 const SITE = 'https://whizzzest.com';
 const CONTACT_EMAIL = 'contact@whizzzest.com';
@@ -115,6 +116,10 @@ export const AUTH_CSS = `
   .afield input { flex:1; min-width:0; height:100%; border:0; outline:0; background:transparent;
     padding:0 14px 0 0; font-size:15px; color:var(--aink); font-family:inherit; }
   .afield input::placeholder { color:#abaab0; }
+  /* 区号选择器（docs/手机号国际化方案.md §5）：国旗+区号原生下拉，与号码输入同栏 */
+  .afield select.acc { flex:0 0 106px; min-width:0; height:100%; border:0; outline:0; background:transparent;
+    font-size:14px; color:var(--aink); font-family:inherit; cursor:pointer; padding:0 0 0 2px; }
+  .afield .adiv { flex:0 0 1px; height:22px; background:rgba(0,0,0,.12); margin-right:12px; }
   .acode { display:flex; gap:10px; }
   .acode .afield { flex:1; }
   button.abtn { border:1px solid rgba(0,0,0,.13); background:#fff; border-radius:12px; padding:0 16px;
@@ -294,7 +299,9 @@ export function loginPanel(opts) {
   </div>
   <form class="afcol" id="f">
     <label class="afield"><span class="aico">${ICO.phone}</span>
-      <input id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号"></label>
+      <select id="cc" class="acc" aria-label="国家地区">${phoneCountryOptionsHtml()}</select>
+      <span class="adiv"></span>
+      <input id="phone" maxlength="15" inputmode="tel" autocomplete="username" placeholder="手机号"></label>
     <label class="afield"><span class="aico">${ICO.lock}</span>
       <input id="pw" type="password" autocomplete="current-password" placeholder="${opts.pwPlaceholder}"></label>
     <button class="aprimary" id="go" type="submit">登 录</button>
@@ -346,11 +353,16 @@ export function loginPanel(opts) {
     }
     TABS.forEach(function (id, i) { document.getElementById(id).addEventListener('click', function () { switchMode(i); }); });
 
+    // 区号记忆（docs/手机号国际化方案.md §5）：选择写 localStorage，下次免选
+    var cc = document.getElementById('cc');
+    try { var savedCc = localStorage.getItem('wxz_phone_country'); if (savedCc) cc.value = savedCc; } catch (e) {}
+    cc.addEventListener('change', function () { try { localStorage.setItem('wxz_phone_country', cc.value); } catch (e) {} });
+
     document.getElementById('f').addEventListener('submit', function (e) {
       e.preventDefault();
       var btn = document.getElementById('go');
       btn.disabled = true;
-      submitPost('/api/login', { phone: document.getElementById('phone').value.trim(), password: document.getElementById('pw').value }, 'err', btn, PHONE_ERR);
+      submitPost('/api/login', { phone: document.getElementById('phone').value.trim(), country: cc.value, password: document.getElementById('pw').value }, 'err', btn, PHONE_ERR);
     });
 
     document.getElementById('send').addEventListener('click', function () {

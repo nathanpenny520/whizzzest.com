@@ -32,6 +32,7 @@
 import { sendMail } from '../worker/smtp.js';
 import { authPage, loginPanel, passkeyRowHtml, PASSKEY_DASH_JS, ICO } from '../shared/portal-ui.js';
 import { createWebAuthn } from '../shared/webauthn.js';
+import { normalizePhone, phoneCountryOptionsHtml, maskPhone } from '../shared/phone.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
@@ -40,7 +41,6 @@ const COOKIE_NAME = 'wr_session';
 const SITE = 'https://whizzzest.com';
 const CONTACT_EMAIL = 'contact@whizzzest.com';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_RE = /^1\d{10}$/;
 
 const CATEGORIES = { novel: '小说', story: '故事', essay: '随笔', other: '其他' };
 const IMG_TYPES = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -90,7 +90,7 @@ const wa = createWebAuthn({
     env.DB.prepare('UPDATE webauthn_credentials SET counter = ?2 WHERE id = ?1').bind(rowId, counter).run(),
   issueSession: (env, uid) => authedResponse(env.WRITER_SESSION_SECRET, uid),
   userName: (user) => user.login_email
-    || (user.login_phone ? user.login_phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2') : '作者 ' + user.uid),
+    || (user.login_phone ? maskPhone(user.login_phone) : '作者 ' + user.uid),
 });
 
 
@@ -284,19 +284,19 @@ async function handleRegister(request, env) {
   // Honeypot：机器人填了隐藏字段 → 假装成功
   if (String(body?.website || '') !== '') return json({ ok: true });
 
-  const phone = String(body?.phone || '').replace(/\s/g, '');
+  const phone = normalizePhone(String(body?.phone || ''), String(body?.country || ''));
   const password = String(body?.password || '');
-  if (!PHONE_RE.test(phone)) return json({ ok: false, error: 'phone' }, 400);
+  if (!phone.ok) return json({ ok: false, error: 'phone' }, 400);
   if (password.length < 8 || password.length > 64) return json({ ok: false, error: 'password' }, 400);
 
-  const dup = await env.DB.prepare('SELECT id FROM writer_users WHERE phone = ?1').bind(phone).first();
+  const dup = await env.DB.prepare('SELECT id FROM writer_users WHERE phone = ?1').bind(phone.e164).first();
   if (dup) return json({ ok: false, error: 'dup' }, 409);
 
   const salt = crypto.randomUUID().replace(/-/g, '');
   const hash = await pbkdf2Hex(password, salt);
   const r = await env.DB.prepare(
     'INSERT INTO writer_users (phone, pass_hash, pass_salt) VALUES (?1,?2,?3)'
-  ).bind(phone, hash, salt).run();
+  ).bind(phone.e164, hash, salt).run();
   return authedResponse(env.WRITER_SESSION_SECRET, r.meta.last_row_id);
 }
 
@@ -345,12 +345,13 @@ async function handleLogin(request, env) {
   } catch {
     return json({ ok: false, error: 'format' }, 400);
   }
-  const phone = String(body?.phone || '').replace(/\s/g, '');
+  const phone = normalizePhone(String(body?.phone || ''), String(body?.country || ''));
   const password = String(body?.password || '');
+  if (!phone.ok) return json({ ok: false, error: 'bad' }, 401);
 
   const row = await env.DB.prepare(
     'SELECT id, pass_hash, pass_salt FROM writer_users WHERE phone = ?1'
-  ).bind(phone).first();
+  ).bind(phone.e164).first();
   if (!row) return json({ ok: false, error: 'bad' }, 401);
 
   const hash = await pbkdf2Hex(password, row.pass_salt);
@@ -1121,9 +1122,12 @@ function registerHtml(url) {
   </div>
   <form class="afcol" id="fp">
     <label class="afield"><span class="aico">${ICO.phone}</span>
-      <input id="phone" maxlength="11" inputmode="numeric" autocomplete="username" placeholder="手机号"></label>
+      <select id="cc" class="acc" aria-label="国家地区">${phoneCountryOptionsHtml()}</select>
+      <span class="adiv"></span>
+      <input id="phone" maxlength="15" inputmode="tel" autocomplete="username" placeholder="手机号"></label>
     <label class="afield"><span class="aico">${ICO.lock}</span>
       <input id="pw" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="设置密码（至少 8 位）"></label>
+    <p class="ahint">手机号仅作登录账号使用，不发送短信；建议注册后在「账号安全」绑定邮箱，便于验证码登录与找回密码。</p>
     <button class="aprimary" id="go" type="submit">注册并进入作品台</button>
     <p class="aerr" id="err" style="display:none"></p>
   </form>
@@ -1163,13 +1167,18 @@ function registerHtml(url) {
     document.getElementById('rt-phone').addEventListener('click', function () { switchMode(false); });
     document.getElementById('rt-email').addEventListener('click', function () { switchMode(true); });
 
+    // 区号记忆（docs/手机号国际化方案.md §5）：选择写 localStorage，下次免选
+    var cc = document.getElementById('cc');
+    try { var savedCc = localStorage.getItem('wxz_phone_country'); if (savedCc) cc.value = savedCc; } catch (e) {}
+    cc.addEventListener('change', function () { try { localStorage.setItem('wxz_phone_country', cc.value); } catch (e) {} });
+
     // 手机号注册
     document.getElementById('fp').addEventListener('submit', function (e) {
       e.preventDefault();
       var btn = document.getElementById('go');
       btn.disabled = true;
       fetch('/api/register', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ phone: document.getElementById('phone').value.trim(),
+        body: JSON.stringify({ phone: document.getElementById('phone').value.trim(), country: cc.value,
           password: document.getElementById('pw').value, website: '' }) })
         .then(function (r) {
           if (r.ok) { location.href = '/dashboard'; return; }
@@ -1291,7 +1300,7 @@ async function dashboardHtml(env, user, url) {
         <tr><th>登录邮箱</th><td>${user.login_email ? esc(maskEmail(user.login_email)) + ' ' : ''}<button type="button" class="btn-text" id="bind-toggle">${user.login_email ? '更换' : '绑定邮箱'}</button></td></tr>
         ${passkeyRowHtml((pkeys || []).map((k) => ({ ...k, device: esc(k.device || '') })))}
       </table>
-      <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录作者中心。验证码由 notifications@whizzzest.com 发送。通行密钥（指纹/面容）添加后可免密登录本站。</p>
+      <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录作者中心。验证码由 notifications@whizzzest.com 发送。通行密钥（指纹/面容）添加后可免密登录本站。${user.login_email ? '' : '<b>当前账号未绑定邮箱：忘记密码将无法自助找回，建议尽快绑定。</b>'}</p>
       <div id="bindbox" style="display:none;margin-top:14px">
         <div class="ops" style="flex-wrap:wrap;align-items:center">
           <input class="inl" id="bind-email" type="email" placeholder="邮箱" style="flex:1;min-width:200px">

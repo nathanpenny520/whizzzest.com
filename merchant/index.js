@@ -26,6 +26,7 @@
 import { sendMail } from '../worker/smtp.js';
 import { authPage, loginPanel, widePage, passkeyRowHtml, PASSKEY_DASH_JS } from '../shared/portal-ui.js';
 import { createWebAuthn } from '../shared/webauthn.js';
+import { normalizePhone, phoneCountryOptionsHtml, maskPhone } from '../shared/phone.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SESSION_TTL_S = SESSION_TTL_MS / 1000;
@@ -91,7 +92,7 @@ const wa = createWebAuthn({
     env.DB.prepare('UPDATE webauthn_credentials SET counter = ?2 WHERE id = ?1').bind(rowId, counter).run(),
   issueSession: (env, uid) => authedResponse(env.MERCHANT_SESSION_SECRET, uid),
   userName: (user) => user.login_email
-    || (user.login_phone ? user.login_phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2') : '商户 ' + user.uid),
+    || (user.login_phone ? maskPhone(user.login_phone) : '商户 ' + user.uid),
 });
 
 
@@ -243,8 +244,6 @@ function limited(key, windowMs, max) {
 
 /* ---------------- 入驻申请 ---------------- */
 
-const PHONE_RE = /^1\d{10}$/;
-
 async function handleApply(request, env) {
   const ip = request.headers.get('cf-connecting-ip') || '';
   if (ip && limited('apply:' + ip, 60 * 60 * 1000, 3)) {
@@ -264,14 +263,14 @@ async function handleApply(request, env) {
   }
 
   const f = readProfile(form);
-  const phone = String(form.get('mp_phone') || '').replace(/\s/g, '');
+  const phone = normalizePhone(String(form.get('mp_phone') || ''), String(form.get('mp_country') || ''));
   const password = String(form.get('mp_password') || '');
 
   if (!f.name || !f.intro || !CATEGORIES[f.category]) return redirect('/apply?err=fields');
-  if (!PHONE_RE.test(phone)) return redirect('/apply?err=phone');
+  if (!phone.ok) return redirect('/apply?err=phone');
   if (password.length < 8 || password.length > 64) return redirect('/apply?err=password');
 
-  const dup = await env.DB.prepare('SELECT id FROM merchant_users WHERE phone = ?1').bind(phone).first();
+  const dup = await env.DB.prepare('SELECT id FROM merchant_users WHERE phone = ?1').bind(phone.e164).first();
   if (dup) return redirect('/apply?err=dup');
 
   const r = await env.DB.prepare(
@@ -299,7 +298,7 @@ async function handleApply(request, env) {
   const hash = await pbkdf2Hex(password, salt);
   const ur = await env.DB.prepare(
     'INSERT INTO merchant_users (merchant_id, phone, pass_hash, pass_salt) VALUES (?1,?2,?3,?4)'
-  ).bind(merchantId, phone, hash, salt).run();
+  ).bind(merchantId, phone.e164, hash, salt).run();
 
   // 会话承载 merchant_users.id（门户统一按用户 ID 解析身份）
   return authedResponse(env.MERCHANT_SESSION_SECRET, ur.meta.last_row_id);
@@ -318,12 +317,13 @@ async function handleLogin(request, env) {
   } catch {
     return json({ ok: false, error: 'format' }, 400);
   }
-  const phone = String(body?.phone || '').replace(/\s/g, '');
+  const phone = normalizePhone(String(body?.phone || ''), String(body?.country || ''));
   const password = String(body?.password || '');
+  if (!phone.ok) return json({ ok: false, error: 'bad' }, 401);
 
   const row = await env.DB.prepare(
     'SELECT u.id uid, u.merchant_id, u.pass_hash, u.pass_salt FROM merchant_users u WHERE u.phone = ?1'
-  ).bind(phone).first();
+  ).bind(phone.e164).first();
   if (!row) return json({ ok: false, error: 'bad' }, 401);
 
   const hash = await pbkdf2Hex(password, row.pass_salt);
@@ -722,7 +722,7 @@ async function dashboardHtml(env, merchant, url) {
           <tr><th>登录邮箱</th><td>${merchant.login_email ? esc(maskEmail(merchant.login_email)) + ' ' : ''}<button type="button" class="btn-text" id="bind-toggle">${merchant.login_email ? '更换' : '绑定邮箱'}</button></td></tr>
           ${passkeyRowHtml((pkeys || []).map((k) => ({ ...k, device: esc(k.device || '') })))}
         </table>
-        <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录商户中心，无需输入密码。验证码由 notifications@whizzzest.com 发送。通行密钥（指纹/面容）添加后可免密登录本站。</p>
+        <p class="tip" style="margin-top:8px">绑定邮箱后，可用「邮箱 + 验证码」登录商户中心，无需输入密码。验证码由 notifications@whizzzest.com 发送。通行密钥（指纹/面容）添加后可免密登录本站。${merchant.login_email ? '' : '<b>当前账号未绑定邮箱：忘记密码将无法自助找回，建议尽快绑定。</b>'}</p>
         <div id="bindbox" style="display:none;margin-top:14px">
           <div class="ops" style="flex-wrap:wrap;align-items:center">
             <input class="inl" id="bind-email" type="email" placeholder="邮箱" style="flex:1;min-width:200px">
@@ -1040,9 +1040,13 @@ function applyHtml(url) {
         <label>门店图片（最多 9 张，JPG/PNG/WebP，单张 ≤5MB）<input type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple></label>
         <label>联系人（不公开）<input name="contact_name" maxlength="40"></label>
         <label>联系电话（不公开）<input name="contact_phone" maxlength="30"></label>
-        <label>登录手机号 *<input name="mp_phone" maxlength="11" inputmode="numeric" placeholder="用于登录商户中心"></label>
+        <label>国家地区 *
+          <select name="mp_country">${phoneCountryOptionsHtml()}</select>
+        </label>
+        <label>手机号 *<input name="mp_phone" maxlength="15" inputmode="tel" placeholder="用于登录商户中心"></label>
         <label>设置密码 *（至少 8 位）<input name="mp_password" type="password" minlength="8" maxlength="64" autocomplete="new-password"></label>
       </div>
+      <p class="tip" style="margin-top:12px">登录手机号仅用于登录商户中心，不公开、不发送短信；建议入驻后在「账号安全」绑定邮箱，便于验证码登录与找回密码。</p>
       <div class="ops" style="margin-top:18px">
         <button class="primary" type="submit">提交申请</button>
         <a class="btn" href="${SITE}/">返回官网</a>

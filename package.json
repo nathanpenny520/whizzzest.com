@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "description": "焰境·万载 — 零依赖静态构建 + Cloudflare Workers；sharp 仅用于构建期 WebP 图片优化；@simplewebauthn/server 用于门户通行密钥（打包进 writer/merchant Worker）",
+  "description": "焰境·万载 — 零依赖静态构建 + Cloudflare Workers；sharp 仅用于构建期 WebP 图片优化；@simplewebauthn/server 用于门户通行密钥、libphonenumber-js 用于手机号编号计划级核验（均打包进 writer/merchant Worker，docs/手机号国际化方案.md）",
   "scripts": {
     "build": "node build.js"
   },
@@ -13,6 +13,7 @@
     "wrangler": "4.129.0"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^14.0.1"
+    "@simplewebauthn/server": "^14.0.1",
+    "libphonenumber-js": "^1.13.12"
   }
 }

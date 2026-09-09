@@ -101,10 +101,11 @@ CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status, sort_weight
 -- 商户门户账号（M2，merchant.whizzzest.com）：一商户一账号，手机号+密码登录；
 -- email（M2.1）：绑定的登录邮箱（可空），绑定后可用「邮箱+验证码」免密登录
 -- pass_hash = PBKDF2-SHA256(pass_salt, 10万次)，密码不明文存储
+-- phone（2026-09-09 迁移 005）：统一 E.164 存储（如 +8613800138000，docs/手机号国际化方案.md）
 CREATE TABLE IF NOT EXISTS merchant_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   merchant_id INTEGER NOT NULL UNIQUE REFERENCES merchants(id),
-  phone TEXT UNIQUE NOT NULL,
+  phone TEXT UNIQUE NOT NULL,              -- E.164（+86…），登录账号（编号计划级核验，不发短信）
   email TEXT,
   pass_hash TEXT NOT NULL,
   pass_salt TEXT NOT NULL,
@@ -259,7 +260,7 @@ CREATE INDEX IF NOT EXISTS idx_attractions_pub ON attractions(status, sort, id D
 -- （线上旧表迁移：DROP TABLE writer_users; 后按本结构重建——当时为空表，无数据损失）
 CREATE TABLE IF NOT EXISTS writer_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  phone TEXT,                              -- 手机号注册账号填；纯邮箱注册为 NULL
+  phone TEXT,                              -- 手机号（E.164，如 +86…）注册账号填；纯邮箱注册为 NULL（迁移 005 起）
   email TEXT,
   pass_hash TEXT NOT NULL,                 -- PBKDF2-SHA256(pass_salt, 10万次)
   pass_salt TEXT NOT NULL,
