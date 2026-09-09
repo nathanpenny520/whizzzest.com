@@ -58,6 +58,10 @@
     {
       "href": "/en/merchants/",
       "label": "Merchants"
+    },
+    {
+      "href": "https://game.whizzzest.com/en/",
+      "label": "Whizzzest Arcade"
     }
   ],
   "footer": {
