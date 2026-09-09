@@ -149,10 +149,10 @@ export default {
         if (top && top.v === v && !top.merged) { top.v *= 2; top.merged = true; }
         else stack.push({ v, merged: false });
       }
-      // 与原序列比较：完全一致 = 这条线没动
-      const same = stack.length === vals.filter(Boolean).length &&
-        stack.every((s, i) => s.v === vals.filter(Boolean)[i]);
-      if (same) continue;
+      // 与原行比较：压紧后的整行（含尾部补零）逐一相等 = 没动。
+      // 注意必须比位置——只比值序会把 [2,0,0,4] 按左误判成无效移动（值序相同但方块挪了）。
+      const after = stack.map((s) => s.v).concat(Array(N - stack.length).fill(0)).join(',');
+      if (vals.join(',') === after) continue;
       // 清线重建
       for (const [r, c] of seq) this.removeTile(r, c);
       stack.forEach((s, i) => {
