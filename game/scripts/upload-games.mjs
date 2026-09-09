@@ -22,23 +22,29 @@ import { spawnSync } from 'node:child_process';
 const BUCKET = 'whizzzest-game';
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'r2-assets', 'g');
 
-/* 与 worker/index.js 的 MIME 兜底表保持一致（上传时即写入正确的 Content-Type） */
+/* 与 worker/index.js 的 MIME 兜底表保持一致（上传时即写入正确的 Content-Type）。
+ * 注意：值不能带空格（如 "; charset=utf-8"）——spawnSync(shell:true) 按空格拼接参数会截断，
+ * HTML 用 <meta charset> 声明编码，无需依赖 Content-Type charset。 */
 const MIME = {
-  html: 'text/html; charset=utf-8',
-  js: 'text/javascript; charset=utf-8',
-  mjs: 'text/javascript; charset=utf-8',
-  css: 'text/css; charset=utf-8',
-  json: 'application/json; charset=utf-8',
+  html: 'text/html',
+  js: 'text/javascript',
+  mjs: 'text/javascript',
+  css: 'text/css',
+  json: 'application/json',
   webmanifest: 'application/manifest+json',
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
   svg: 'image/svg+xml', ico: 'image/x-icon',
   woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', otf: 'font/otf',
   wasm: 'application/wasm',
   mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
-  txt: 'text/plain; charset=utf-8', xml: 'application/xml', md: 'text/plain; charset=utf-8',
+  txt: 'text/plain', xml: 'application/xml', md: 'text/plain',
 };
 
-const wanted = process.argv.slice(2);
+/* --text-only：只传文本类（2026-09-09 首轮上传因 charset 参数截断，二进制已全部成功，此为补传） */
+const TEXT_EXTS = new Set(['html', 'js', 'mjs', 'css', 'json', 'webmanifest', 'txt', 'xml', 'md']);
+const TEXT_ONLY = process.argv.includes('--text-only');
+
+const wanted = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const dirs = readdirSync(ROOT).filter(
   (d) => statSync(join(ROOT, d)).isDirectory() && (!wanted.length || wanted.includes(d))
 );
@@ -59,6 +65,7 @@ for (const dir of dirs) {
   for (const file of walk(join(ROOT, dir))) {
     const key = relative(ROOT, file).split(sep).join('/');
     const ext = (key.split('.').pop() || '').toLowerCase();
+    if (TEXT_ONLY && !TEXT_EXTS.has(ext)) continue;
     const args = ['wrangler', 'r2', 'object', 'put', `${BUCKET}/${key}`, '--file', file, '--remote'];
     if (MIME[ext]) args.push('--content-type', MIME[ext]);
     // shell:true 兼容 Windows 的 npx.cmd；仓库路径不含空格，无需引号包装

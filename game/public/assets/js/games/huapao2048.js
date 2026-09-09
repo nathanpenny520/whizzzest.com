@@ -74,6 +74,8 @@ export default {
     this.tiles = new Map();
     this.nextId = 1;
 
+    window.__DBG = new URLSearchParams(location.search).has('debug');
+    if (window.__DBG) console.log('[dbg] mount 完成 tiles=' + this.tiles.size);
     this.bindInput(wrap);
     this.spawn(); this.spawn();
     this.render();
@@ -126,6 +128,7 @@ export default {
   /* ---------- 玩法：按方向推紧 + 合并（dir：0左 1上 2右 3下） ---------- */
 
   move(dir) {
+    if (window.__DBG) console.log('[dbg] move dir=' + dir + ' tiles=' + this.tiles.size + ' 非零格=' + this.cells.flat().filter(Boolean).length);
     const before = JSON.stringify(this.gridValues());
     // 每条线：外层 k 取垂直于移动方向的序号，深度 i 从「移动朝向的最前端」往后排
     let moved = false;
@@ -214,9 +217,11 @@ export default {
   bindInput(wrap) {
     const KEYMAP = { ArrowLeft: 0, ArrowUp: 1, ArrowRight: 2, ArrowDown: 3, a: 0, w: 1, d: 2, s: 3, A: 0, W: 1, D: 2, S: 3 };
     this.onKey = (e) => {
+      if (window.__DBG) console.log('[dbg] onKey key=' + e.key + ' trusted=' + e.isTrusted);
       if (!(e.key in KEYMAP)) return;
       e.preventDefault();
-      this.move(KEYMAP[e.key]);
+      try { this.move(KEYMAP[e.key]); } catch (err) { console.error('[dbg] move 抛错', err && err.stack); }
+      if (window.__DBG) console.log('[dbg] move 完成 tiles=' + this.tiles.size + ' cells非零=' + this.cells.flat().filter(Boolean).length);
     };
     window.addEventListener('keydown', this.onKey);
 
