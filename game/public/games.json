@@ -352,6 +352,7 @@
       "controls": "方向键移动/选择 · Enter 确认 · 数值规划（键盘）· 菜单不支持鼠标",
       "gamepad": true,
       "keyboardOnly": true,
+      "kbHint": true,
       "orientation": "any",
       "mode": "iframe",
       "entry": "/g/4399-212029/szhong.4399.com/4399swf/upload_swf/ftp31/liuxinyu/20200323/5/gameIndex.html",

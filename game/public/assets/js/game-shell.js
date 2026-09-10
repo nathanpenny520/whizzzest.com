@@ -521,10 +521,11 @@ async function boot() {
     $('#bootState').hidden = true;
     if (meta.gamepad) $('#padHost').classList.add('ready');
     if (shell.saveMode === 'none') toast(t('sl.cStorage', '该游戏使用浏览器自带存储，进度保存在本机。'));
-    // 纯键盘游戏提示（魔塔50层3D 等原版菜单不支持鼠标点选，2026-09-10 业主拍板）：
-    // 进页即提示一次（快加载游戏可见）；首次点击游戏区再补一次——慢加载游戏进页那条早停了，恰好点菜单没反应时才最需要。
+    // 键盘操作提示——按款标记 meta.kbHint（2026-09-10 业主拍板收窄：仅魔塔50层3D 一款启用，
+    // 不再挂 keyboardOnly 全量生效；其余纯键盘游戏业主认为有鼠标/触屏可用，不弹）：
+    // 进页即提示一次（快加载可见）；首次点击游戏区再补一次——慢加载游戏进页那条早停了，恰好点菜单没反应时才最需要。
     // 注意 pointerdown 不跨 iframe 文档：iframe 游戏要挂进游戏文档内部（load 后取新 doc），module 游戏挂 stage 即可
-    if (meta.keyboardOnly) {
+    if (meta.kbHint) {
       const kbHint = () => toast(t('play.kbOnly', '本游戏需键盘操作：方向键选择/移动，Enter 确认。'));
       setTimeout(kbHint, 600);
       const frame = document.querySelector('#stage > iframe.game-frame');

@@ -62,7 +62,7 @@ if (enGames) {
     else console.log(`✓ ${p.id}`);
   }
   // 机制字段混入覆盖表 → 数据分叉风险（方案 §3.2 字段边界）
-  const MECH = ['mode', 'entry', 'saveMode', 'saveKeys', 'keyboardOnly', 'gamepad', 'gamepadLayout', 'gamepadKeymap', 'orientation', 'version', 'tier'];
+  const MECH = ['mode', 'entry', 'saveMode', 'saveKeys', 'keyboardOnly', 'kbHint', 'gamepad', 'gamepadLayout', 'gamepadKeymap', 'orientation', 'version', 'tier'];
   for (const [id, ov] of Object.entries(enGames.games || {})) {
     const bad = MECH.filter((f) => f in ov);
     if (bad.length) {
