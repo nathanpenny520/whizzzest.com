@@ -77,6 +77,6 @@ for (let round = 1; round <= ROUNDS; round++) {
   console.log(`  回源补抓成功 ${fixed}/${bad.length}`);
   if (!fixed) { console.log('⚠️ 剩余 404 源站本身没有（死引用），无法修复'); break; }
 }
-writeFileSync(join(ROOT, 'whizzzest.com', 'game', 'scripts', `_repair-${gid}.json`),
+writeFileSync(join(ROOT, '.build-tmp', 'game', `_repair-${gid}.json`),
   JSON.stringify({ gid, entryRel, rounds: ROUNDS, fixed: grandFixed, at: new Date().toISOString() }, null, 1));
 console.log(`合计补入 ${grandFixed} 文件（${gid}）`);

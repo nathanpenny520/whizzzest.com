@@ -35,6 +35,6 @@ console.log(`控制台错误 ${errors.length} 条：`); errors.slice(0, 12).forE
 console.log(`请求失败 ${failed.length} 条：`); failed.slice(0, 12).forEach((e) => console.log('  ' + e));
 const frames = page.frames().map((f) => f.url().slice(0, 100));
 console.log('frames:', JSON.stringify(frames, null, 1).slice(0, 400));
-await page.screenshot({ path: 'game/scripts/_shot.png' });
-writeFileSync('game/scripts/_browser-last.json', JSON.stringify({ url, errors, failed, frames }, null, 1));
+await page.screenshot({ path: '.build-tmp/game/_shot.png' });
+writeFileSync('.build-tmp/game/_browser-last.json', JSON.stringify({ url, errors, failed, frames }, null, 1));
 await browser.close();

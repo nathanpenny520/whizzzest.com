@@ -21,14 +21,14 @@ page.on('response', (r) => {
 page.on('pageerror', (e) => bad.add('PAGEERROR ' + String(e).slice(0, 120)));
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
 await new Promise((r) => setTimeout(r, 12000));
-await page.screenshot({ path: `game/scripts/_diag_${tag}_0_载入.png` });
+await page.screenshot({ path: `.build-tmp/game/_diag_${tag}_0_载入.png` });
 const pts = [[640, 500], [640, 600], [640, 680], [640, 740], [500, 620], [780, 620], [640, 560]];
 for (let i = 0; i < pts.length; i++) {
   await page.mouse.click(pts[i][0], pts[i][1]).catch(() => {});
   await new Promise((r) => setTimeout(r, 3500));
-  if (i === 2 || i === pts.length - 1) await page.screenshot({ path: `game/scripts/_diag_${tag}_${i + 1}_点击.png` });
+  if (i === 2 || i === pts.length - 1) await page.screenshot({ path: `.build-tmp/game/_diag_${tag}_${i + 1}_点击.png` });
 }
 await new Promise((r) => setTimeout(r, 5000));
-await page.screenshot({ path: `game/scripts/_diag_${tag}_final.png` });
+await page.screenshot({ path: `.build-tmp/game/_diag_${tag}_final.png` });
 console.log('404/异常:', [...bad].slice(0, 10));
 await browser.close();
