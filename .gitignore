@@ -20,3 +20,6 @@ game/r2-assets/g/4399-212029/szhong.4399.com/4399swf/upload_swf/ftp31/liuxinyu/2
 # 游戏站脚本产物（自愈json/截图/日志）统一落 .build-tmp/game/
 game/scripts/_repair-*.json
 game/scripts/_*.log
+
+# 4399 未上架款游戏包不入 git（R2 即交付；已跟踪的 496 文件不受影响）
+game/r2-assets/g/4399-*
