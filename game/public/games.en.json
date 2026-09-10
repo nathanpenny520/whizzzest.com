@@ -117,7 +117,7 @@
       "genre": "Escape puzzle",
       "duration": "10–20 min per stage",
       "controls": "Tap / click to interact",
-      "deviceNote": "Chinese interface.",
+      "deviceNote": "Chinese interface. Flash kernel via bundled Ruffle.",
       "badge": "Web classic"
     },
     "4399-257780": {

@@ -257,7 +257,7 @@ async function boot() {
 
   /* 顶栏：全屏 + 手柄开关（有手柄配置的游戏才出现） */
   $('#btnFullscreen').addEventListener('click', async () => {
-    const wrap = document.documentElement;
+    const wrap = document.querySelector('.stage-wrap') || document.documentElement; // 只全屏游玩区：顶栏留在容器外，浏览器自动隐藏
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else if (document.fullscreenEnabled) await wrap.requestFullscreen();
@@ -268,6 +268,9 @@ async function boot() {
   });
   document.addEventListener('fullscreenchange', () => {
     $('#btnFullscreen').textContent = document.fullscreenElement ? t('play.exitFullscreen', '退出全屏') : t('play.fullscreen', '全屏');
+    // 焦点回笼：全屏切换后 iframe 键盘游戏会失焦（activeElement=BODY，体感=卡死），把焦点还给游戏
+    const gf = document.querySelector('#stage > iframe.game-frame');
+    if (gf) { try { gf.contentWindow.focus(); } catch { /* 跨域 iframe 忽略 */ } gf.focus?.(); }
   });
 
   /* 键盘防误滚（方向键/空格在游玩时不滚页面；游戏自己 preventDefault 的先行） */

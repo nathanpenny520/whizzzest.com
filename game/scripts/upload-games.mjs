@@ -27,6 +27,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'r2-assets
  * HTML 用 <meta charset> 声明编码，无需依赖 Content-Type charset。 */
 const MIME = {
   html: 'text/html',
+  htm: 'text/html',
   js: 'text/javascript',
   mjs: 'text/javascript',
   css: 'text/css',
@@ -66,7 +67,7 @@ for (const dir of dirs) {
     const key = relative(ROOT, file).split(sep).join('/');
     const ext = (key.split('.').pop() || '').toLowerCase();
     if (TEXT_ONLY && !TEXT_EXTS.has(ext)) continue;
-    const args = ['wrangler', 'r2', 'object', 'put', `${BUCKET}/${key}`, '--file', file, '--remote'];
+    const args = ['wrangler', 'r2', 'object', 'put', `${BUCKET}/${key}`, '--file', `"${file}"`, '--remote'];
     if (MIME[ext]) args.push('--content-type', MIME[ext]);
     // shell:true 兼容 Windows 的 npx.cmd；仓库路径不含空格，无需引号包装
     const r = spawnSync('npx', args, { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
