@@ -63,7 +63,7 @@
       "genre": "Creative toy",
       "duration": "Free exploration · no ending",
       "controls": "Touch / keyboard & mouse",
-      "deviceNote": "Chinese interface. Connects to the original online version (fullest features); this site's local mirror stays as fallback (/g/win12/)",
+      "deviceNote": "Full local mirror: login on boot, Chinese/English plus many more interface languages, theme library, AI assistant, lunar calendar and weather widgets all available (the original online version was retired after an antivirus false-positive)",
       "badge": "Fun project"
     },
     "pvz": {
@@ -92,6 +92,59 @@
       "controls": "Keyboard & mouse: WASD move · mouse look/mine/place · E inventory",
       "deviceNote": "Needs a recent browser and plenty of memory — iOS is risky; first load about 20 MB; worlds are saved in this browser",
       "badge": "Open-source classic"
+    },
+    "4399-230326": {
+      "title": "Bleach vs. Naruto: Bond",
+      "tagline": "Bleach and Naruto characters clash in same-screen brawls: combos, supers and assist strikes — 4399's official H5 port of the flash-era fighter.",
+      "genre": "Fighting action",
+      "duration": "Rematch anytime · minutes per bout",
+      "controls": "Keyboard combos (virtual gamepad relayed)",
+      "deviceNote": "Chinese interface. First load is about 45 MB — desktop or Wi-Fi recommended.",
+      "badge": "Web classic"
+    },
+    "4399-231124": {
+      "title": "Pet Connect 3.1",
+      "tagline": "H5 revival of 4399's evergreen connect-the-pairs classic: clear matching pet tiles against the clock — paths may turn at most twice.",
+      "genre": "Puzzle classic",
+      "duration": "Minutes per run · level progression",
+      "controls": "Tap / mouse select",
+      "deviceNote": "Chinese interface.",
+      "badge": "Web classic"
+    },
+    "4399-246749": {
+      "title": "Escape Room 3: Office Tower",
+      "tagline": "Third entry in the classic escape series: trapped in an office building — search for items, crack the mechanisms, and claw your way out floor by floor.",
+      "genre": "Escape puzzle",
+      "duration": "10–20 min per stage",
+      "controls": "Tap / click to interact",
+      "deviceNote": "Chinese interface.",
+      "badge": "Web classic"
+    },
+    "4399-257780": {
+      "title": "AI Gomoku",
+      "tagline": "A quiet board game against a local AI: no network, no sign-in — Minimax attack and defense, one tap to start.",
+      "genre": "Board duel",
+      "duration": "About 5–15 min",
+      "controls": "Tap / click to place a stone",
+      "deviceNote": "Chinese interface.",
+      "badge": "Web classic"
+    },
+    "4399-226392": {
+      "title": "IQ Sudoku",
+      "tagline": "A crisp sudoku by WellSudoku: four difficulties, pencil notes, mistake hints — the pure deduction of pen and paper.",
+      "genre": "Number puzzle",
+      "duration": "About 5–20 min",
+      "controls": "Tap / click to fill digits",
+      "deviceNote": "Chinese interface.",
+      "badge": "Web classic"
+    },
+    "chinese-chess": {
+      "title": "Chinese Chess",
+      "tagline": "Red versus black across the river: an opening-book AI with two strength levels, undo and a bigger board — tap to play.",
+      "genre": "Board duel",
+      "duration": "About 5–15 min",
+      "controls": "Tap / click",
+      "deviceNote": "The mid-level AI thinks locally and may pause for 1–3 seconds before moving."
     }
   },
   "platforms": {
