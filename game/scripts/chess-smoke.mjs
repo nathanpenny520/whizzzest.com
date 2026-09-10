@@ -7,7 +7,11 @@
  * 用法：node game/scripts/chess-smoke.mjs [baseUrl=http://127.0.0.1:8931/]
  */
 import puppeteer from 'puppeteer-core';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+
+/* 截图/记录落 .build-tmp/（gitignored，诊断产物不入 game/scripts） */
+const OUT = '.build-tmp';
+mkdirSync(OUT, { recursive: true });
 
 const base = process.argv[2] || 'http://127.0.0.1:8931/';
 const ORIGIN = new URL(base).origin;
@@ -70,7 +74,7 @@ async function round(browser, label, viewport) {
     pace: play.pace.length,
     moveInfo: (document.getElementById('moveInfo').textContent || '').replace(/\s+/g, ' ').slice(0, 120),
   }));
-  await page.screenshot({ path: `game/scripts/_chess-smoke-${label}.png` });
+  await page.screenshot({ path: `${OUT}/chess-smoke-${label}.png` });
   await page.close();
   const ok = state0.depth === 3 && selected === 'p0' && info.pace >= 2 && errors.length === 0 && failed.length === 0 && external.length === 0;
   console.log(`[${label}] ${ok ? 'PASS' : 'FAIL'} depth=${state0.depth} 选中=${selected} 着法=${info.pace} 外链=${external.length}`);
@@ -88,6 +92,6 @@ const browser = await puppeteer.launch({
 const a = await round(browser, 'desktop', { width: 1280, height: 800 });
 const b = await round(browser, 'mobile320', { width: 320, height: 600 });
 await browser.close();
-writeFileSync('game/scripts/_chess-smoke-last.json', JSON.stringify({ desktop: a, mobile320: b }, null, 1));
+writeFileSync(`${OUT}/chess-smoke-last.json`, JSON.stringify({ desktop: a, mobile320: b }, null, 1));
 console.log(a && b ? '== 全部通过 ==' : '== 存在失败 ==');
 process.exit(a && b ? 0 : 1);
