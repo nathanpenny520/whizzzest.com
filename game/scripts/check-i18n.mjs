@@ -1,14 +1,17 @@
 /**
- * i18n 欠账检查（docs/游戏英文版方案.md §6.3/§8.7，决策③配套）：只报告、不拦截（漂移检查除外）。
+ * i18n 欠账检查（docs/游戏英文版方案.md §6.3/§8.7，决策③配套）：只报告、不拦截（漂移检查与 schema 校验除外）。
  *
  *  1) 元数据覆盖：games.json 每个游戏 / 平台在 games.en.json 是否有覆盖表，
  *     并列出缺的展示字段（EN 列表页会以中文兜底显示这些字段）；
+ *  1b) schema 校验（拦截）：games.json 每个游戏条目的必填字段 / 字段白名单 / 类型 / id 唯一性
+ *     （2026-09-10 结构精简 A5 新增——此前字段拼错会静默失效；新增机制字段须同步本表与 MECH 名单）；
  *  2) 字典欠账：模板 {{t.key}} 占位符与 JS t('key') 调用引用的键是否都在字典里——
  *     模板键须 zh/en 双字典齐备（两边都要烘），JS 键须 en 字典齐备（zh 兜底在代码调用点）；
  *  3) 孤儿键：en 字典里从未被引用的键（多为调用点改名后的遗留，宜清理）；
  *  4) 产物漂移：模板/字典改了但没跑 build-game.mjs → 报错退出（此项拦截，防部署过期产物）。
  *
- * 运行：node game/scripts/check-i18n.mjs   （无依赖，仅 Node 内置模块）
+ * 退出码：✗ 类问题（漂移 / schema / 机制字段混入）→ exit 1；○/△ 欠账只报告不拦截。
+ * 运行：node game/scripts/check-i18n.mjs   （无依赖，仅 Node 内置模块；须在仓库根运行）
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -69,6 +72,67 @@ if (enGames) {
       console.error(`✗ ${id}：覆盖表混入机制字段 ${bad.join(', ')}（违反字段边界，会覆盖母本行为）`);
       problems++;
     }
+  }
+}
+
+/* ---------- 1b) games.json schema 校验（拦截项，2026-09-10 结构精简 A5） ---------- */
+console.log('\n== games.json schema 校验（必填 / 白名单 / 类型 / id 唯一）==');
+{
+  const REQUIRED_STR = ['id', 'title', 'tagline', 'genre', 'tier', 'duration', 'controls', 'orientation', 'entry'];
+  const REQUIRED_BOOL = ['gamepad'];
+  const REQUIRED_NUM = ['version'];
+  const OPTIONAL_TYPES = {
+    badge: 'string',
+    mode: 'string',
+    saveMode: 'string',
+    keyboardOnly: 'boolean',
+    kbHint: 'boolean',
+    deviceNote: 'string',
+    saveKeys: 'array',
+    gamepadLayout: 'object',
+    gamepadKeymap: 'object',
+  };
+  const KNOWN = new Set([...REQUIRED_STR, ...REQUIRED_BOOL, ...REQUIRED_NUM, ...Object.keys(OPTIONAL_TYPES)]);
+  const seenIds = new Set();
+  let schemaGames = 0;
+  let schemaErrs = 0;
+  for (const g of zhGames.games || []) {
+    schemaGames++;
+    const errs = [];
+    if (!g || typeof g !== 'object' || Array.isArray(g)) {
+      console.error('✗ 游戏条目不是对象');
+      problems++;
+      schemaErrs++;
+      continue;
+    }
+    for (const f of REQUIRED_STR) if (typeof g[f] !== 'string' || !g[f].trim()) errs.push(`缺必填字符串字段 ${f}`);
+    for (const f of REQUIRED_BOOL) if (typeof g[f] !== 'boolean') errs.push(`缺必填布尔字段 ${f}`);
+    for (const f of REQUIRED_NUM) if (typeof g[f] !== 'number') errs.push(`缺必填数字字段 ${f}`);
+    for (const f of Object.keys(g)) {
+      if (!KNOWN.has(f)) errs.push(`未知字段 ${f}（字段拼错会静默失效；新机制字段须同步本白名单与 MECH 名单）`);
+    }
+    for (const [f, ty] of Object.entries(OPTIONAL_TYPES)) {
+      if (g[f] == null) continue;
+      const ok =
+        ty === 'array'
+          ? Array.isArray(g[f])
+          : ty === 'object'
+            ? typeof g[f] === 'object' && !Array.isArray(g[f])
+            : typeof g[f] === ty;
+      if (!ok) errs.push(`字段 ${f} 类型应为 ${ty}`);
+    }
+    if (typeof g.id === 'string' && g.id.trim()) {
+      if (seenIds.has(g.id)) errs.push(`id 重复：${g.id}`);
+      else seenIds.add(g.id);
+    }
+    if (errs.length) {
+      for (const e of errs) console.error(`✗ ${g.id || '(无 id)'}：${e}`);
+      problems += errs.length;
+      schemaErrs += errs.length;
+    }
+  }
+  if (!schemaErrs) {
+    console.log(`✓ ${schemaGames} 款全部通过（必填 11 字段 + 白名单 ${KNOWN.size} 字段 + 类型 + id 唯一）`);
   }
 }
 
@@ -144,4 +208,5 @@ if (debtGames) notes.push(`${debtGames} 款游戏缺 EN 覆盖`);
 if (debtPlatforms) notes.push(`${debtPlatforms} 家平台缺 EN 覆盖`);
 if (debtFields) notes.push(`${debtFields} 条目缺个别展示字段`);
 console.log(`\n欠账检查完成：${notes.length ? notes.join('；') : '全部干净'}`);
-process.exit(0);
+// 拦截项（✗：漂移 / schema 校验 / 覆盖表混入机制字段）→ 非零退出；○/△ 欠账只报告不拦截
+process.exit(problems ? 1 : 0);
