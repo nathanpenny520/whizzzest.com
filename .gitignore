@@ -9,3 +9,6 @@ node_modules/
 .wrangler/
 .dev.vars
 .DS_Store
+
+# 一次性诊断/临时产物（探针脚本+截图集中地，随手可清）
+.build-tmp/
