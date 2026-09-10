@@ -755,6 +755,8 @@ ${DYNAMIC_SECTIONS.map(
   const versions = {
     '/assets/css/style.css': hashFile(path.join(DIST, 'assets/css/style.css')),
     '/assets/js/main.js': hashFile(path.join(DIST, 'assets/js/main.js')),
+    '/assets/js/home-hero.js': hashFile(path.join(DIST, 'assets/js/home-hero.js')),
+    '/assets/js/music-player.js': hashFile(path.join(DIST, 'assets/js/music-player.js')),
     '/assets/css/fireworks.css': hashFile(path.join(DIST, 'assets/css/fireworks.css')),
     '/assets/js/fireworks.js': hashFile(path.join(DIST, 'assets/js/fireworks.js')),
     '/assets/css/ai-chat.css': hashFile(path.join(DIST, 'assets/css/ai-chat.css')),

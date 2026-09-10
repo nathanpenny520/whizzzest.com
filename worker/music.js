@@ -8,7 +8,7 @@
  * D1 内容暂无双语字段 → EN 页界面英文、曲目名/歌手回退中文原文（admin 双语录入后替换）。
  * 音频/封面存 R2 whizzzest-media（music/ 前缀），经主站 /media/* 代理公开读取——
  * 代理已支持 Range，<audio> 拖进度条 seek 直接可用。
- * 页面只出列表与数据（data-* 属性），播放器交互逻辑在 main.js（单 <audio> 复用 + MediaSession）。
+ * 页面只出列表与数据（data-* 属性），播放器交互逻辑在 music-player.js（2026-09-10 结构精简 A3 自 main.js 拆出，单 <audio> 复用 + MediaSession）。
  */
 import { UI, LOCALES } from './strings.js';
 
@@ -192,6 +192,7 @@ function pageShell(chrome, loc, { title, description, url, body, jsonLd }) {
   const L = LOCALES[loc];
   const cssV = chrome.meta['/assets/css/style.css'] || '';
   const jsV = chrome.meta['/assets/js/main.js'] || '';
+  const mpV = chrome.meta['/assets/js/music-player.js'] || '';
   const ogImage = '/assets/img/longhu_yanhuowanhui.jpeg';
   const ld = jsonLd
     ? `  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>\n`
@@ -227,6 +228,7 @@ ${body}
   </main>
   ${chrome.footer}
 ${i18nJs}  <script type="module" src="/assets/js/main.js?v=${esc(jsV)}"></script>
+  <script type="module" src="/assets/js/music-player.js?v=${esc(mpV)}"></script>
 </body>
 </html>`;
 }

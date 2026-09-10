@@ -14,7 +14,7 @@
 #
 # 环境变量：
 #   BASE_URL           主站地址（默认 https://whizzzest.com）
-#   SMOKE_FINGERPRINT  为 true 时比对本地 dist/build-meta.json 的 6 项资产指纹与
+#   SMOKE_FINGERPRINT  为 true 时比对本地 dist/build-meta.json 的全部资产指纹与
 #                      生产实际返回，校验「本次部署真的上线了」
 #                      （dist 不进 git，需先跑 node build.js 取得本次构建指纹）
 #   DIST_DIR           本地构建产物目录（默认 dist）
