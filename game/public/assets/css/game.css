@@ -150,6 +150,9 @@ button { font-family: inherit; cursor: pointer; }
 /* 伪全屏（iOS Safari 无元素全屏 API 时的兜底） */
 body.pseudo-full .topbar, body.pseudo-full .persist-banner { display: none; }
 body.pseudo-full .stage-wrap { padding-top: 0; }
+/* 元素全屏：游玩区铺满，去掉顶栏预留位（顶栏在容器外自动隐藏） */
+.stage-wrap:fullscreen { padding-top: 0; }
+.stage-wrap:-webkit-full-screen { padding-top: 0; }
 
 /* 覆盖层：加载中 / 未找到 / 崩溃 */
 .boot {
@@ -474,6 +477,29 @@ dialog::backdrop { background: rgba(10, 5, 3, 0.6); backdrop-filter: blur(4px); 
 .platform-card .meta { font-size: 12px; color: var(--c-text-3); }
 .platform-card .btn { align-self: flex-start; margin-top: 6px; padding: 8px 18px; font-size: 13px; }
 .cloud-note { margin-top: 16px; font-size: 12px; color: var(--c-text-3); }
+
+/* 正版平台 · 第三方商店入口（docs/游戏整合方案.md §8.6，决策⑰）
+   紧凑链接网格：一行一条「名称 — 一句话」，视觉轻于云区大卡，金色悬停与云区一致 */
+.store-list {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.store-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+.store-item:hover { border-color: rgba(244, 211, 31, 0.45); }
+.store-item b { flex-shrink: 0; font-size: 14px; font-weight: 600; }
+.store-item b::after { content: " ↗"; font-size: 11px; color: var(--c-text-3); }
+.store-item span { flex: 1; min-width: 0; font-size: 12px; color: var(--c-text-2); line-height: 1.6; }
 
 .site-foot {
   border-top: 1px solid var(--c-hairline);

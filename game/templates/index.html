@@ -34,12 +34,23 @@
   </main>
 
   <!-- 云端畅玩 · 第三方平台入口（docs/游戏整合方案.md §8，决策⑭）：外链指路牌，非收录游戏；
-       platforms 缺失/为空时保持 hidden 整节不渲染；EN 版保留并标注面向中国大陆（游戏英文版方案 决策②） -->
+       platforms 缺失/为空时保持 hidden 整节不渲染；EN 版保留（游戏英文版方案 决策②），
+       国内/海外平台 note 区分服务区域（决策⑰ §8.6.1） -->
   <section class="cloud" id="cloudSection" hidden>
     <h2>{{t.cloud.title}}</h2>
     <p class="cloud-sub">{{t.cloud.sub}}</p>
     <div class="cloud-grid" id="cloudGrid"></div>
     <p class="cloud-note">{{t.cloud.note}}</p>
+  </section>
+
+  <!-- 正版平台 · 第三方商店入口（docs/游戏整合方案.md §8.6，决策⑰）：外链指路牌，非收录游戏；
+       商店是购买/下载渠道非云游戏，与云区「免下载即玩」定位分开；紧凑链接网格形态；
+       stores 缺失/为空时保持 hidden 整节不渲染 -->
+  <section class="cloud store" id="storeSection" hidden>
+    <h2>{{t.store.title}}</h2>
+    <p class="cloud-sub">{{t.store.sub}}</p>
+    <div class="store-list" id="storeList"></div>
+    <p class="cloud-note">{{t.store.note}}</p>
   </section>
 
   <footer class="site-foot">
@@ -99,6 +110,23 @@
           cloudGrid.appendChild(card);
         }
         cloudSection.hidden = false;
+      }
+
+      // 正版平台（决策⑰ §8.6.2）：数据驱动紧凑链接网格——新标签打开、不泄露本站 referrer、不传权重
+      const stores = (list.stores || []).map((p) => ({ ...p, ...overlay('stores', p) }));
+      const storeSection = document.getElementById('storeSection');
+      if (storeSection && stores.length) {
+        const storeList = document.getElementById('storeList');
+        for (const p of stores) {
+          const row = document.createElement('a');
+          row.className = 'store-item';
+          row.href = p.url;
+          row.target = '_blank';
+          row.rel = 'noopener noreferrer nofollow';
+          row.innerHTML = `<b>${p.title}</b><span>${p.tagline || ''}</span>`;
+          storeList.appendChild(row);
+        }
+        storeSection.hidden = false;
       }
     } catch {
       grid.innerHTML = `<div class="game-card ghost"><b>${t('home.loadFail', '游戏库加载失败')}</b><span>${t('home.loadFailHint', '请刷新重试')}</span></div>`;

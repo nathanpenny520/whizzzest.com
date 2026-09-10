@@ -929,6 +929,129 @@
       "tagline": "米哈游官方云游戏，原神等大作免下载、点开即玩",
       "note": "需登录 · 免费时长有限",
       "url": "https://mhyy.mihoyo.com/"
+    },
+    {
+      "id": "cloud-gfn",
+      "title": "GeForce NOW",
+      "tagline": "NVIDIA 官方云游戏，PC 大作串流即玩",
+      "note": "免费档排队限时 · 需海外网络与支付",
+      "url": "https://www.nvidia.com/en-us/geforce-now/"
+    },
+    {
+      "id": "cloud-xcloud",
+      "title": "Xbox 云游戏 xCloud",
+      "tagline": "Xbox 官方云游戏，Game Pass 库数百款点开即玩",
+      "note": "需 Ultimate 订阅 · 需海外网络与支付",
+      "url": "https://www.xbox.com/en-US/play"
+    },
+    {
+      "id": "cloud-psplus",
+      "title": "PS Plus Premium 云串流",
+      "tagline": "索尼官方云串流，PS 系大作与经典库",
+      "note": "需高级档订阅 · 需海外网络与支付",
+      "url": "https://www.playstation.com/en-us/ps-plus/"
+    },
+    {
+      "id": "cloud-boosteroid",
+      "title": "Boosteroid",
+      "tagline": "欧洲老牌云游戏平台，订阅制畅玩",
+      "note": "订阅制 · 需海外网络与支付",
+      "url": "https://boosteroid.com"
+    },
+    {
+      "id": "cloud-shadow",
+      "title": "Shadow PC",
+      "tagline": "云电脑整机租用，装满自己的游戏库",
+      "note": "订阅制 · 需海外网络与支付",
+      "url": "https://shadow.tech"
+    },
+    {
+      "id": "cloud-luna",
+      "title": "Amazon Luna",
+      "tagline": "亚马逊官方云游戏，Prime 会员部分免费",
+      "note": "需 Amazon 账号 · 需海外网络与支付",
+      "url": "https://www.amazon.com/luna"
+    },
+    {
+      "id": "cloud-blacknut",
+      "title": "Blacknut",
+      "tagline": "家庭订阅制云游戏，500+ 款即点即玩",
+      "note": "订阅制 · 需海外网络与支付",
+      "url": "https://www.blacknut.com"
+    }
+  ],
+  "stores": [
+    {
+      "id": "store-steam",
+      "title": "Steam",
+      "tagline": "全球最大 PC 游戏商店，特卖与大作首发主阵地",
+      "url": "https://store.steampowered.com"
+    },
+    {
+      "id": "store-epic",
+      "title": "Epic Games Store",
+      "tagline": "虚幻引擎官方商店，每周免费领游戏",
+      "url": "https://store.epicgames.com"
+    },
+    {
+      "id": "store-gog",
+      "title": "GOG",
+      "tagline": "无 DRM 经典与新作商店，买断即永久拥有",
+      "url": "https://www.gog.com"
+    },
+    {
+      "id": "store-itch",
+      "title": "itch.io",
+      "tagline": "独立游戏集散地，海量免费与试玩佳作",
+      "url": "https://itch.io"
+    },
+    {
+      "id": "store-ea",
+      "title": "EA App",
+      "tagline": "EA 官方平台，体育与射击自家大作",
+      "url": "https://www.ea.com"
+    },
+    {
+      "id": "store-ubisoft",
+      "title": "Ubisoft Connect",
+      "tagline": "育碧官方平台，刺客信条/彩虹六号等",
+      "url": "https://www.ubisoft.com"
+    },
+    {
+      "id": "store-battlenet",
+      "title": "Battle.net",
+      "tagline": "暴雪官方平台，魔兽/守望/暗黑",
+      "url": "https://www.battle.net"
+    },
+    {
+      "id": "store-rockstar",
+      "title": "Rockstar Games",
+      "tagline": "R星官方平台，GTA/荒野大镖客",
+      "url": "https://www.rockstargames.com"
+    },
+    {
+      "id": "store-humble",
+      "title": "Humble Bundle",
+      "tagline": "慈善捆绑包起家的游戏商店，低价收包",
+      "url": "https://www.humblebundle.com"
+    },
+    {
+      "id": "store-psstore",
+      "title": "PlayStation Store",
+      "tagline": "索尼官方商店（主机 + PC App）",
+      "url": "https://store.playstation.com"
+    },
+    {
+      "id": "store-xbox",
+      "title": "Xbox 商店",
+      "tagline": "微软 Xbox 官方游戏商店",
+      "url": "https://www.xbox.com/en-US/games"
+    },
+    {
+      "id": "store-nintendo",
+      "title": "Nintendo eShop",
+      "tagline": "任天堂官方商店（Switch）",
+      "url": "https://www.nintendo.com/us/store/"
     }
   ]
 }

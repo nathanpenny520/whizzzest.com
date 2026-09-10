@@ -429,6 +429,91 @@
       "title": "HoYoverse Cloud Gaming",
       "tagline": "HoYoverse's official cloud gaming — Genshin Impact and other big titles, tap and play, no download",
       "note": "Sign-in required · limited free time · mainland China service"
+    },
+    "cloud-gfn": {
+      "title": "GeForce NOW",
+      "tagline": "NVIDIA's official cloud gaming — stream PC blockbusters instantly",
+      "note": "Free tier has queues & time limits · overseas service, international payment required"
+    },
+    "cloud-xcloud": {
+      "title": "Xbox Cloud Gaming (xCloud)",
+      "tagline": "Xbox's official cloud gaming — hundreds of Game Pass titles, tap and play",
+      "note": "Game Pass Ultimate required · overseas service"
+    },
+    "cloud-psplus": {
+      "title": "PS Plus Premium streaming",
+      "tagline": "Sony's official cloud streaming — PlayStation blockbusters and classics",
+      "note": "Premium tier required · overseas service"
+    },
+    "cloud-boosteroid": {
+      "title": "Boosteroid",
+      "tagline": "Long-standing European cloud gaming platform — subscription play",
+      "note": "Subscription · overseas service"
+    },
+    "cloud-shadow": {
+      "title": "Shadow PC",
+      "tagline": "Rent a full cloud PC and fill it with your own game library",
+      "note": "Subscription · overseas service"
+    },
+    "cloud-luna": {
+      "title": "Amazon Luna",
+      "tagline": "Amazon's official cloud gaming — some channels free with Prime",
+      "note": "Amazon account required · overseas service"
+    },
+    "cloud-blacknut": {
+      "title": "Blacknut",
+      "tagline": "Family-friendly subscription cloud gaming — 500+ titles on tap",
+      "note": "Subscription · overseas service"
+    }
+  },
+  "stores": {
+    "store-steam": {
+      "title": "Steam",
+      "tagline": "The world's largest PC game store — seasonal sales and blockbuster launches"
+    },
+    "store-epic": {
+      "title": "Epic Games Store",
+      "tagline": "Unreal Engine's official store — free games every week"
+    },
+    "store-gog": {
+      "title": "GOG",
+      "tagline": "DRM-free classics and new releases — buy once, yours forever"
+    },
+    "store-itch": {
+      "title": "itch.io",
+      "tagline": "The indie game hub — thousands of free and demo titles"
+    },
+    "store-ea": {
+      "title": "EA App",
+      "tagline": "EA's official platform — its sports and shooter franchises"
+    },
+    "store-ubisoft": {
+      "title": "Ubisoft Connect",
+      "tagline": "Ubisoft's official platform — Assassin's Creed, Rainbow Six and more"
+    },
+    "store-battlenet": {
+      "title": "Battle.net",
+      "tagline": "Blizzard's official platform — Warcraft, Overwatch, Diablo"
+    },
+    "store-rockstar": {
+      "title": "Rockstar Games",
+      "tagline": "Rockstar's official platform — GTA, Red Dead Redemption"
+    },
+    "store-humble": {
+      "title": "Humble Bundle",
+      "tagline": "The charity-bundle game store — grab packs for less"
+    },
+    "store-psstore": {
+      "title": "PlayStation Store",
+      "tagline": "Sony's official store (console + PC app)"
+    },
+    "store-xbox": {
+      "title": "Xbox Store",
+      "tagline": "Microsoft's official Xbox games store"
+    },
+    "store-nintendo": {
+      "title": "Nintendo eShop",
+      "tagline": "Nintendo's official store (Switch)"
     }
   }
 }
