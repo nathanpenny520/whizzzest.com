@@ -441,23 +441,6 @@
       "badge": "收录4399"
     },
     {
-      "id": "4399-209197",
-      "title": "飞机大战H5",
-      "tagline": "横空出街的直纵版飞机射击：穿弹幕、捡火力，把高分刷到天上去。",
-      "genre": "STG弹幕",
-      "tier": "填充",
-      "duration": "分数挑战 · 单局数分钟",
-      "controls": "键盘/鼠标移动射击",
-      "gamepad": false,
-      "keyboardOnly": true,
-      "orientation": "any",
-      "mode": "iframe",
-      "entry": "/g/4399-209197/szhong.4399.com/4399swf/upload_swf/ftp30/liuxinyu/20191025/4/main/index_https.html",
-      "saveMode": "none",
-      "version": 1,
-      "badge": "收录4399"
-    },
-    {
       "id": "4399-225752",
       "title": "泡泡坦克3H5",
       "tagline": "吸泡泡长大、分裂换命的泡泡坦克：在一片活的泡泡宇宙里越滚越强。",
@@ -521,22 +504,6 @@
       "orientation": "any",
       "mode": "iframe",
       "entry": "/g/4399-196556/szhong.4399.com/4399swf/upload_swf/ftp24/csya/20180402/4/index_https.html",
-      "saveMode": "none",
-      "version": 1,
-      "badge": "收录4399"
-    },
-    {
-      "id": "4399-218084",
-      "title": "疯狂猜歌",
-      "tagline": "听前奏猜歌名——一场华语金曲耳虫的马拉松。",
-      "genre": "音乐猜歌",
-      "tier": "填充",
-      "duration": "单轮数分钟",
-      "controls": "触屏/鼠标选答",
-      "gamepad": false,
-      "orientation": "portrait",
-      "mode": "iframe",
-      "entry": "/g/4399-218084/szhong.4399.com/4399swf/upload_swf/ftp35/liuxinyu/20210129/2/index_https.html",
       "saveMode": "none",
       "version": 1,
       "badge": "收录4399"

@@ -200,15 +200,6 @@
       "badge": "Web classic",
       "deviceNote": "Chinese interface."
     },
-    "4399-209197": {
-      "title": "Sky Strike",
-      "tagline": "A straight-up arcade plane shooter: weave the barrage, upgrade your guns, chase the high score into the sky.",
-      "genre": "Shoot 'em up",
-      "duration": "Score runs · minutes",
-      "controls": "Keyboard / mouse",
-      "badge": "Web classic",
-      "deviceNote": "Chinese interface."
-    },
     "4399-225752": {
       "title": "Bubble Tanks 3",
       "tagline": "Absorb bubbles to grow, split to escape — duel proto-tanks across a living bubble universe.",
@@ -242,15 +233,6 @@
       "genre": "Beat 'em up",
       "duration": "Minutes per stage",
       "controls": "Keyboard",
-      "badge": "Web classic",
-      "deviceNote": "Chinese interface."
-    },
-    "4399-218084": {
-      "title": "Guess the Song",
-      "tagline": "Hear a hook, name the track — a marathon of earworms for mandarin pop veterans.",
-      "genre": "Music quiz",
-      "duration": "Minutes per round",
-      "controls": "Tap / click to answer",
       "badge": "Web classic",
       "deviceNote": "Chinese interface."
     },
