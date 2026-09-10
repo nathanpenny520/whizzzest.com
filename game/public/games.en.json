@@ -151,7 +151,7 @@
       "tagline": "The classic Magic Tower reborn in 3D: 50 floors where every tile matters — which key to take, which monster to fight first; the route is everything.",
       "genre": "Tower puzzle RPG",
       "duration": "Long climb · segmented runs",
-      "controls": "Arrow keys to move & fight (keyboard)",
+      "controls": "Arrow keys to move/select · Enter to confirm · keyboard only — the menu ignores mouse clicks",
       "badge": "Web classic",
       "deviceNote": "Chinese interface."
     },

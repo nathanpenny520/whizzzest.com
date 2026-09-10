@@ -103,6 +103,7 @@
   "sl.autoSlot": "1 (autosave)",
   "sl.deleted": "Deleted",
   "sl.cStorage": "This game manages its own storage in the browser — progress stays on your device.",
+  "play.kbOnly": "Keyboard-driven game: arrow keys to navigate/move, Enter to confirm — the menu ignores mouse clicks.",
   "e.noIdb": "IndexedDB is not available in this environment",
   "e.idbOpen": "Failed to open IndexedDB",
   "e.tx": "Save transaction failed",

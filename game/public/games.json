@@ -349,7 +349,7 @@
       "genre": "魔塔解谜",
       "tier": "补充",
       "duration": "50 层长线 · 分段推进",
-      "controls": "方向键移动 · 数值规划（键盘）",
+      "controls": "方向键移动/选择 · Enter 确认 · 数值规划（键盘）· 菜单不支持鼠标",
       "gamepad": true,
       "keyboardOnly": true,
       "orientation": "any",
