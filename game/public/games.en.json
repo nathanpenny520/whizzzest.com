@@ -173,39 +173,12 @@
       "badge": "Web classic",
       "deviceNote": "Chinese interface."
     },
-    "4399-226229": {
-      "title": "Idiom Hunt",
-      "tagline": "Read the definition, hunt down the matching English idiom — a hunt across everyday English phrases, stage by stage.",
-      "genre": "Word puzzle",
-      "duration": "Minutes per stage",
-      "controls": "Tap / click",
-      "badge": "Web classic",
-      "deviceNote": "In-game text is English."
-    },
     "4399-225888": {
       "title": "Atomic Puzzle",
       "tagline": "Merge same-colored atoms in the fewest moves — one wrong tap and the whole chain betrays you.",
       "genre": "Logic puzzle",
       "duration": "Minutes per level",
       "controls": "Tap / click",
-      "badge": "Web classic",
-      "deviceNote": "Chinese interface."
-    },
-    "4399-209828": {
-      "title": "Thunder Raid",
-      "tagline": "Classic vertical bullet-hell raiding: thread walls of fire, grab power-ups and melt bosses.",
-      "genre": "Shoot 'em up",
-      "duration": "Score runs · minutes",
-      "controls": "Keyboard / mouse (virtual gamepad)",
-      "badge": "Web classic",
-      "deviceNote": "Chinese interface."
-    },
-    "4399-225752": {
-      "title": "Bubble Tanks 3",
-      "tagline": "Absorb bubbles to grow, split to escape — duel proto-tanks across a living bubble universe.",
-      "genre": "Shoot 'em up",
-      "duration": "Free roam · minutes per run",
-      "controls": "Keyboard + mouse",
       "badge": "Web classic",
       "deviceNote": "Chinese interface."
     },
