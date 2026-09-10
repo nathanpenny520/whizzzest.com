@@ -12,6 +12,8 @@
  *   - 其余 /en/*   → 交还资产层：真静态件直接命中；miss 时改送 /en/404.html（英文 404，
  *                    保留原生 404 状态码，docs/游戏英文版方案.md §8.7）
  *   - /g/*         → R2 桶 whizzzest-game 反代（第三方游戏包托管，docs/游戏整合方案.md §1.1/§1.7）
+ *   - /g/api/*     → win12 外部 API 白名单反代（§7.6：上游无 CORS 头/非法 CORS 头的两接口，
+ *                    路径固定非开放代理；补 ACAO:* 使同源/跨域均可用）
  *   - 其余         → 交还资产层（无匹配时按 not_found_handling 返回 /404.html）
  * 阶段二绑定：R2（第三方游戏包，后续模拟器内核/ROM 同桶）；D1（云存档）仍按方案 §6 后置。
  */
@@ -21,6 +23,7 @@ const PLAY_RE_EN = /^\/en\/play\/(?:[\w.-]+)?\/?$/; // 英文运行页同规则�
 /* /g/* Content-Type 兜底表（正常情况上传时已带 metadata，这里只兜漏网之鱼） */
 const MIME = {
   html: 'text/html; charset=utf-8',
+  htm: 'text/html; charset=utf-8',
   js: 'text/javascript; charset=utf-8',
   mjs: 'text/javascript; charset=utf-8',
   css: 'text/css; charset=utf-8',
@@ -67,9 +70,44 @@ async function handleGameAsset(request, url, env) {
   return new Response(obj.body, { headers });
 }
 
+/* win12 外部 API 白名单反代（§7.6）：
+ * 上游两个接口在浏览器端必挂——api.xcboke.cn 无 CORS 头、api.msn.cn 返回非法通配 `ACAO: *.msn.cn`，
+ * 原站同样坏；这里固定路径反代（无任意 URL 参数，非开放代理），补 `ACAO: *`。
+ * apikey 为上游项目公开于其源码的赞助接口密钥，随路径内联（本 worker 源码同为公开仓库）。 */
+const GAME_API = {
+  'lunar': {
+    upstream: 'https://api.xcboke.cn/api/calendar',
+    cache: 'public, max-age=3600',
+  },
+  'weather': {
+    upstream: 'https://api.msn.cn/weather/overview?apikey=j5i4gDqHL6nGYwx5wi5kRhXjtf2c5qgFX9fzfk0TOo&locale=zh-cn&ocid=msftweather',
+    cache: 'public, max-age=1800',
+  },
+};
+
+async function handleGameApi(request, url) {
+  if (request.method !== 'GET') return new Response(null, { status: 405 });
+  const conf = GAME_API[url.pathname.slice('/g/api/'.length)];
+  if (!conf) return new Response(null, { status: 404 });
+  try {
+    const up = await fetch(conf.upstream, { headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
+    const headers = new Headers();
+    headers.set('content-type', up.headers.get('content-type') || 'application/json; charset=utf-8');
+    headers.set('access-control-allow-origin', '*');
+    headers.set('cache-control', conf.cache);
+    headers.set('x-content-type-options', 'nosniff');
+    return new Response(up.body, { status: up.status, headers });
+  } catch {
+    return new Response(null, { status: 502 });
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/g/api/')) {
+      return handleGameApi(request, url);
+    }
     if (url.pathname.startsWith('/g/')) {
       return handleGameAsset(request, url, env);
     }
