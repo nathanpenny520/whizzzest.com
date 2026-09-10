@@ -4900,7 +4900,7 @@ function loadKnowledge(reset) {
     var box = el('klist');
     if (reset) box.innerHTML = '';
     if (reset && list.length === 0) {
-      box.innerHTML = '<p class="empty">知识库为空：先执行 scripts/ai-seed.sql 导入旧站 68 条，或点右上「新增知识」。</p>';
+      box.innerHTML = '<p class="empty">知识库为空：可执行 scripts/archive/ai-seed.sql 导入旧站 68 条种子，或点右上「新增知识」。</p>';
     } else {
       list.forEach(function (x) { box.appendChild(renderKnowledge(x)); });
     }
