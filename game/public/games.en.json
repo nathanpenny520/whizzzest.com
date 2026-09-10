@@ -145,6 +145,258 @@
       "duration": "About 5–15 min",
       "controls": "Tap / click",
       "deviceNote": "The mid-level AI thinks locally and may pause for 1–3 seconds before moving."
+    },
+    "4399-212029": {
+      "title": "Magic Tower 3D: 50 Floors",
+      "tagline": "The classic Magic Tower reborn in 3D: 50 floors where every tile matters — which key to take, which monster to fight first; the route is everything.",
+      "genre": "Tower puzzle RPG",
+      "duration": "Long climb · segmented runs",
+      "controls": "Arrow keys to move & fight (keyboard)",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-196034": {
+      "title": "Three Kingdoms 15-Puzzle",
+      "tagline": "The 15-puzzle in Three Kingdoms dress: slide the numbered tiles back into order — fewer moves, prettier solve.",
+      "genre": "Sliding puzzle",
+      "duration": "About 5–15 min per board",
+      "controls": "Drag blocks (touch / mouse)",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-185956": {
+      "title": "UNO Color Cards",
+      "tagline": "The classic shedding card game against AI: match color or number and time your action cards for the dirtiest plays.",
+      "genre": "Card duel",
+      "duration": "About 5–10 min per round",
+      "controls": "Tap / click to play",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-226229": {
+      "title": "Idiom Hunt",
+      "tagline": "Read the definition, hunt down the matching English idiom — a hunt across everyday English phrases, stage by stage.",
+      "genre": "Word puzzle",
+      "duration": "Minutes per stage",
+      "controls": "Tap / click",
+      "badge": "Web classic",
+      "deviceNote": "In-game text is English."
+    },
+    "4399-225888": {
+      "title": "Atomic Puzzle",
+      "tagline": "Merge same-colored atoms in the fewest moves — one wrong tap and the whole chain betrays you.",
+      "genre": "Logic puzzle",
+      "duration": "Minutes per level",
+      "controls": "Tap / click",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-209828": {
+      "title": "Thunder Raid",
+      "tagline": "Classic vertical bullet-hell raiding: thread walls of fire, grab power-ups and melt bosses.",
+      "genre": "Shoot 'em up",
+      "duration": "Score runs · minutes",
+      "controls": "Keyboard / mouse (virtual gamepad)",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-209197": {
+      "title": "Sky Strike",
+      "tagline": "A straight-up arcade plane shooter: weave the barrage, upgrade your guns, chase the high score into the sky.",
+      "genre": "Shoot 'em up",
+      "duration": "Score runs · minutes",
+      "controls": "Keyboard / mouse",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-225752": {
+      "title": "Bubble Tanks 3",
+      "tagline": "Absorb bubbles to grow, split to escape — duel proto-tanks across a living bubble universe.",
+      "genre": "Shoot 'em up",
+      "duration": "Free roam · minutes per run",
+      "controls": "Keyboard + mouse",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-230745": {
+      "title": "Stick Badminton 3",
+      "tagline": "Stick-figure badminton with smashes, drops and fakes — same-screen doubles included.",
+      "genre": "Sports game",
+      "duration": "Minutes per match · 2P same screen",
+      "controls": "Keyboard (two-player, one screen)",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-224419": {
+      "title": "Stick Fight Heroes",
+      "tagline": "Stick-figure arena brawling: combos, weapons and wave after wave of rivals.",
+      "genre": "Fighting action",
+      "duration": "Minutes per bout",
+      "controls": "Keyboard combos",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-196556": {
+      "title": "Arcade Reaper",
+      "tagline": "Side-scrolling arcade brawler with a Reaper twist: swing the scythe and watch the street queue up to fall.",
+      "genre": "Beat 'em up",
+      "duration": "Minutes per stage",
+      "controls": "Keyboard",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "4399-218084": {
+      "title": "Guess the Song",
+      "tagline": "Hear a hook, name the track — a marathon of earworms for mandarin pop veterans.",
+      "genre": "Music quiz",
+      "duration": "Minutes per round",
+      "controls": "Tap / click to answer",
+      "badge": "Web classic",
+      "deviceNote": "Chinese interface."
+    },
+    "cat-city": {
+      "title": "CatCity",
+      "tagline": "A cozy pixel cat-town RPG: create your cat, explore freely, take quests, shop, and tackle minigames.",
+      "genre": "Pixel RPG",
+      "duration": "Quest-driven · resume anytime",
+      "controls": "WASD/Arrows to move · E to interact · number keys for hotbar",
+      "deviceNote": "Single-player edition (multiplayer auto-degrades); Russian interface; saves are per-player-name",
+      "badge": "Open-source import"
+    },
+    "emberquest": {
+      "title": "EmberQuest",
+      "tagline": "A long-haul idle RPG: grind levels, run dungeons, brew potions and trade — fully playable offline.",
+      "genre": "Idle RPG",
+      "duration": "Endless idle · no ending",
+      "controls": "Mouse / touch",
+      "deviceNote": "English interface; cloud chat/news render as local empty states; progress stays in this browser",
+      "badge": "Open-source import"
+    },
+    "life-restart": {
+      "title": "Life Restart",
+      "tagline": "Restart your life in one second: draw talents, allocate stats, and live a whole life in about three minutes.",
+      "genre": "Text casual",
+      "duration": "3-10 min per run",
+      "controls": "Touch / mouse",
+      "deviceNote": "Achievements and talent unlocks are stored in this browser",
+      "badge": "Open-source import"
+    },
+    "proxx": {
+      "title": "Proxx: Space Minesweeper",
+      "tagline": "Minesweeper in space: reason from neighbor counts to chart a safe route through black holes.",
+      "genre": "Number puzzle",
+      "duration": "5-15 min per round",
+      "controls": "Touch / mouse",
+      "deviceNote": "Best times are stored in this browser (IndexedDB)",
+      "badge": "Open-source import"
+    },
+    "dos-pal": {
+      "title": "The Legend of Sword and Fairy",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Classic RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~19.3MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-jinyong": {
+      "title": "Jin Yong Qun Xia Zhuan",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Classic RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~24.9MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-xuanyuan2": {
+      "title": "Xuan-Yuan Sword 2",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Classic RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~11.3MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-dahanghai2": {
+      "title": "Uncharted Waters II",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Seafaring strategy RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~2.9MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-sanguoyj": {
+      "title": "Romance of the Three Kingdoms: Heroic Legend",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Tactics RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~3.3MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-yanlong2": {
+      "title": "Flame Dragon 2: Legend of Golden Castle",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Tactics RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~7.8MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-dafuweng3": {
+      "title": "Rich Man 3",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Board casual",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~9.1MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-simcity2000": {
+      "title": "SimCity 2000",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "City builder",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~2.8MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-hospital": {
+      "title": "Theme Hospital",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Sim management",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~25.4MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-crazyhospital": {
+      "title": "Crazy Doctor",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Sim management",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~3.2MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-taikou": {
+      "title": "Taikō Risshiden",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Strategy RPG",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~2.4MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
+    },
+    "dos-dune2": {
+      "title": "Dune II",
+      "tagline": "A Chinese DOS classic, playable in your browser via a self-hosted DOS emulator.",
+      "genre": "Real-time strategy",
+      "duration": "Long-form · resume anytime",
+      "controls": "Keyboard required",
+      "deviceNote": "Keyboard required; kernel ~2MB + pack ~3.9MB on first load; saves persist in this browser",
+      "badge": "DOS zone"
     }
   },
   "platforms": {
