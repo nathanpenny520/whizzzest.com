@@ -13,13 +13,9 @@ node_modules/
 # 一次性诊断/临时产物（探针脚本+截图集中地，随手可清）
 .build-tmp/
 
-# 大件不进 git（>50MB 警戒 / >100MB 硬限）：R2 即交付，磁盘保留
-game/r2-assets/g/4399-230326/szhong.4399.com/4399swf/upload_swf/ftp53/huangcijin/20260202/08/Build/WEB_4399_1.21.dat
-game/r2-assets/g/4399-212029/szhong.4399.com/4399swf/upload_swf/ftp31/liuxinyu/20200323/5/Build/WebGL_Mota3D.data.unityweb
+# 游戏资产镜像整目录不入 git（R2 即交付，磁盘保留供 upload-games.mjs 上传；2026-09-10 业主拍板历史全剥离）
+game/r2-assets/
 
 # 游戏站脚本产物（自愈json/截图/日志）统一落 .build-tmp/game/
 game/scripts/_repair-*.json
 game/scripts/_*.log
-
-# 4399 未上架款游戏包不入 git（R2 即交付；已跟踪的 496 文件不受影响）
-game/r2-assets/g/4399-*
