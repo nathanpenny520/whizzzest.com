@@ -23,6 +23,9 @@ const DISPLAY_FIELDS = ['title', 'tagline', 'genre', 'duration', 'controls', 'de
 const PLATFORM_FIELDS = ['title', 'tagline', 'note'];
 
 let problems = 0;
+let debtGames = 0; // ○ 无覆盖表的游戏数（2026-09-10 起计入汇总——只报数不拦截，但「全部干净」必须在真干净时才出现）
+let debtPlatforms = 0;
+let debtFields = 0; // △ 有覆盖表但缺个别展示字段的条目数
 
 /* ---------- 1) 元数据覆盖 ---------- */
 const zhGames = JSON.parse(fs.readFileSync(path.join(pub, 'games.json'), 'utf8'));
@@ -40,19 +43,23 @@ if (enGames) {
     const ov = (enGames.games || {})[g.id];
     if (!ov) {
       console.log(`○ ${g.id}：无覆盖表（EN 显示中文卡）`);
+      debtGames++;
       continue;
     }
     const missing = DISPLAY_FIELDS.filter((f) => g[f] != null && ov[f] == null);
-    console.log(missing.length ? `△ ${g.id}：缺 ${missing.join(', ')}` : `✓ ${g.id}`);
+    if (missing.length) { console.log(`△ ${g.id}：缺 ${missing.join(', ')}`); debtFields++; }
+    else console.log(`✓ ${g.id}`);
   }
   for (const p of zhGames.platforms || []) {
     const ov = (enGames.platforms || {})[p.id];
     if (!ov) {
       console.log(`○ ${p.id}：无覆盖表`);
+      debtPlatforms++;
       continue;
     }
     const missing = PLATFORM_FIELDS.filter((f) => p[f] != null && ov[f] == null);
-    console.log(missing.length ? `△ ${p.id}：缺 ${missing.join(', ')}` : `✓ ${p.id}`);
+    if (missing.length) { console.log(`△ ${p.id}：缺 ${missing.join(', ')}`); debtFields++; }
+    else console.log(`✓ ${p.id}`);
   }
   // 机制字段混入覆盖表 → 数据分叉风险（方案 §3.2 字段边界）
   const MECH = ['mode', 'entry', 'saveMode', 'saveKeys', 'keyboardOnly', 'gamepad', 'gamepadLayout', 'gamepadKeymap', 'orientation', 'version', 'tier'];
@@ -131,5 +138,10 @@ try {
   problems++;
 }
 
-console.log(`\n欠账检查完成：${problems ? `${problems} 项待处理` : '全部干净'}`);
+const notes = [];
+if (problems) notes.push(`${problems} 项错误待处理`);
+if (debtGames) notes.push(`${debtGames} 款游戏缺 EN 覆盖`);
+if (debtPlatforms) notes.push(`${debtPlatforms} 家平台缺 EN 覆盖`);
+if (debtFields) notes.push(`${debtFields} 条目缺个别展示字段`);
+console.log(`\n欠账检查完成：${notes.length ? notes.join('；') : '全部干净'}`);
 process.exit(0);
