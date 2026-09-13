@@ -47,6 +47,10 @@ jobs:
         working-directory: writer
         run: npx -y wrangler@4.129.0 deploy --dry-run --outdir=.wrangler-dry
 
+      - name: Dry-run im portal
+        working-directory: im
+        run: npx -y wrangler@4.129.0 deploy --dry-run --outdir=.wrangler-dry
+
   deploy:
     name: Deploy
     if: github.event_name != 'pull_request'
@@ -108,6 +112,16 @@ jobs:
           accountId: 67e59aecb10a2a8b4b4d525ff8ddcb56
           wranglerVersion: "4.129.0"
           workingDirectory: writer
+
+      # IM 即时聊天门户（im.whizzzest.com，im/ 目录独立 worker，docs/IM聊天方案.md）
+      - name: Deploy im portal
+        if: steps.check.outputs.has_token == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 67e59aecb10a2a8b4b4d525ff8ddcb56
+          wranglerVersion: "4.129.0"
+          workingDirectory: im
 
 # 注：部署后冒烟检查已移除（2026-09-08）——站点边缘机器人防护会质询数据中心 IP
 # 的非浏览器请求（403 + cf-mitigated: challenge），CI 无法穿透。

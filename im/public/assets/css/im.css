@@ -1,0 +1,162 @@
+/* 焰境密语 — /app 布局（M1 骨架）。认证页样式走 shared/portal-ui.js AUTH_CSS，本文件只管应用壳。 */
+
+:root {
+  --im-brand: #d64524;
+  --im-brand-deep: #b23318;
+  --im-ink: #1d1d1f;
+  --im-faint: #6e6e73;
+  --im-line: rgba(0, 0, 0, .1);
+  --im-bg: #f5f5f7;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body.im-app {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--im-ink);
+  background: var(--im-bg);
+}
+
+.im-layout { display: flex; height: 100vh; }
+
+/* ---- 左侧：会话列表栏 ---- */
+
+.im-side {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-right: 1px solid var(--im-line);
+}
+
+.im-side-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--im-line);
+}
+
+.im-side-who { display: flex; flex-direction: column; min-width: 0; }
+.im-side-who b { font-size: 15px; }
+.im-side-who span { font-size: 12px; color: var(--im-faint); overflow: hidden; text-overflow: ellipsis; }
+
+.im-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+.im-conv-list { flex: 1; overflow-y: auto; padding: 10px; }
+
+.im-empty {
+  margin: 40px 10px;
+  text-align: center;
+  color: var(--im-faint);
+  font-size: 13.5px;
+  line-height: 2;
+}
+.im-empty small { font-size: 11.5px; opacity: .75; }
+
+.im-ghost {
+  margin: 12px 18px 16px;
+  padding: 10px;
+  border: 1px solid var(--im-line);
+  background: transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--im-faint);
+  cursor: pointer;
+}
+.im-ghost:hover { color: var(--im-brand); border-color: var(--im-brand); }
+
+/* ---- 右侧主区 ---- */
+
+.im-main { flex: 1; overflow-y: auto; }
+
+.im-welcome { max-width: 880px; margin: 0 auto; padding: 48px 28px 60px; }
+.im-welcome h1 { margin: 0; font-size: 30px; letter-spacing: .5px; }
+.im-sub { color: var(--im-faint); margin: 8px 0 18px; }
+
+.im-badge {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 980px;
+  padding: 6px 14px;
+}
+.im-badge.ok { background: #e8f5ec; color: #1d7a3e; }
+.im-badge.warn { background: #fdf1e4; color: #a05a12; }
+
+.im-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 26px; }
+
+.im-card {
+  background: #fff;
+  border: 1px solid var(--im-line);
+  border-radius: 16px;
+  padding: 20px;
+}
+.im-card h2 { margin: 0 0 14px; font-size: 15px; }
+
+.im-kv { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 13.5px; }
+.im-kv dt { color: var(--im-faint); }
+.im-kv dd { margin: 0; word-break: break-all; }
+.im-kv code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; letter-spacing: 1px; }
+
+/* ---- 表单 ---- */
+
+.im-f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: 13px; color: var(--im-faint); }
+.im-f input {
+  border: 1px solid var(--im-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--im-ink);
+  background: #fafafa;
+  outline: none;
+}
+.im-f input:focus { border-color: var(--im-brand); background: #fff; }
+
+.im-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.im-swatch {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.im-swatch.on { border-color: var(--im-ink); box-shadow: 0 0 0 2px #fff inset; }
+
+.im-primary {
+  border: 0;
+  background: var(--im-brand);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 11px 22px;
+  cursor: pointer;
+}
+.im-primary:hover { background: var(--im-brand-deep); }
+
+.im-msg { font-size: 12.5px; min-height: 18px; margin: 8px 0 0; color: var(--im-faint); }
+.im-msg.ok { color: #1d7a3e; }
+.im-msg.err { color: #c23a1c; }
+
+/* ---- 移动端 ---- */
+
+@media (max-width: 720px) {
+  .im-layout { flex-direction: column; }
+  .im-side { flex: 0 0 auto; height: 42vh; border-right: 0; border-bottom: 1px solid var(--im-line); }
+  .im-welcome { padding: 28px 18px 48px; }
+}
