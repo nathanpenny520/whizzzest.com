@@ -186,6 +186,7 @@ function footerHtml(cfg) {
       <a href="${SITE}/about/">关于本站</a><span class="sep">·</span>
       <a href="https://merchant.whizzzest.com">商户中心</a><span class="sep">·</span>
       <a href="https://writer.whizzzest.com">文库作者中心</a><span class="sep">·</span>
+      <a href="https://im.whizzzest.com">焰境密语</a><span class="sep">·</span>
       <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>
     </p>
     <p class="foot-copy">
