@@ -4,6 +4,9 @@ dist/
 # 本地参考：旧站源码克隆（勿提交）
 reference/
 
+# IM 板块参考项目克隆（ZQ-Chat / workers-chat-demo，勿提交）
+im/reference/
+
 # 依赖与本地状态
 node_modules/
 .wrangler/
