@@ -21,6 +21,9 @@ import { html, json, redirect } from './src/util.js';
 import { currentUser } from './src/session.js';
 import { sendEmailCode } from './src/mail.js';
 import * as authApi from './src/api/auth.js';
+import * as socialApi from './src/api/social.js';
+import * as convsApi from './src/api/convs.js';
+import { handleWs } from './src/ws.js';
 import { loginPanelHtml, registerPanelHtml, LOGIN_PAGE_JS, REGISTER_PAGE_JS, appShellHtml } from './src/pages/auth.js';
 import { PORTAL_UI } from './src/config.js';
 import { authPage } from '../shared/portal-ui.js';
@@ -41,21 +44,26 @@ export default {
     try {
       let res;
       if (path.startsWith('/api/') || path === '/ws') {
-        res = path === '/ws' ? handleWs(request, env) : await handleApi(request, env, path, url);
+        res = path === '/ws' ? await handleWs(request, env, url) : await handleApi(request, env, path, url);
       } else {
         res = await handlePage(request, env, path);
       }
-      Object.entries(baseHeaders).forEach(([k, v]) => res.headers.set(k, v));
-      res.headers.set('content-security-policy', [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'", // 认证页内嵌脚本 + /assets 模块文件
-        "style-src 'self' 'unsafe-inline'",
-        "connect-src 'self'",
-        "img-src 'self' data: https://whizzzest.com",
-        "object-src 'none'",
-        "base-uri 'none'",
-        "frame-ancestors 'none'",
-      ].join('; '));
+      // DO 转发响应（101 WS 握手等）头不可变：统一加头仅对普通响应生效
+      try {
+        Object.entries(baseHeaders).forEach(([k, v]) => res.headers.set(k, v));
+        res.headers.set('content-security-policy', [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline'", // 认证页内嵌脚本 + /assets 模块文件
+          "style-src 'self' 'unsafe-inline'",
+          "connect-src 'self'",
+          "img-src 'self' data: https://whizzzest.com",
+          "object-src 'none'",
+          "base-uri 'none'",
+          "frame-ancestors 'none'",
+        ].join('; '));
+      } catch (e) {
+        if (res.status !== 101) console.error('im headers skip:', res.status, e.message);
+      }
       return res;
     } catch (err) {
       console.error('im worker error:', err);
@@ -110,11 +118,33 @@ async function handleApi(request, env, path, url) {
   if (path === '/api/me' && method === 'GET') return authApi.meGet(env, user);
   if (path === '/api/me' && method === 'PATCH') return authApi.mePatch(request, env, user);
 
-  return json({ ok: false, error: 'not_found' }, 404);
-}
+  /* ---- 好友（M2，方案 §6/§8） ---- */
+  if (path === '/api/users/search' && method === 'GET') return socialApi.userSearch(request, env, user, url);
+  if (path === '/api/friends' && method === 'GET') return socialApi.friendsList(env, user);
+  if (path === '/api/friends/requests' && method === 'GET') return socialApi.requestsList(env, user, url);
+  if (path === '/api/friends/requests' && method === 'POST') return socialApi.requestCreate(request, env, user);
+  let m = path.match(/^\/api\/friends\/requests\/(\d+)\/(accept|reject)$/);
+  if (m && method === 'POST') return socialApi.requestHandle(request, env, user, Number(m[1]), m[2]);
+  m = path.match(/^\/api\/friends\/requests\/(\d+)$/);
+  if (m && method === 'DELETE') return socialApi.requestCancel(env, user, Number(m[1]));
+  m = path.match(/^\/api\/friends\/(\d+)$/);
+  if (m && method === 'DELETE') return socialApi.friendDelete(env, user, Number(m[1]));
+  if (path === '/api/blocks' && method === 'GET') return socialApi.blocksList(env, user);
+  m = path.match(/^\/api\/blocks\/(\d+)$/);
+  if (m && method === 'PUT') return socialApi.blockPut(env, user, Number(m[1]));
+  if (m && method === 'DELETE') return socialApi.blockDelete(env, user, Number(m[1]));
 
-function handleWs(request, env) {
-  return json({ ok: false, error: 'not_yet', detail: 'WebSocket 实时通道随 M2 上线（docs/IM聊天方案.md §5）' }, 501);
+  /* ---- 会话（M2，方案 §3.2/§6） ---- */
+  if (path === '/api/convs' && method === 'GET') return convsApi.convsList(env, user);
+  if (path === '/api/convs/dm' && method === 'POST') return convsApi.dmCreate(request, env, user);
+  m = path.match(/^\/api\/convs\/(\d+)\/keys$/);
+  if (m && method === 'GET') return convsApi.convKeys(env, user, Number(m[1]), url);
+  m = path.match(/^\/api\/convs\/(\d+)\/messages$/);
+  if (m && method === 'GET') return convsApi.convMessages(env, user, Number(m[1]), url);
+  m = path.match(/^\/api\/convs\/(\d+)\/read$/);
+  if (m && method === 'POST') return convsApi.convRead(request, env, user, Number(m[1]));
+
+  return json({ ok: false, error: 'not_found' }, 404);
 }
 
 /* ---------------- DO 导出 ---------------- */

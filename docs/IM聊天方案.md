@@ -1,6 +1,7 @@
 # IM —— 站内即时聊天板块方案（im.whizzzest.com）
 
-> 文档版本：**v1.1** ｜ 2026-09-13 ｜ 状态：**M1 已上线**（账号+密钥目录+SPA 骨架，本地 wrangler 86aea8ae + push CI；验收含换设备密码恢复密钥）｜ M2（好友+1v1 E2EE）未开工
+> 文档版本：**v1.2** ｜ 2026-09-13 ｜ 状态：**M1 已上线**；**M2（好友+1v1 E2EE 实时通道）本地真浏览器双账号验收通过**，随本次 push 上线（线上核验见上线记录）
+> v1.2 变更：① **代码模块划分入档（§13）**——业主拍板「一个文件不要什么功能都有，文件分块」，index.js 降为薄入口，服务端/前端按职责拆模块；② **消息加密实现修订（§3.3）**——nonce 改为每消息随机 96bit、AAD 绑定 (conv_id, sender_uid, key_version)（原设计 seq 参与 nonce/AAD，但 seq 由 DO 发送时才分配，预分配需额外往返且产生空洞，防重排改由「服务器单点分配 seq + 客户端按 seq 渲染」承担）；③ API 增补（§6）：`POST /api/convs/<id>/read`（已读上报）、`DELETE /api/friends/requests/<id>`（撤回申请）、dm 信封随建会话提交。
 > v1.1 变更：**端到端加密恢复 + 参考项目分析入档**——业主 2026-09-13 拍板「参考项目里有现成 E2EE 就做」；实读 `im/reference/` 两参考仓库后确认：**ZQ-Chat 是现成的 Workers+DO+原生 JS 端到端加密聊天**（架构可搬），**workers-chat-demo 补齐 CF 官方 DO 聊天范式**（服务端可搬）；加密设计定稿为「账号身份密钥 + 会话密钥信封分发」（§3），采纳 ZQ 架构但**弃其加密原语**（无认证加密/TOFU 洞，§1.3）；四项拍板落定（§11）；里程碑更新为 M1-M4 约 13-17 天。
 > v1.0 变更：明文方案初稿（业主当日先拍板放弃 E2EE，后中途改口，见 §11 拍板记录）。
 > 需求：新板块 **im.whizzzest.com**——好友关系（通过邮箱或手机号查找添加）+ 1v1 聊天 + 多人群组聊天；仅支持文字（图片不做）；**必须注册登录后才能使用**；**端到端加密**。
@@ -70,8 +71,8 @@ whizzzest-im Worker（im/ 新目录，custom_domain im.whizzzest.com）
 
 ### 3.3 消息加密
 
-- `AES-256-GCM(K)`；96bit nonce = `key_version(4B) || seq(8B)`——(key_version, seq) 在会话内唯一，nonce 永不复用；
-- AAD 绑定 `(conv_id, seq, sender_uid, key_version)`——防篡改、防重排、防跨会话重放；
+- `AES-256-GCM(K)`；**96bit nonce 每消息随机**（v1.2 修订），随密文存于 body（`b64(key_version 1B ‖ iv 12B ‖ ct)`）；
+- AAD 绑定 `(conv_id, sender_uid, key_version)`——防篡改、防跨会话重放；**seq 不入 AAD**（v1.2 修订）：seq 由 DO 在服务器侧分配，发送方加密时不可知，预分配需额外往返且产生空洞；防重排由「服务器单点分配 seq + 客户端按 seq 渲染」承担；
 - 密文即 `im_messages.body`，服务器只见盲文；系统消息（进群/退群/踢人/改名）由服务器生成，**不加密**（本就是成员可见的事件通知）。
 
 ### 3.4 安全边界（诚实交底）
@@ -132,14 +133,15 @@ POST /api/register/phone | /api/register/email     注册（双方式；含 pub_
 POST /api/login/phone   | /api/login/email         登录（响应含 enc_priv_key+kdf_salt 供恢复私钥）
 POST /api/logout ／ GET|PATCH /api/me               会话/资料
 GET  /api/users/search?q=<完整邮箱|手机号>          精确匹配，仅回 id/display_name/bio/avatar_color/pub_key
-POST /api/friends/requests（+GET ?box=in|out、POST /<id>/accept|reject、DELETE /api/friends/<uid>）
+POST /api/friends/requests（+GET ?box=in|out、POST /<id>/accept|reject、DELETE /<id> 撤回、DELETE /api/friends/<uid> 删好友）
 PUT|DELETE /api/blocks/<uid>
 GET  /api/friends                                   好友列表（含未读汇总）
-POST /api/convs/dm {peer_uid}                       幂等建/取 1v1（首条消息时出信封）
+POST /api/convs/dm {peer_uid}                       幂等建/取 1v1（发起方生成 K+双方信封随建提交，v1.2 定稿）
 POST /api/convs/group {name, member_uids[], envelopes[]}   建群（≤100 人，限好友；信封随建群提交）
 POST /api/convs/<id>/members {uids[], envelopes[]}         拉人（群主；对全员重钥出新信封）
 DELETE /api/convs/<id>/members/<uid> | DELETE /api/convs/<id> | PATCH /api/convs/<id>
 GET  /api/convs                                     会话列表（末条概要+未读数）
+POST /api/convs/<id>/read {seq}                     已读上报（last_read_seq 基准，v1.2 增补）
 GET  /api/convs/<id>/keys?version=                  拉本会话信封（解出 K）
 GET  /api/convs/<id>/messages?after_seq=&before_seq=&limit=50
 POST /api/reports                                   举报（会话+seq 区间+理由；明文不可见，举报人可附本地解密的引用文）
@@ -203,3 +205,40 @@ GET  /ws?conv=<id>                                  WS 升级
 | 5 | 实时通道 = DO IMRoom（SQLite Hibernation）+ RateLimiter DO，模式照 workers-chat-demo | 2026-09-13 |
 | 6 | 仅文字不传媒体；头像 v1 首字+预设色；新成员不回看入群前历史 | 2026-09-13 |
 | 7 | 导航「焰境万象」加入口：v1 仅中文，EN 随英文版后补 | 2026-09-13 |
+| 8 | **代码模块划分（§13）**：index.js 薄入口 + src/ 按职责拆文件，前端同理；新功能=新模块，禁止往单文件攒 | 2026-09-13 |
+| 9 | 消息 nonce 改随机 96bit、AAD 绑定 (conv_id, sender_uid, key_version)（§3.3 v1.2 修订，理由见该节） | 2026-09-13 |
+
+## 13. 代码模块划分（业主拍板「文件分块」，v1.2 入档）
+
+原则：**index.js 只做薄入口**（路由分发表 + 安全响应头 + DO 类导出，~150 行）；一个文件一个职责，新功能=新模块；单文件超过 ~350 行即考虑再拆。
+
+### 服务端（im/）
+
+| 文件 | 职责 |
+|---|---|
+| `index.js` | 薄入口：fetch 分发、安全头（101 WS 握手响应跳过）、DO 导出 |
+| `src/config.js` | 常量（站点/会话/密钥约束/限流参数）+ 门户文案 + logo |
+| `src/util.js` | 通用工具：响应构造、base64/hex、哈希签名、内存限流桶、脱敏 |
+| `src/session.js` | HMAC 会话 Cookie（签发/校验/登出） |
+| `src/mail.js` | 邮箱验证码（im_email_codes 独立表）+ 邮件模板 |
+| `src/api/auth.js` | 双方式注册/登录、登出、资料、E2EE 密钥材料校验 |
+| `src/api/social.js` | 好友：精确搜索、申请（创建/列表/同意/拒绝/撤回）、删除、拉黑 |
+| `src/api/convs.js` | 会话：dm 幂等建会话（信封随建）、列表（末条+未读）、信封拉取、历史分页、已读 |
+| `src/ws.js` | /ws 升级链：验会话+成员资格 → 注入 X-IM-UID 转发 DO /connect |
+| `src/do/room.js` | DO IMRoom：Hibernation、seq 单调分配、拉黑拒收、限流、广播（M3 加成员变更） |
+| `src/do/rate-limiter.js` | DO RateLimiter（每 IP）+ RateLimiterClient（照 workers-chat-demo） |
+| `src/pages/auth.js` | 认证页面板（与三门户同构）+ /app 壳 HTML |
+
+### 前端（im/public/assets/js/）
+
+| 文件 | 职责 |
+|---|---|
+| `app.js` | SPA 控制器：状态（me/identity/convs/密钥缓存）+ 视图切换 + 上下文回调 |
+| `api.js` | REST 客户端（401 统一跳登录） |
+| `ui.js` | 展示工具：esc（铁律：明文必须过 esc）/头像/指纹/时间格式化 |
+| `im-crypto.js` | E2EE 全部加密：身份密钥、信封（创建/解包）、消息加解密、IndexedDB 留存 |
+| `ws.js` | WS 客户端：连接/指数退避重连/帧分发 |
+| `convlist.js` | 左侧栏：会话列表（预览/未读/时间）+ 好友入口 + 退出 |
+| `contacts.js` | 好友视图：列表/申请/添加三 Tab |
+| `chat.js` | 聊天窗：历史解密渲染、发送（tag 确认）、缺口补拉、typing/在线、拉黑删除 |
+| `profile.js` | 资料/设置视图（账号 + 加密身份 + 编辑资料） |

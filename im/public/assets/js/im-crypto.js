@@ -4,8 +4,24 @@
  * 服务器只见 pub_key / enc_priv_key（密码包裹备份）/ 信封 / 密文，永不持有可解密钥。
  *
  * M1 暴露：generateIdentity / wrapPrivateKey / unwrapPrivateKey / saveIdentity / loadIdentity
- * M2 增量：信封生成与解包（会话密钥分发）、消息加解密（AAD 绑定 conv/seq/sender/key_version）
+ * M2 增量：会话密钥信封（创建/解包）+ 消息加解密（方案 §3.2/§3.3）
+ *
+ * 信封（每成员一枚，存 im_conv_keys）：ECDH(临时 P-256 × 成员身份公钥) → HKDF-SHA256
+ *   （salt=临时公钥 raw，info='wxz-im-convkey-v1'）→ AES-GCM 包裹会话密钥 K；
+ *   blob = b64( iv 12B ‖ 临时公钥 raw 65B ‖ ct(K 32B+16B tag) )
+ * 消息（AES-256-GCM(K)）：nonce=每消息随机 96bit（v1.2 修订，见方案 §3.3）；
+ *   AAD 绑定 (conv_id, sender_uid, key_version)——防篡改/防跨会话重放；
+ *   blob = b64( key_version 1B ‖ iv 12B ‖ ct )，seq 由服务器分配后随帧回传，不进 AAD
  */
+
+const HKDF_INFO = new TextEncoder().encode('wxz-im-convkey-v1');
+const MSG_AAD_PREFIX = 'wxz-im-msg-v1';
+
+function randBytes(n) {
+  const u = new Uint8Array(n);
+  crypto.getRandomValues(u);
+  return u;
+}
 
 const KDF_ITERS = 310000;
 const DB_NAME = 'im-identity';
@@ -122,4 +138,104 @@ export function loadIdentity() {
 
 export function clearIdentity() {
   return withStore('readwrite', (st) => st.delete(KEY));
+}
+
+/* ---------- 会话密钥信封（方案 §3.2） ---------- */
+
+async function importIdentityPrivate(jwk) {
+  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']);
+}
+
+/** 共享位 → HKDF(salt=临时公钥 raw, info 固定) → AES-GCM 包裹钥 */
+async function hkdfWrapKey(sharedBits, ephPubRaw) {
+  const hk = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: ephPubRaw, info: HKDF_INFO },
+    hk,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * 建会话：生成随机会话密钥 K，并为每个成员出一枚信封（含自己，换设备后可自解）。
+ * 共享秘密 = ECDH(本函数临时私钥 × 成员身份公钥)；收件方以 ECDH(身份私钥 × 信封内临时公钥) 还原同一位。
+ * @param members [{uid, pub_key}]（pub_key 为 65B raw 的 base64）
+ * @returns { keyVersion, rawKeyB64, envelopes: [{uid, envelope}] }——rawKeyB64 供发起方直接入缓存
+ */
+export async function createConvEnvelopes(members) {
+  const raw = randBytes(32);
+  const envelopes = [];
+  for (const m of members) {
+    const pub = await crypto.subtle.importKey('raw', b64ToBuf(m.pub_key), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']);
+    const ephRaw = await crypto.subtle.exportKey('raw', eph.publicKey);
+    const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: pub }, eph.privateKey, 256);
+    const wrapKey = await hkdfWrapKey(shared, ephRaw);
+    const iv = randBytes(12);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, raw);
+    const blob = new Uint8Array(iv.length + ephRaw.byteLength + ct.byteLength);
+    blob.set(iv, 0);
+    blob.set(new Uint8Array(ephRaw), iv.length);
+    blob.set(new Uint8Array(ct), iv.length + ephRaw.byteLength);
+    envelopes.push({ uid: m.uid, envelope: bufToB64(blob.buffer) });
+  }
+  return { keyVersion: 1, rawKeyB64: bufToB64(raw.buffer), envelopes };
+}
+
+/** 解信封 → 会话密钥 raw（base64），用本机身份私钥 */
+export async function unwrapEnvelope(envelopeB64, privateKeyJwk) {
+  const all = new Uint8Array(b64ToBuf(envelopeB64));
+  if (all.length <= 12 + 65 + 16) throw new Error('bad envelope');
+  const iv = all.slice(0, 12);
+  const ephRaw = all.slice(12, 12 + 65);
+  const ct = all.slice(12 + 65);
+  const priv = await importIdentityPrivate(privateKeyJwk);
+  const ephPub = await crypto.subtle.importKey('raw', ephRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: ephPub }, priv, 256);
+  const wrapKey = await hkdfWrapKey(shared, ephRaw);
+  const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrapKey, ct);
+  return bufToB64(raw);
+}
+
+/** 会话密钥 raw(base64) → 可用 CryptoKey（AES-256-GCM） */
+export async function importConvKey(rawKeyB64) {
+  return crypto.subtle.importKey('raw', b64ToBuf(rawKeyB64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+/* ---------- 消息加解密（方案 §3.3） ---------- */
+
+function msgAad(convId, senderUid, keyVersion) {
+  return new TextEncoder().encode(`${MSG_AAD_PREFIX}|${convId}|${senderUid}|${keyVersion}`);
+}
+
+/** 加密一条消息 → 存库密文 b64(key_version ‖ iv ‖ ct) */
+export async function encryptMessage(convKey, { convId, senderUid, keyVersion, text }) {
+  const iv = randBytes(12);
+  const ct = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: msgAad(convId, senderUid, keyVersion) },
+    convKey,
+    new TextEncoder().encode(text)
+  );
+  const blob = new Uint8Array(1 + iv.length + ct.byteLength);
+  blob[0] = keyVersion;
+  blob.set(iv, 1);
+  blob.set(new Uint8Array(ct), 1 + iv.length);
+  return bufToB64(blob.buffer);
+}
+
+/** 解密一条消息 → { text, keyVersion }；AAD/密钥不符时 reject */
+export async function decryptMessage(convKey, { convId, senderUid, bodyB64 }) {
+  const u = new Uint8Array(b64ToBuf(bodyB64));
+  if (u.length < 1 + 12 + 16) throw new Error('bad message blob');
+  const keyVersion = u[0];
+  const iv = u.slice(1, 13);
+  const ct = u.slice(13);
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, additionalData: msgAad(convId, senderUid, keyVersion) },
+    convKey,
+    ct
+  );
+  return { text: new TextDecoder().decode(pt), keyVersion };
 }
