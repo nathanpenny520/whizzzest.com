@@ -10,12 +10,20 @@ export function connectConv(convId, handlers) {
   let closed = false;
   let retries = 0;
   let timer = null;
+  const outbox = []; // 未 OPEN 时的发送排队（连上即冲刷；防冷启动窗口静默丢消息）
+
+  function flush() {
+    while (outbox.length && ws && ws.readyState === 1) {
+      try { ws.send(outbox.shift()); } catch { break; }
+    }
+  }
 
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${proto}//${location.host}/ws?conv=${convId}`);
     ws.onopen = () => {
       retries = 0;
+      flush();
       if (handlers.onOpen) handlers.onOpen();
     };
     ws.onmessage = (e) => {
@@ -35,7 +43,11 @@ export function connectConv(convId, handlers) {
 
   connect();
   return {
-    send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); },
+    send(obj) {
+      const s = JSON.stringify(obj);
+      if (ws && ws.readyState === 1) ws.send(s);
+      else if (outbox.length < 50) outbox.push(s); // 超限丢弃由上层 err/超时兜底
+    },
     close() {
       closed = true;
       clearTimeout(timer);
