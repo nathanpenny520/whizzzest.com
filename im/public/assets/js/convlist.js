@@ -19,12 +19,14 @@ function renderChatsPanel(sideEl, ctx) {
   sideEl.classList.toggle('im-selmode', !!ctx.selMode);
   sideEl.innerHTML = `
     <div class="im-p-head">
-      <h1>焰境密语</h1>
-      <div class="im-p-acts">
+      <div class="im-p-bar">
         ${ctx.selMode
-          ? `<button class="im-ibtn" id="p-sel-x" title="取消选择">${icon('x', 19)}</button>`
-          : `<button class="im-ibtn" id="p-newchat" title="发起新聊天">${icon('newchat', 19)}</button>
-             <button class="im-ibtn" id="p-menu-btn" title="批量选择会话">${icon('dots', 19)}</button>`}
+          ? `<button class="im-ibtn" id="p-sel-x" title="取消选择">${icon('x', 20)}</button>`
+          : `<button class="im-ibtn" id="p-menu-btn" title="批量选择会话">${icon('dots', 20)}</button>`}
+        <h1>焰境密语</h1>
+        <div class="im-p-acts">
+          ${ctx.selMode ? '' : `<button class="im-fab" id="p-newchat" title="发起新聊天">${icon('newchat', 19)}</button>`}
+        </div>
       </div>
     </div>
     ${ctx.selMode ? `
@@ -66,7 +68,7 @@ function renderChatsPanel(sideEl, ctx) {
       return true;
     });
     if (!list.length) {
-      rowsEl.innerHTML = `<div class="im-empty">${ctx.searchQ || ctx.filter !== 'all' ? '没有匹配的会话' : '还没有会话<br><small>点右上 ✎ 或到「联系人」找人开聊</small>'}</div>`;
+      rowsEl.innerHTML = `<div class="im-empty">${ctx.searchQ || ctx.filter !== 'all' ? '没有匹配的会话' : '还没有会话<br><small>点右上 ✎ 或到「联系人」找人开聊</small>'}</div><div class="im-e2e">${icon('lock', 12)}焰境密语的个人消息均经端到端加密</div>`;
       return;
     }
     rowsEl.innerHTML = list.map((c) => {
@@ -80,16 +82,21 @@ function renderChatsPanel(sideEl, ctx) {
       const badge = unread && !c.muted ? `<span class="im-unread">${c.unread > 99 ? '99+' : c.unread}</span>` : '';
       const selck = ctx.selMode ? `<span class="im-selck${picked ? ' on' : ''}">${picked ? icon('check', 13) : ''}</span>` : '';
       const mute = c.muted ? `<span class="im-mutic" title="免打扰">${icon('bellOff', 13)}</span>` : '';
+      // dm 自己发的末条预览前回执勾（v2.1 §8.1）：peer_last_read 已有，纯前端判断；群聊/system 不显
+      const lm = c.last_msg;
+      const mineText = isDm && lm && lm.type === 'text' && lm.sender_id === ctx.me.uid;
+      const rd = mineText && c.last_seq <= (c.peer_last_read || 0);
+      const tick = mineText ? `<span class="im-prevtick${rd ? ' rd' : ''}">${icon(rd ? 'checks' : 'check', 13)}</span>` : '';
       return `
         <div class="im-row${active}${unread ? ' unread' : ''}${picked ? ' picked' : ''}" data-id="${c.id}">
-          ${selck}${avatarHtml(name, color, 49)}
+          ${selck}${avatarHtml(name, color, 54)}
           <div class="im-row-t">
-            <div class="im-row-top"><b>${esc(name)}</b><span>${c.last_msg ? fmtListTime(c.last_msg.created_at) : ''}${mute}</span></div>
-            <div class="im-row-prev">${esc(ctx.previewFor(c))}</div>
+            <div class="im-row-top"><b>${esc(name)}</b><span>${lm ? fmtListTime(lm.created_at) : ''}${mute}</span></div>
+            <div class="im-row-prev">${tick}${esc(ctx.previewFor(c))}</div>
           </div>
           ${badge}
         </div>`;
-    }).join('');
+    }).join('') + `<div class="im-e2e">${icon('lock', 12)}焰境密语的个人消息均经端到端加密</div>`;
     rowsEl.querySelectorAll('.im-row').forEach((el) => {
       el.addEventListener('click', () => {
         const id = Number(el.dataset.id);
@@ -120,8 +127,8 @@ function renderChatsPanel(sideEl, ctx) {
       if (label) b.querySelector('span').textContent = label;
     };
     setBtn('#sb-read', picked.some((c) => c.unread > 0));
-    setBtn('#sb-pin', picked.length > 0, picked.every((c) => c.pinned) ? '取消置顶' : '置顶');
-    setBtn('#sb-mute', picked.length > 0, picked.every((c) => c.muted) ? '取消免打扰' : '免打扰');
+    setBtn('#sb-pin', picked.length > 0, picked.length && picked.every((c) => c.pinned) ? '取消置顶' : '置顶');
+    setBtn('#sb-mute', picked.length > 0, picked.length && picked.every((c) => c.muted) ? '取消免打扰' : '免打扰');
     setBtn('#sb-del', picked.length > 0);
   }
   syncSelUI();

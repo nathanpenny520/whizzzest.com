@@ -87,7 +87,7 @@ export function openChat(root, ctx, conv) {
     canCrypt = !!(keyInfo && ctx.identity);
     textEl.placeholder = canCrypt ? '输入消息（端到端加密）…' : '本机未解锁密钥，无法收发——退出后重新登录可恢复';
     textEl.disabled = !canCrypt;
-    sendBtn.disabled = !canCrypt;
+    sendBtn.disabled = !canCrypt || !textEl.value.trim(); // v2.1 §8.2：空输入发送钮灰态（有字实心），与 input 监听同口径
 
     if (isGroup) await loadMembers(); // 先取成员表：历史渲染需要发送者名
     else await loadBlockState();      // dm：拉黑态供菜单/抽屉

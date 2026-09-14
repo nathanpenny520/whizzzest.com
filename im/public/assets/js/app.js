@@ -135,7 +135,21 @@ function syncRail() {
   railEls.chats.classList.toggle('on', !settingsOpen && panel === 'chats');
   railEls.contacts.classList.toggle('on', !settingsOpen && panel === 'contacts');
   railEls.settings.classList.toggle('on', settingsOpen);
-  if (me) railEls.me.innerHTML = ui.avatarHtml(me.display_name, me.avatar_color, 30);
+  if (me && railEls.me._ic) railEls.me._ic.innerHTML = ui.avatarHtml(me.display_name, me.avatar_color, 30);
+  syncRailBadge();
+}
+
+/** 聊天 tab 未读数字胶囊（v2.1 §8.3）：全部会话 unread 求和（免打扰不计，与行内徽标口径一致），99+ 封顶 */
+function syncRailBadge() {
+  const un = convs.reduce((n, c) => n + (c.muted || !(c.unread > 0) ? 0 : c.unread), 0);
+  let b = railEls.chats.querySelector('.im-rail-badge');
+  if (!b) {
+    b = document.createElement('span');
+    b.className = 'im-rail-badge';
+    railEls.chats.querySelector('.im-rail-ic').appendChild(b);
+  }
+  b.textContent = un > 99 ? '99+' : un;
+  b.hidden = un === 0;
 }
 
 /** 移动端（≤720px）：有聊天/设置占主区时主区覆盖列表 */
@@ -144,10 +158,15 @@ function syncMobile() {
 }
 
 function wireRail() {
-  railEls.chats.innerHTML = icon('chats');
-  railEls.contacts.innerHTML = icon('users');
-  railEls.settings.innerHTML = icon('gear');
-  railEls.logout.innerHTML = icon('logout');
+  // v2.1：壳内按钮带 .im-rail-ic（图标容器）+ .im-rail-lb（移动端文字标签），图标填入 ic 不冲掉标签
+  for (const el of Object.values(railEls)) {
+    const ic = el.querySelector('.im-rail-ic');
+    if (ic) el._ic = ic;
+  }
+  railEls.chats._ic.innerHTML = icon('chats');
+  railEls.contacts._ic.innerHTML = icon('users');
+  railEls.settings._ic.innerHTML = icon('gear');
+  railEls.logout._ic.innerHTML = icon('logout');
   railEls.chats.addEventListener('click', () => {
     settingsOpen = false;
     if (activeConvId > 0) return openConv(activeConvId);
@@ -216,6 +235,7 @@ function openView(render) {
   settingsOpen = true;
   activeConvId = 0;
   closeChat();
+  document.body.classList.remove('im-slide'); // v2.1 §8.4：tab 级切换（设置/我）直接切换，不播层级 push 动画
   syncMobile();
   render(mainEl, ctx);
   syncRail();
@@ -413,6 +433,7 @@ async function openConv(id) {
   settingsOpen = false;
   activeConvId = id;
   closeChat();
+  document.body.classList.add('im-slide'); // v2.1 §8.4：列表→聊天详情是层级导航，播 push 滑入（返回同播滑出）
   renderSideNow();
   syncMobile();
   currentChat = openChat(mainEl, ctx, conv);

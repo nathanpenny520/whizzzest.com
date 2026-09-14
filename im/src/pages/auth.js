@@ -318,13 +318,13 @@ export function appShellHtml() {
 <div class="im-shell">
   <nav class="im-rail" id="im-rail">
     <div class="im-rail-top">
-      <button class="im-rail-btn" id="rail-chats" title="聊天"></button>
-      <button class="im-rail-btn" id="rail-contacts" title="联系人"></button>
-      <button class="im-rail-btn" id="rail-settings" title="设置"></button>
+      <button class="im-rail-btn" id="rail-chats" title="聊天"><span class="im-rail-ic"></span><span class="im-rail-lb">聊天</span></button>
+      <button class="im-rail-btn" id="rail-contacts" title="联系人"><span class="im-rail-ic"></span><span class="im-rail-lb">联系人</span></button>
+      <button class="im-rail-btn" id="rail-settings" title="设置"><span class="im-rail-ic"></span><span class="im-rail-lb">设置</span></button>
     </div>
     <div class="im-rail-bottom">
-      <button class="im-rail-btn" id="rail-me" title="我的资料"></button>
-      <button class="im-rail-btn" id="rail-logout" title="退出登录"></button>
+      <button class="im-rail-btn" id="rail-me" title="我的资料"><span class="im-rail-ic"></span><span class="im-rail-lb">我</span></button>
+      <button class="im-rail-btn im-rail-desk" id="rail-logout" title="退出登录"><span class="im-rail-ic"></span><span class="im-rail-lb">退出</span></button>
     </div>
   </nav>
   <aside class="im-side" id="im-side"></aside>

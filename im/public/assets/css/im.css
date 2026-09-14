@@ -25,6 +25,7 @@
   --accent: #ff7a45;        /* 焰橙：链接 / 状态强调 */
   --accent-dim: rgba(255, 122, 69, .38);
   --read: #ffcfae;          /* 已读 ✓✓（发出气泡上的亮焰色）*/
+  --unread: #d64524;        /* 未读徽标（v2.1 独立变量，初值同 brand 焰红，为主题切换预留）*/
   --ok: #2fa14e;
   --danger: #e56555;
 
@@ -85,6 +86,21 @@ button { font-family: inherit; }
 .im-rail-btn:hover { background: var(--panel-hi); color: var(--ink); }
 .im-rail-btn.on { background: var(--panel-on); color: var(--accent); }
 
+/* v2.1：图标容器 + 移动端文字标签 + 聊天 tab 未读胶囊（桌面标签隐藏=纯 icon 原视觉） */
+.im-rail-ic { position: relative; display: inline-flex; }
+.im-rail-lb { display: none; }
+.im-rail-badge {
+  position: absolute; top: -3px; right: -5px;
+  min-width: 17px; height: 17px;
+  padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--unread);
+  color: var(--on-out);
+  font-size: 10px; font-weight: 700;
+}
+.im-rail-badge[hidden] { display: none; }
+
 /* ---- 会话列表面板 ---- */
 
 .im-side {
@@ -98,10 +114,24 @@ button { font-family: inherit; }
 
 .im-p-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 14px 10px 20px;
+  padding: 14px 14px 10px 12px;
 }
-.im-p-head h1 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: .3px; }
+/* v2.1 头部两段式：bar=左钮（⋯/✕）+ 标题 + 右钮（✎ 实心）；桌面同行，移动端标题独立成行（§8.1） */
+.im-p-bar { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+.im-p-bar h1 { flex: 1; margin: 0; font-size: 21px; font-weight: 700; letter-spacing: .3px; }
 .im-p-acts { display: flex; gap: 4px; }
+
+/* 实心 FAB（新聊天 ✎）：桌面/移动统一实心 brand 圆钮 */
+.im-fab {
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: var(--brand);
+  color: var(--on-out);
+  cursor: pointer;
+  padding: 0;
+}
+.im-fab:hover { background: var(--brand-deep); }
 
 .im-ibtn {
   width: 34px; height: 34px;
@@ -184,13 +214,27 @@ button { font-family: inherit; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .im-row.unread .im-row-prev { color: var(--ink); }
+.im-row.unread .im-row-top b { font-weight: 700; }
+
+/* dm 末条预览回执勾（v2.1 §8.1，仅自己发的文本消息） */
+.im-prevtick { color: var(--ink-2); margin-right: 4px; vertical-align: -2px; }
+.im-prevtick.rd { color: var(--read); }
+
+/* 列表底部 E2E 常驻提示（v2.1 §8.1） */
+.im-e2e {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 16px 12px 20px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.im-e2e svg { flex: 0 0 auto; opacity: .8; }
 
 .im-unread {
   flex: 0 0 auto;
   min-width: 20px; height: 20px;
   padding: 0 6px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--brand);
+  background: var(--unread);
   color: var(--on-out);
   border-radius: 999px;
   font-size: 11.5px; font-weight: 700;
@@ -502,7 +546,8 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .im-send:hover { background: var(--brand-deep); }
-.im-send:disabled { opacity: .4; cursor: default; }
+/* v2.1 §8.2：空输入=灰底灰 icon（WhatsApp 行为），可发送才实心 brand */
+.im-send:disabled { background: var(--panel-hi); color: var(--ink-2); cursor: default; }
 
 /* ============ 信息抽屉（dm 资料 / 群信息） ============ */
 
@@ -712,43 +757,78 @@ button { font-family: inherit; }
 /* ============ 移动端 ≤720px ============ */
 
 @media (max-width: 720px) {
-  .im-shell { padding-bottom: 56px; }
+  .im-shell { padding-bottom: 86px; }
 
+  /* ---- 底部 tab（v2.1 §8.3）：WhatsApp 式圆角浮岛——4 tab（退出挪「我」页）+ 图标 + 文字标签 + 激活胶囊 ---- */
   .im-rail {
-    position: fixed; left: 0; right: 0; bottom: 0;
+    position: fixed;
+    left: 10px; right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
     top: auto;
     flex: none;
-    height: 56px;
+    height: 66px;
     flex-direction: row;
     justify-content: space-around;
-    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
-    border-right: 0;
-    border-top: 1px solid var(--line);
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    box-shadow: var(--shadow);
     z-index: 25;
   }
-  .im-rail-top, .im-rail-bottom { flex-direction: row; }
+  .im-rail-top, .im-rail-bottom { display: contents; } /* 两分组打散，4 tab 均匀分布 */
+  .im-rail-btn {
+    flex-direction: column;
+    gap: 2px;
+    width: 60px; height: 52px;
+    border-radius: 17px;
+  }
+  .im-rail-lb { display: block; font-size: 10.5px; line-height: 1; }
+  /* 4 tab 收敛：退出钮移除（个人资料页 pf-logout 已有入口） */
+  .im-rail-desk { display: none; }
+  #rail-me .im-avatar { width: 22px !important; height: 22px !important; font-size: 9px !important; }
 
   .im-side { flex: 1 1 auto; border-right: 0; }
-  .im-p-head h1 { font-size: 19px; }
 
-  .im-main { display: none; }
-  body.im-mobile-chat .im-main { display: flex; position: fixed; inset: 0 0 56px 0; z-index: 24; }
+  /* ---- 列表态头部两段式（v2.1 §8.1）：操作行 + 大标题独立成行 ---- */
+  .im-p-bar { flex-wrap: wrap; row-gap: 4px; }
+  .im-p-bar h1 { order: 3; flex: 0 0 100%; font-size: 30px; letter-spacing: .2px; }
+  .im-p-bar .im-ibtn { order: 1; }
+  .im-p-bar .im-p-acts { order: 2; margin-left: auto; }
+
+  /* ---- 主区动效（v2.1 §8.4，业主拍板修订）：滑动仅用于层级导航（列表→聊天详情 push/返回 pop），
+       底部 tab 间切换（聊天/联系人/设置/我）直接切换——body.im-slide 标记由 openConv 加、openView 清 ---- */
+  .im-main {
+    display: flex;
+    position: fixed; inset: 0 0 86px 0;
+    z-index: 24;
+    transform: translateX(102%);
+    visibility: hidden;
+  }
+  body.im-slide .im-main { transition: transform .24s ease-out, visibility 0s .24s; }
+  body.im-mobile-chat .im-main { transform: translateX(0); visibility: visible; }
+  body.im-slide.im-mobile-chat .im-main { transition: transform .24s ease-out, visibility 0s 0s; }
 
   .im-back { display: inline-flex; }
 
-  .im-msgrow { max-width: 86%; }
+  /* 气泡限宽挪包裹层（行限宽会压掉 flex-end 贴边，对齐热修 ⑥ 同病）：移动端放宽到 86% */
+  .im-bwrap, .im-msgrow.mine .im-bubble { max-width: 86%; }
   .im-chat-inner { padding: 0 12px; }
 
   .im-friend .im-fact { opacity: 1; }
 
-  /* 信息抽屉：全屏覆盖层 */
+  /* 信息抽屉：主区内全屏覆盖（.im-main 带 transform 为 containing block，fixed 会相对它定位——显式 absolute 同视觉） */
   .im-info {
-    position: fixed; inset: 0;
+    position: absolute; inset: 0;
     z-index: 30;
     flex: none;
   }
 
   .im-chat-head .im-chat-sub { display: block; }
+}
+
+/* 层级 push 动效尊重系统减弱动态偏好（v2.1 §8.4） */
+@media (prefers-reduced-motion: reduce) {
+  body.im-slide .im-main, body.im-slide.im-mobile-chat .im-main { transition: none; }
 }
 
 /* ============ 批量选择会话（业主拍板 ⋮ 改批量操作，2026-09-14，文件尾追加） ============ */

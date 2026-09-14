@@ -168,3 +168,13 @@ WhatsApp 设置页式：头像大图（首字+色）+ 昵称/简介/头像色编
 ### 8.6 验收
 
 esbuild bundle + wrangler dry-run + check-i18n 全绿；本地 wrangler dev 真浏览器 390px 视口逐项截图（列表态/聊天态/4 tab/胶囊/抽屉/未读/动效）+ 1280px 桌面回归无影响；push 走 CI 自动部署后线上真机核验。改动集中前端 5 文件，一次提交一次验收。
+
+### 8.7 实施与验收补记（2026-09-14，当日实施完成）
+
+- **实际改动 6 文件**：§8.5 所列 5 文件 + `chat.js`（开会话时发送钮初始 disabled 补 `|| !textEl.value.trim()` 空输入口径，与 input 监听一致——原逻辑只判密钥，空输入发送钮实心可点）；
+- **顺修行 40 遗留**：批量选择操作钮空选时因空数组 `every` 恒真显「取消置顶/取消免打扰」，补 `picked.length &&` 守卫（disabled 态文案瑕疵）；
+- **实施微调**：移动端 4 tab 均布用 `.im-rail-top/.im-rail-bottom { display:contents }` 打散两分组；「我」tab 头像 CSS 压至 22px（内联 style 需 `!important`）；空态列表也显示 E2E 提示；实心 FAB 桌面端统一采用（视觉一致性）；
+- **验收实录**（本地 wrangler dev 8788 + chrome-devtools 双 isolatedContext 真浏览器，console 全程零报错）：390px 列表态两段式头部/实心 FAB/大标题/搜索 chips/E2E 提示 ✅；4 tab 等距+文字标签+激活胶囊、退出钮隐藏 ✅；批量选择态（X/已选计数/操作栏）在移动端正常 ✅；双账号全链路（+86 手机号互加好友→dm 建会话→互发消息）：行未读名字时间加粗+焰红徽标 ✅、聊天 tab 未读胶囊实时亮起且切到联系人 tab 仍可见 ✅、dm 自己发的末条预览 ✓/✓✓ 与 read 帧实时翻转 ✅、发送钮空灰/有字实心 ✅、气泡回执 ✅；1280px 桌面回归（三栏/纯 icon rail 5 钮含退出/头部同行）✅；esbuild bundle + wrangler dry-run + check-i18n 全绿 ✅。本地测试两账号（13912341234/13987654321）留存本地 D1，不入线上。
+- **业主预览两轮反馈修订（当日）**：
+  1. 「设置/我的行为和前两个 tab 不一样」→ 先给主区已在屏时补了重播滑入；业主复看拍板**动画统一=tab 间直接切换**：滑动只保留给层级导航（列表→聊天详情 push、返回 pop），实现为 `body.im-slide` 标记（openConv 加、openView 清）门控 `.im-main` 的 transition——tab 切换零动画（帧采样瞬到位），会话进出保留 240ms push（帧采样 510→166 逐帧递减）；
+  2. 「WhatsApp 底部 UI 是圆润的」→ 底部 tab 改**圆角浮岛**：左右 10px/底部 safe-area+8px 悬浮、四角 26px 圆角、描边+阴影、4 tab 等距（`display:contents` 打散 rail 两分组）；`.im-main`/`.im-shell` 高度同步 86px；信息抽屉移动端 `fixed→absolute`（.im-main 带 transform 后为 containing block，语义显式化）。
