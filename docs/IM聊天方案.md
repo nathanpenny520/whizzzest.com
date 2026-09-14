@@ -1,6 +1,7 @@
 # IM —— 站内即时聊天板块方案（im.whizzzest.com）
 
-> 文档版本：**v1.2** ｜ 2026-09-13 ｜ 状态：**M1 已上线**；**M2（好友+1v1 E2EE 实时通道）本地真浏览器双账号验收通过**，随本次 push 上线（线上核验见上线记录）
+> 文档版本：**v1.3** ｜ 2026-09-14 ｜ 状态：**M1/M2 已上线**；**M3（群组 E2EE）本地验收通过**（3 客户端扇出有序 / 踢人原子重钥被踢者无门 / 100 人群信封正确 / dm 幂等回归，见上线记录）
+> v1.3 变更（M3 实施落档）：① **seq 分配修订（§5）**——群组引入 REST 侧系统消息，DO 内存计数器与之撞号，改为「INSERT 内 `MAX(seq)+1` 标量子查询」（D1 单语句原子），DO/REST 共用分配器；② **群主不可退群**（§3.2）——重钥由群主生成，群主离开无人能出信封，故群主退出=解散（对齐微信惯例）；③ **退群重钥交底**——退群者无法持有新钥，踢人=信封随请求原子重钥（对抗场景无缺口），退群=群主在线时经 `/rekey` 自动补钥，群主离线的窗口 v1 接受（退群者已无成员资格，REST/WS 均拉不到新消息）；④ **拉黑仅拦 1v1**（§8）——群聊不按私聊拉黑拦截（服务器经会话类型区分）；⑤ API 增补（§6）：建群/成员列表/拉人/踢人/退群解散/改名/重钥；⑥ **min_seq 边界修正**（§4）——新成员可见消息改为 `seq > min_seq`（原 `>=` 会漏放入群前最后一条）；⑦ 模块表增 `members.js`（§13）。
 > v1.2 变更：① **代码模块划分入档（§13）**——业主拍板「一个文件不要什么功能都有，文件分块」，index.js 降为薄入口，服务端/前端按职责拆模块；② **消息加密实现修订（§3.3）**——nonce 改为每消息随机 96bit、AAD 绑定 (conv_id, sender_uid, key_version)（原设计 seq 参与 nonce/AAD，但 seq 由 DO 发送时才分配，预分配需额外往返且产生空洞，防重排改由「服务器单点分配 seq + 客户端按 seq 渲染」承担）；③ API 增补（§6）：`POST /api/convs/<id>/read`（已读上报）、`DELETE /api/friends/requests/<id>`（撤回申请）、dm 信封随建会话提交。
 > v1.1 变更：**端到端加密恢复 + 参考项目分析入档**——业主 2026-09-13 拍板「参考项目里有现成 E2EE 就做」；实读 `im/reference/` 两参考仓库后确认：**ZQ-Chat 是现成的 Workers+DO+原生 JS 端到端加密聊天**（架构可搬），**workers-chat-demo 补齐 CF 官方 DO 聊天范式**（服务端可搬）；加密设计定稿为「账号身份密钥 + 会话密钥信封分发」（§3），采纳 ZQ 架构但**弃其加密原语**（无认证加密/TOFU 洞，§1.3）；四项拍板落定（§11）；里程碑更新为 M1-M4 约 13-17 天。
 > v1.0 变更：明文方案初稿（业主当日先拍板放弃 E2EE，后中途改口，见 §11 拍板记录）。
@@ -66,7 +67,7 @@ whizzzest-im Worker（im/ 新目录，custom_domain im.whizzzest.com）
 
 - 每个会话一把随机 256bit **会话密钥 K**，带 `key_version`（v1 起）；
 - **信封** = 对每个成员：`ECDH(发送方临时 P-256 密钥, 成员身份公钥) → HKDF-SHA256 → AES-GCM 包裹 K`；信封存服务器（`im_conv_keys`），成员拉取后用自己的身份私钥解包得 K；
-- 建会话（1v1 首条消息/建群）时生成 K 并出全套信封；**成员变动即重钥**：群主生成 K_{v+1} 对现存成员重新出信封（被踢者拿不到新钥，收不到后续消息）；
+- 建会话（1v1 首条消息/建群）时生成 K 并出全套信封；**成员变动即重钥**：群主生成 K_{v+1} 对现存成员重新出信封（被踢者拿不到新钥，收不到后续消息）；**群主本人不可退群**（v1.3：重钥职责在群主，群主离开无人能出信封——群主退出=解散，对齐微信惯例）；
 - 100 人群成本可控：每条消息只加密 **1 次**（共享 K），N 个信封只在建群/拉人/踢人时产生——优于 ZQ 每消息按成员扇出 N 次的做法。
 
 ### 3.3 消息加密
@@ -119,10 +120,11 @@ im_reports          id, reporter_uid, conversation_id, seq_from, seq_to, reason,
 - `durable_objects` binding `ROOM` + `migrations: new_sqlite_classes=["IMRoom"]`；另有 `LIMITERS` binding（RateLimiter，每 IP）。
 - **升级链**：`GET /ws?conv=<id>` → Worker 验 cookie + **D1 查成员资格** → stub.fetch 携 X-IM-UID → DO accept。DO 信任 Worker 注入的 uid，不查库。
 - **Hibernation**：`serializeAttachment` 存 {uid, limiterId}；构造器重水合 sessions；`webSocketMessage/Close/Error` 三件套照搬官方实现。
-- **seq 分配**：内存 nextSeq，唤醒后首条消息前 `SELECT MAX(seq)` 冷启动；DO 单线程无竞态。
+- **seq 分配（v1.3 修订）**：M3 起系统消息由 REST 侧插入，DO 内存计数器与 REST 撞号 → 改为「INSERT 内 `MAX(seq)+1` 标量子查询」（D1 单语句原子），DO 发消息与 REST 系统消息共用分配器；分配后落库失败留空洞无害。
 - **消息流**：client `{t:'msg', tag:'<uuid>', body:<密文>}` → DO 校验成员+限流（RateLimiterClient 模式）→ 写 D1 → 广播 `{t:'msg', conv, seq, uid, body, at, tag}`（含发送者，tag 回显去重/确认）。
 - **在线/typing**：接入广播在线表；`{t:'typing', uid}` 纯转发不落库。
-- **成员变更**：被踢/退群 → DO 对其 WS 发 `{t:'kicked'}` 并 close(4003)。
+- **成员变更（v1.3 落地）**：REST 会话管理 API 变更成员后经 DO 内部端点 `/sys`（仅 Worker 经 binding 可达）通知：被移出/退群/解散者的 WS 收 `{t:'kicked', why}` 并 close(4003)；余员广播 `members`（成员增删+重钥版本）/`rekey`/`rename` 帧，客户端据此刷成员表、弃密钥缓存、补拉系统消息。
+- **拉黑与通道**：拉黑拒收仅对 1v1 生效（v1.3；升级链把会话类型注入 DO attachment）——群聊不按私聊拉黑拦截。
 - **断线补拉**：重连 REST `?after_seq=` 拉增量再上 WS；不搞 DO 内回放。
 - **推送**：v1 不做（Web Push 后议；iOS PWA 后台推送本就不承诺）。
 
@@ -137,9 +139,13 @@ POST /api/friends/requests（+GET ?box=in|out、POST /<id>/accept|reject、DELET
 PUT|DELETE /api/blocks/<uid>
 GET  /api/friends                                   好友列表（含未读汇总）
 POST /api/convs/dm {peer_uid}                       幂等建/取 1v1（发起方生成 K+双方信封随建提交，v1.2 定稿）
-POST /api/convs/group {name, member_uids[], envelopes[]}   建群（≤100 人，限好友；信封随建群提交）
-POST /api/convs/<id>/members {uids[], envelopes[]}         拉人（群主；对全员重钥出新信封）
-DELETE /api/convs/<id>/members/<uid> | DELETE /api/convs/<id> | PATCH /api/convs/<id>
+POST /api/convs/group {name, member_uids[], key_version, envelopes[]}   建群（≤100 人，限好友；v1 信封随建群提交）
+POST /api/convs/<id>/members {uids[], key_version, envelopes[]}         拉人（群主，≤20 人/次；对全员重钥出 K_{max+1} 信封，原子提交）
+DELETE /api/convs/<id>/members/<uid> {key_version, envelopes[]}         踢人（群主；余员信封随 DELETE body 提交=原子重钥）
+DELETE /api/convs/<id>                              退群（成员）/ 解散（群主；成员清空，会话行与历史保留）
+PATCH  /api/convs/<id> {name}                       改名（群主；系统消息+rename 帧）
+POST /api/convs/<id>/rekey {key_version, envelopes[]}   重钥（群主补钥：他人退群后的成员变动在此出全套信封）
+GET  /api/convs/<id>/members                        成员列表（uid/角色/公钥——群主拉人与聊天窗发送者名共用）
 GET  /api/convs                                     会话列表（末条概要+未读数）
 POST /api/convs/<id>/read {seq}                     已读上报（last_read_seq 基准，v1.2 增补）
 GET  /api/convs/<id>/keys?version=                  拉本会话信封（解出 K）
@@ -162,8 +168,9 @@ GET  /ws?conv=<id>                                  WS 升级
 | 用户搜索 | uid+IP 30 次/小时，仅精确匹配，不暴露联系方式本身 |
 | 好友申请 | 待处理 ≤50、每用户 20 条/天、同对 UNIQUE |
 | 发消息 | RateLimiter DO 全局 + 每会话 10 条/10s；注册 <1h 新号 5 条/min；body ≤2000 字符 |
+| 群管理操作 | 建/拉/踢/退/散/名/重钥合并限流 60 次/小时每 uid（M3） |
 | WS 并发 | 单 uid ≤5 连接 |
-| 拉黑 | 申请静默拒、消息拒收 |
+| 拉黑 | 申请静默拒、消息拒收（v1.3：仅 1v1 拒收——群聊不按私聊拉黑拦截） |
 | 停用 | im_users.status=disabled 全接口 401（站长经 D1 处置） |
 | 举报 | **E2EE 后站长也读不了内容**——举报人可自愿附上本地解密的引用文（类似 WhatsApp 举报机制）；im_reports 照存；这是 E2EE 的既定治理取舍 |
 
@@ -173,7 +180,7 @@ GET  /ws?conv=<id>                                  WS 升级
 |---|---|---|---|
 | M1 | 账号+密钥目录+骨架：wrangler（DO×2 migration）+ D1 迁移 + 双方式注册/登录 + **im-crypto.js**（生成/包裹/恢复）+ SPA 骨架 + deploy.yml 增 whizzzest-im | 3-4 天 | 注册→自动生成密钥→**换浏览器用密码恢复私钥成功**；线上 / 与 /api/me 核验 |
 | M2 | 好友+1v1 E2EE：搜索/申请/同意/拉黑/删除 + dm 幂等 + 信封分发 + DO 实时 + 历史分页解密 + 未读 | 4-5 天 | 双浏览器互发实时解密；**D1 中核实为密文**；离线补拉不丢不重（tag）；换设备恢复后仍能解历史 |
-| M3 | 群组 E2EE：建群（直接拉人制）/拉人/退群/踢人/解散/改名 + **重钥** + system 消息 + 群未读 | 4-5 天 | 3 浏览器群聊扇出有序；**踢人重钥后被踢者解不开新消息**；100 人群建群信封正确；重复建 dm 不重复 |
+| M3 | 群组 E2EE：建群（直接拉人制）/拉人/退群/踢人/解散/改名 + **重钥** + system 消息 + 群未读 ✅ 2026-09-14 | 4-5 天 | 3 浏览器群聊扇出有序；**踢人重钥后被踢者解不开新消息**；100 人群建群信封正确；重复建 dm 不重复 |
 | M4 | 加固+上线：RateLimiter DO + 全限流 + 举报拉黑 + 重连多标签 + 安全数字（可选）+ **主站导航「焰境万象」加入口** + 文档/上线记录 | 2-3 天 | 限流命中；举报落库可查；nav 入口 zh 生效（EN 随英文版批次后补） |
 
 总量 **约 13-17 天**。M1 先在本地 `wrangler dev` 把 DO 通路打穿再上量。
@@ -207,6 +214,9 @@ GET  /ws?conv=<id>                                  WS 升级
 | 7 | 导航「焰境万象」加入口：v1 仅中文，EN 随英文版后补 | 2026-09-13 |
 | 8 | **代码模块划分（§13）**：index.js 薄入口 + src/ 按职责拆文件，前端同理；新功能=新模块，禁止往单文件攒 | 2026-09-13 |
 | 9 | 消息 nonce 改随机 96bit、AAD 绑定 (conv_id, sender_uid, key_version)（§3.3 v1.2 修订，理由见该节） | 2026-09-13 |
+| 10 | **群主不可退群**：重钥职责在群主，群主退出=解散；退群重钥由群主在线时经 /rekey 补，离线窗口 v1 接受（退群者已无成员资格）（§3.2 v1.3） | 2026-09-14 |
+| 11 | **seq 分配改「INSERT 内 MAX(seq)+1 标量子查询」**：M3 系统消息走 REST，DO 内存计数器会与 REST 撞号；D1 单语句原子承担互斥（§5 v1.3） | 2026-09-14 |
+| 12 | **拉黑仅拦 1v1**：群聊消息不按私聊拉黑拦截（会话类型随升级链注入 DO）；新成员可见消息边界改 `seq > min_seq`（修正原 `>=` 的 off-by-one） | 2026-09-14 |
 
 ## 13. 代码模块划分（业主拍板「文件分块」，v1.2 入档）
 
@@ -223,9 +233,9 @@ GET  /ws?conv=<id>                                  WS 升级
 | `src/mail.js` | 邮箱验证码（im_email_codes 独立表）+ 邮件模板 |
 | `src/api/auth.js` | 双方式注册/登录、登出、资料、E2EE 密钥材料校验 |
 | `src/api/social.js` | 好友：精确搜索、申请（创建/列表/同意/拒绝/撤回）、删除、拉黑 |
-| `src/api/convs.js` | 会话：dm 幂等建会话（信封随建）、列表（末条+未读）、信封拉取、历史分页、已读 |
-| `src/ws.js` | /ws 升级链：验会话+成员资格 → 注入 X-IM-UID 转发 DO /connect |
-| `src/do/room.js` | DO IMRoom：Hibernation、seq 单调分配、拉黑拒收、限流、广播（M3 加成员变更） |
+| `src/api/convs.js` | 会话：dm 幂等建会话（信封随建）、列表（末条+未读）、信封拉取、历史分页、已读；群组建/拉/踢/退/散/名/重钥 + 系统消息（M3） |
+| `src/ws.js` | /ws 升级链：验会话+成员资格 → 注入 X-IM-UID/会话类型 转发 DO /connect |
+| `src/do/room.js` | DO IMRoom：Hibernation、seq 标量子查询分配（v1.3）、拉黑拒收（仅 dm）、限流、广播、/sys 成员变更通知（M3） |
 | `src/do/rate-limiter.js` | DO RateLimiter（每 IP）+ RateLimiterClient（照 workers-chat-demo） |
 | `src/pages/auth.js` | 认证页面板（与三门户同构）+ /app 壳 HTML |
 
@@ -239,6 +249,7 @@ GET  /ws?conv=<id>                                  WS 升级
 | `im-crypto.js` | E2EE 全部加密：身份密钥、信封（创建/解包）、消息加解密、IndexedDB 留存 |
 | `ws.js` | WS 客户端：连接/指数退避重连/帧分发 |
 | `convlist.js` | 左侧栏：会话列表（预览/未读/时间）+ 好友入口 + 退出 |
-| `contacts.js` | 好友视图：列表/申请/添加三 Tab |
-| `chat.js` | 聊天窗：历史解密渲染、发送（tag 确认）、缺口补拉、typing/在线、拉黑删除 |
+| `contacts.js` | 好友视图：列表/申请/添加/建群四 Tab（M3 增建群：好友多选+群名） |
+| `chat.js` | 聊天窗：历史解密渲染、发送（tag 确认）、缺口补拉、typing/在线、拉黑删除；群组发送者名/成员变更·重钥·改名·被移出帧处理（M3） |
+| `members.js` | 群成员面板（M3）：成员列表（含指纹）、群主拉人（好友多选）/移出；密钥信封生成一律走 ctx（app 层） |
 | `profile.js` | 资料/设置视图（账号 + 加密身份 + 编辑资料） |

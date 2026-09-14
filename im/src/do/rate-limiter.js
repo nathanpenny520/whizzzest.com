@@ -34,16 +34,17 @@ export class RateLimiterClient {
     try {
       let response;
       try {
-        response = await this.limiter.fetch('https://rate-limiter');
+        response = await this.limiter.fetch('https://rate-limiter', { method: 'POST' });
       } catch {
         this.limiter = this.getLimiterStub();
-        response = await this.limiter.fetch('https://rate-limiter');
+        response = await this.limiter.fetch('https://rate-limiter', { method: 'POST' });
       }
       const cooldown = +(await response.text());
       if (cooldown > 0) await new Promise((resolve) => setTimeout(resolve, cooldown * 1000));
       this.inCooldown = false;
     } catch (err) {
       this.reportError(err);
+      this.inCooldown = false; // 限流器故障兜底：fail-open，不因它永久卡死发消息（每会话 10条/10s 仍在）
     }
   }
 }

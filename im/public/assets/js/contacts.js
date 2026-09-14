@@ -1,6 +1,6 @@
 /**
- * 焰境密语 — 好友视图（M2：列表/申请/添加三 Tab）
- * 好友行点击 = 开私聊（dm 幂等建会话 + 信封随建提交）；删除/拉黑走确认弹窗。
+ * 焰境密语 — 好友视图（M2：列表/申请/添加；M3 增建群 Tab）
+ * 好友行点击 = 开私聊（dm 幂等建会话 + 信封随建提交）；建群 = 好友多选 + 群名（信封随建提交，app 层生成）。
  */
 
 import { GET, POST, DEL, PUT } from './api.js';
@@ -13,6 +13,7 @@ export async function renderContacts(root, ctx) {
         <button class="im-tab on" data-tab="friends">好友</button>
         <button class="im-tab" data-tab="requests">申请</button>
         <button class="im-tab" data-tab="add">添加</button>
+        <button class="im-tab" data-tab="group">建群</button>
       </div>
       <div class="im-tab-body" id="tab-body"></div>
     </div>`;
@@ -22,6 +23,7 @@ export async function renderContacts(root, ctx) {
     friends: () => renderFriends(body, ctx),
     requests: () => renderRequests(body, ctx),
     add: () => renderAdd(body, ctx),
+    group: () => renderGroupBuild(body, ctx),
   };
   root.querySelectorAll('.im-tab').forEach((t) => {
     t.addEventListener('click', () => {
@@ -177,4 +179,45 @@ async function renderAdd(body, ctx) {
   };
   body.querySelector('#add-go').addEventListener('click', doSearch);
   body.querySelector('#add-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+}
+
+/* ---------------- 建群（M3，方案 §11.1：群主从好友直接拉入，上限 100 人） ---------------- */
+
+async function renderGroupBuild(body, ctx) {
+  const j = await GET('/api/friends');
+  if (!j.ok) { body.innerHTML = '<p class="im-empty">好友列表加载失败</p>'; return; }
+  if (!j.friends.length) {
+    body.innerHTML = '<p class="im-empty">还没有好友，先去「添加」找到人，再回来建群。</p>';
+    return;
+  }
+  body.innerHTML = `
+    <div class="im-add">
+      <label class="im-f"><span>群名（1-30 字）</span>
+        <input id="grp-name" maxlength="30" placeholder="比如：周末爬山小队">
+      </label>
+      <p class="im-hint">勾选要拉入的好友（≤99 人，群成员上限 100）：</p>
+      <div class="im-pick-list" id="grp-list">${j.friends.map((f) => `
+        <label class="im-member im-pick">
+          <input type="checkbox" value="${f.uid}">
+          ${avatarHtml(f.display_name, f.avatar_color, 34)}
+          <div class="im-member-txt">
+            <b>${esc(f.display_name)}</b>
+            <span>${esc(f.bio || 'UID ' + f.uid)}</span>
+          </div>
+        </label>`).join('')}</div>
+      <button class="im-primary" id="grp-go">创建群聊</button>
+      <p class="im-msg" id="grp-msg"></p>
+    </div>`;
+
+  body.querySelector('#grp-go').addEventListener('click', () => {
+    const msg = body.querySelector('#grp-msg');
+    const name = body.querySelector('#grp-name').value.trim().replace(/\s+/g, ' ');
+    if (!name || name.length > 30) { msg.textContent = '群名需 1-30 字'; msg.className = 'im-msg err'; return; }
+    const checked = [...body.querySelectorAll('#grp-list input:checked')].map((c) => Number(c.value));
+    const sel = j.friends.filter((f) => checked.includes(f.uid));
+    if (!sel.length) { msg.textContent = '至少勾选 1 位好友'; msg.className = 'im-msg err'; return; }
+    if (sel.length > 99) { msg.textContent = '一次最多拉 99 位好友（群上限 100 人）'; msg.className = 'im-msg err'; return; }
+    msg.textContent = '正在生成密钥信封…'; msg.className = 'im-msg';
+    ctx.createGroup(name, sel);
+  });
 }

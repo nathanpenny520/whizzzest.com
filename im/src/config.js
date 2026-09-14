@@ -29,6 +29,12 @@ export const AVATAR_COLORS = 8;
 export const FRIEND_REQ_MSG_MAX = 100;
 export const WS_PER_UID_LIMIT = 5;      // 单 uid 并发 WS 连接上限
 
+/* 群组（M3，方案 §3.2/§6/§11：上限 100 人、群主直接拉好友入群、单次拉人 ≤20） */
+export const GROUP_MAX = 100;
+export const GROUP_NAME_MAX = 30;
+export const GROUP_ADD_MAX = 20;
+export const GROUP_RATE = { windowMs: 60 * 60 * 1000, max: 60 };  // 群管理操作（建/拉/踢/退/散/名/重钥）合并限流
+
 /* 限流（方案 §8） */
 export const RATE_SEARCH = { windowMs: 60 * 60 * 1000, max: 30 };          // 用户搜索（uid+IP）
 export const RATE_FRIEND_REQ = { dailyMax: 20, inboxMax: 50 };             // 好友申请：我 20 条/天，对方待收 ≤50
@@ -45,7 +51,7 @@ export const PORTAL_UI = {
   slogan: '说给对的人，密语不过夜',
   sideSlogan: '端到端加密 · 服务器只递信，不看信',
   highlights: [
-    '好友私聊与百人群组（M2/M3 陆续开放）',
+    '好友私聊与百人群组',
     '端到端加密：密文进出，服务器不可读',
     '身份密钥本机生成，密码加密备份可换机恢复',
     '仅文字，轻量纯净',

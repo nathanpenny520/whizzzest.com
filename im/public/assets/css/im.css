@@ -369,3 +369,75 @@ body.im-app {
 @media (max-width: 720px) {
   .im-back { display: block; }
 }
+
+/* ================= M3：群组 ================= */
+
+/* 群消息发送者名（他人消息气泡上方） */
+.im-sender { font-size: 11.5px; color: var(--im-faint); margin: 0 0 2px 4px; }
+
+/* 系统消息：居中细字条（服务器生成的成员可见事件通知） */
+.im-sysrow { text-align: center; margin: 12px 0; }
+.im-sysrow .im-sys {
+  display: inline-block;
+  background: #f4f4f6;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11.5px;
+  color: var(--im-faint);
+}
+
+/* 群成员面板（替代消息区显示；‹ 返回先回聊天，再退才回主页） */
+.im-members { flex: 1; overflow-y: auto; padding: 16px 20px 24px; background: #fafafa; }
+.im-members-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.im-members-list { display: flex; flex-direction: column; gap: 4px; }
+
+.im-member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--im-line);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.im-member-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.im-member-txt b { font-size: 14px; }
+.im-member-txt .im-fp { font-size: 11px; color: var(--im-faint); font-family: ui-monospace, monospace; }
+.im-member-txt span { font-size: 12px; color: var(--im-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.im-member .im-minibtn { flex-shrink: 0; }
+.im-member.im-pick { cursor: pointer; }
+.im-member.im-pick:hover { border-color: var(--im-brand); }
+.im-member.im-pick input { accent-color: var(--im-brand); flex-shrink: 0; }
+
+.im-roletag {
+  display: inline-block;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--im-brand);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.im-roletag.me { color: var(--im-faint); }
+
+/* 建群 Tab：好友多选列表 */
+.im-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 8px 0 14px;
+}
+
+@media (max-width: 720px) {
+  .im-members { padding: 12px 12px 24px; }
+}

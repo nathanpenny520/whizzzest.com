@@ -1,19 +1,26 @@
 /**
- * 焰境密语 — 聊天窗（M2：1v1）
+ * 焰境密语 — 聊天窗（M2：1v1；M3：群组）
  * 历史分页解密 → WS 实时收发（tag 确认/去重 + 缺口补拉）→ 已读上报 → typing/在线。
+ * 群组（M3）：发送者名标注、系统消息居中条、成员面板（拉人/移出，members.js）、
+ * 改名/退群/解散、成员变更/重钥/改名/被移出帧（members/rekey/rename/kicked）。
  * 明文一律 esc 渲染；发送前 UTF-8 字节预检（密文 b64 存库 ≤2000）。
  */
 
 import { connectConv } from './ws.js';
-import { GET, POST, PUT, DEL } from './api.js';
+import { GET, POST, PUT, DEL, PATCH } from './api.js';
 import { esc, avatarHtml, fingerprint, fmtTime, fmtDayLabel, utf8Len } from './ui.js';
+import { renderMembersPanel } from './members.js';
 
 const PLAIN_MAX_BYTES = 1400;  // 密文 b64 ≤2000 的安全线（理论明文上限 1471B，方案 §3.3）
+const NAME_MAX = 30;
 
 export function openChat(root, ctx, conv) {
+  const isGroup = conv.type === 'group';
   const peer = conv.peer || { uid: 0, display_name: conv.name || '会话', avatar_color: 0 };
+  const title = isGroup ? (conv.name || '群聊') : (peer.display_name || '会话');
+  const titleColor = isGroup ? (conv.id % 8) : peer.avatar_color;
   const bodyEl = root;
-  let keyInfo = null;
+  let keyInfo = null;         // { byVersion: Map<版本, CryptoKey>, latest }
   let canCrypt = false;
 
   let wsHandle = null;
@@ -24,24 +31,34 @@ export function openChat(root, ctx, conv) {
   const pending = new Map();  // tag → 待确认气泡
   let inbox = Promise.resolve();
   let peerTypingTimer = null;
+  const typists = new Map();  // uid → 过期定时器（群组多人 typing）
   let lastTypingSent = 0;
-  let blocked = false;
+
+  // 在线与成员（dm / 群组共用 onlineSet；群组另持成员表供发送者名与管理操作）
+  const onlineSet = new Set();
+  let onlineKnown = false;
+  let members = new Map();
+  let myRole = 'member';
+  let membersPanel = false;
+  let kickedDone = false;
+  let rekeyBusy = false;
 
   bodyEl.innerHTML = `
     <div class="im-chat">
       <div class="im-chat-head">
         <button class="im-back" id="chat-back" title="返回">‹</button>
-        ${avatarHtml(peer.display_name, peer.avatar_color, 38)}
+        ${avatarHtml(title, titleColor, 38)}
         <div class="im-chat-who">
-          <b>${esc(peer.display_name)}</b>
+          <b id="chat-title">${esc(title)}</b>
           <span class="im-online" id="chat-online"><i class="off"></i><em>连接中…</em></span>
         </div>
-        <code class="im-fp" id="chat-fp"></code>
+        <code class="im-fp" id="chat-fp"${isGroup ? ' hidden' : ''}></code>
         <button class="im-minibtn" id="chat-menu-btn">⋯</button>
         <div class="im-menu" id="chat-menu" hidden></div>
       </div>
       <div class="im-chat-body" id="chat-body"></div>
-      <div class="im-typing" id="chat-typing" hidden>${esc(peer.display_name)} 正在输入…</div>
+      <div class="im-members" id="chat-members" hidden></div>
+      <div class="im-typing" id="chat-typing" hidden></div>
       <form class="im-chat-input" id="chat-form">
         <textarea id="chat-text" rows="1" placeholder="加载中…"></textarea>
         <button class="im-primary" id="chat-send" type="submit" disabled>发送</button>
@@ -49,6 +66,9 @@ export function openChat(root, ctx, conv) {
     </div>`;
 
   const listEl = bodyEl.querySelector('#chat-body');
+  const panelBox = bodyEl.querySelector('#chat-members');
+  const typingEl = bodyEl.querySelector('#chat-typing');
+  const formEl = bodyEl.querySelector('#chat-form');
   const textEl = bodyEl.querySelector('#chat-text');
   const sendBtn = bodyEl.querySelector('#chat-send');
   const onlineEl = bodyEl.querySelector('#chat-online');
@@ -57,16 +77,18 @@ export function openChat(root, ctx, conv) {
   /* ---------- 启动 ---------- */
 
   (async function boot() {
-    fingerprint(peer.pub_key || '').then((fp) => {
-      bodyEl.querySelector('#chat-fp').textContent = peer.pub_key ? fp : '';
-    }).catch(() => {});
-
-    try { keyInfo = await ctx.ensureConvKey(conv); } catch { keyInfo = null; }
+    if (!isGroup && peer.pub_key) {
+      fingerprint(peer.pub_key).then((fp) => {
+        bodyEl.querySelector('#chat-fp').textContent = fp;
+      }).catch(() => {});
+    }
+    try { keyInfo = await ctx.ensureConvKeys(conv); } catch { keyInfo = null; }
     canCrypt = !!(keyInfo && ctx.identity);
     textEl.placeholder = canCrypt ? '输入消息（端到端加密）…' : '本机未解锁密钥，无法收发——退出后重新登录可恢复';
     textEl.disabled = !canCrypt;
     sendBtn.disabled = !canCrypt;
 
+    if (isGroup) await loadMembers(); // 先取成员表：历史渲染需要发送者名
     await loadHistory();
     connect();
     buildMenu();
@@ -83,12 +105,30 @@ export function openChat(root, ctx, conv) {
     markRead(lastSeq);
   }
 
+  async function loadMembers() {
+    const j = await GET(`/api/convs/${conv.id}/members`);
+    if (!j.ok) return;
+    members = new Map(j.members.map((m) => [m.uid, m]));
+    myRole = j.my_role || 'member';
+    if (j.name && conv.name !== j.name) {
+      conv.name = j.name;
+      bodyEl.querySelector('#chat-title').textContent = j.name;
+    }
+    setOnlineUI(onlineKnown);
+    ctx.renderSide();
+  }
+
+  function memberName(uid) {
+    const m = members.get(uid);
+    return m ? m.display_name : 'UID ' + uid;
+  }
+
   /* ---------- WS ---------- */
 
   function connect() {
     wsHandle = connectConv(conv.id, {
       onOpen: () => { /* hello 帧带在线名单；离线缺口由 hello 前的 lastSeq 对齐 */ gapPull(); },
-      onClose: () => setOnline(null),
+      onClose: () => setOnlineUI(false),
       onFrame,
     });
   }
@@ -99,10 +139,19 @@ export function openChat(root, ctx, conv) {
   }
 
   async function handleFrame(f) {
-    if (f.t === 'hello') { setOnline(Array.isArray(f.online) && f.online.includes(peer.uid)); return; }
-    if (f.t === 'join') { if (f.uid === peer.uid) setOnline(true); return; }
-    if (f.t === 'leave') { if (f.uid === peer.uid) setOnline(false); return; }
-    if (f.t === 'typing') { if (f.uid === peer.uid) showPeerTyping(); return; }
+    if (f.t === 'hello') {
+      onlineSet.clear();
+      (Array.isArray(f.online) ? f.online : []).forEach((u) => onlineSet.add(u));
+      setOnlineUI(true);
+      return;
+    }
+    if (f.t === 'join') { onlineSet.add(f.uid); setOnlineUI(true); return; }
+    if (f.t === 'leave') { onlineSet.delete(f.uid); setOnlineUI(true); return; }
+    if (f.t === 'typing') {
+      if (isGroup) markTypist(f.uid);
+      else if (f.uid === peer.uid) showPeerTyping();
+      return;
+    }
     if (f.t === 'err') {
       const el = pending.get(f.tag);
       if (el) {
@@ -112,6 +161,40 @@ export function openChat(root, ctx, conv) {
           rate: '发送太快，稍后再试', blocked: '无法送达', too_long: '消息过长', retry: '发送失败',
         }[f.error] || '发送失败');
       }
+      return;
+    }
+    if (f.t === 'kicked') { // 被移出/退群/解散：DO 对本连接发 kicked 后 close(4003)（ws.js 不重连）
+      if (kickedDone) return;
+      kickedDone = true;
+      alert(f.why === 'disbanded' ? '该群聊已解散' : '你已被移出群聊');
+      ctx.refreshConvs();
+      ctx.showHome();
+      return;
+    }
+    if (f.t === 'rekey') { // 有人重钥：弃缓存换新信封（旧版消息仍按 blob 版本可解）
+      ctx.clearConvKeys(conv.id);
+      keyInfo = await ctx.ensureConvKeys(conv).catch(() => null);
+      return;
+    }
+    if (f.t === 'rename') {
+      conv.name = f.name;
+      bodyEl.querySelector('#chat-title').textContent = f.name;
+      ctx.renderSide();
+      await gapPull(); // 改名系统消息入流
+      return;
+    }
+    if (f.t === 'members') {
+      await loadMembers();
+      if (Array.isArray(f.remove) && f.remove.length && myRole === 'owner' && !rekeyBusy) {
+        // 他人退群 → 群主自动补钥（退群者带不走新钥；v1.3 交底见方案文档）
+        rekeyBusy = true;
+        try {
+          await ctx.rekeyGroup(conv);
+          keyInfo = await ctx.ensureConvKeys(conv).catch(() => null);
+        } finally { rekeyBusy = false; }
+      }
+      if (membersPanel) renderMembersPanel(panelBox, panelCtl);
+      await gapPull(); // 成员变更系统消息入流
       return;
     }
     if (f.t === 'msg' && f.conv === conv.id) {
@@ -171,12 +254,15 @@ export function openChat(root, ctx, conv) {
   }
 
   function bubbleHtml(row, text, state) {
+    if (row.type === 'system') { // 系统事件：居中细字条（服务器生成的明文通知）
+      return `<div class="im-sysrow"${row.seq ? ` data-seq="${row.seq}"` : ''}><span class="im-sys">${esc(text || '')}</span></div>`;
+    }
     const mine = row.sender_id === ctx.me.uid;
-    const inner = row.type === 'system'
-      ? `<span class="im-sys">${esc(text || '')}</span>`
-      : (text === null ? '<span class="im-cant">[无法解密的消息]</span>' : esc(text).replace(/\n/g, '<br>'));
+    const inner = text === null ? '<span class="im-cant">[无法解密的消息]</span>' : esc(text).replace(/\n/g, '<br>');
+    const senderLine = isGroup && !mine ? `<div class="im-sender">${esc(memberName(row.sender_id))}</div>` : '';
     const meta = state === 'sending' ? '发送中…' : fmtTime(row.created_at);
     return `<div class="im-msgrow ${mine ? 'mine' : 'theirs'}" ${row.tag ? `data-tag="${esc(row.tag)}"` : ''}${row.seq ? ` data-seq="${row.seq}"` : ''}>
+      ${senderLine}
       <div class="im-bubble${state === 'failed' ? ' fail' : ''}">${inner}</div>
       <div class="im-msgmeta">${meta}</div>
     </div>`;
@@ -186,23 +272,43 @@ export function openChat(root, ctx, conv) {
     listEl.scrollTop = listEl.scrollHeight;
   }
 
-  function setOnline(state) { // true/false/null(未知-重连中)
+  function setOnlineUI(known) {
+    onlineKnown = known;
     const dot = onlineEl.querySelector('i');
     const txt = onlineEl.querySelector('em');
-    dot.className = state === null ? 'off' : (state ? 'on' : 'off');
-    txt.textContent = state === null ? '重连中…' : (state ? '在线' : '离线');
+    if (isGroup) {
+      dot.className = 'on';
+      txt.textContent = known ? `${members.size} 人 · ${onlineSet.size} 在线` : `${members.size || '…'} 人`;
+      return;
+    }
+    const on = onlineSet.has(peer.uid);
+    dot.className = !known ? 'off' : (on ? 'on' : 'off');
+    txt.textContent = !known ? '重连中…' : (on ? '在线' : '离线');
   }
 
   function showPeerTyping() {
-    const t = bodyEl.querySelector('#chat-typing');
-    t.hidden = false;
+    typingEl.hidden = false;
+    typingEl.textContent = `${peer.display_name} 正在输入…`;
     clearTimeout(peerTypingTimer);
-    peerTypingTimer = setTimeout(() => { t.hidden = true; }, 3000);
+    peerTypingTimer = setTimeout(() => { typingEl.hidden = true; }, 3000);
+  }
+
+  function markTypist(uid) {
+    if (uid === ctx.me.uid) return;
+    clearTimeout(typists.get(uid));
+    typists.set(uid, setTimeout(() => { typists.delete(uid); renderTypists(); }, 3000));
+    renderTypists();
+  }
+
+  function renderTypists() {
+    const names = [...typists.keys()].map(memberName);
+    typingEl.hidden = !names.length;
+    typingEl.textContent = names.length ? `${names.join('、')} 正在输入…` : '';
   }
 
   /* ---------- 发送 ---------- */
 
-  bodyEl.querySelector('#chat-form').addEventListener('submit', (e) => {
+  formEl.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = textEl.value.replace(/\s+$/, '');
     if (!text || !canCrypt) return;
@@ -215,8 +321,8 @@ export function openChat(root, ctx, conv) {
   async function sendText(text) {
     const tag = crypto.randomUUID();
     try {
-      const body = await ctx.crypto.encryptMessage(keyInfo.key, {
-        convId: conv.id, senderUid: ctx.me.uid, keyVersion: keyInfo.version, text,
+      const body = await ctx.crypto.encryptMessage(keyInfo.byVersion.get(keyInfo.latest), {
+        convId: conv.id, senderUid: ctx.me.uid, keyVersion: keyInfo.latest, text,
       });
       ensureDay(new Date());
       listEl.insertAdjacentHTML('beforeend', bubbleHtml(
@@ -237,39 +343,129 @@ export function openChat(root, ctx, conv) {
     textEl.style.height = Math.min(96, textEl.scrollHeight) + 'px';
   });
 
-  /* ---------- 头部操作（拉黑/删除好友） ---------- */
+  /* ---------- 群成员面板（members.js 渲染） ---------- */
 
-  async function buildMenu() {
-    const bj = await GET('/api/blocks').catch(() => ({ ok: false }));
-    blocked = !!(bj.ok && (bj.blocks || []).includes(peer.uid));
-    menuEl.innerHTML = `
-      <button data-act="block">${blocked ? '取消拉黑' : '拉黑对方'}</button>
-      <button data-act="del" class="warn">删除好友</button>`;
-    menuEl.querySelectorAll('button').forEach((b) => {
-      b.addEventListener('click', async () => {
-        menuEl.hidden = true;
-        if (b.dataset.act === 'block') {
-          if (!blocked) {
-            if (!confirm(`拉黑「${peer.display_name}」？对方将无法给你发申请与消息。`)) return;
-            await PUT(`/api/blocks/${peer.uid}`);
-          } else {
-            await DEL(`/api/blocks/${peer.uid}`);
-          }
-          buildMenu();
-          return;
-        }
-        if (b.dataset.act === 'del') {
-          if (!confirm(`删除好友「${peer.display_name}」？会话与聊天记录保留。`)) return;
-          const r = await DEL(`/api/friends/${peer.uid}`);
-          if (r.ok) ctx.onFriendRemoved();
-          else alert('操作失败（' + r.error + '）');
-        }
+  const panelCtl = {
+    conv,
+    ctx,
+    members: () => members,
+    myRole: () => myRole,
+    onChanged: async () => { // 变更成功后双保险：帧也会推 members（幂等）
+      await loadMembers();
+      if (membersPanel) renderMembersPanel(panelBox, panelCtl);
+      keyInfo = await ctx.ensureConvKeys(conv).catch(() => null);
+      gapPull();
+    },
+  };
+
+  function openPanel() {
+    membersPanel = true;
+    panelBox.hidden = false;
+    listEl.style.display = 'none';
+    formEl.style.display = 'none';
+    typingEl.style.display = 'none';
+    renderMembersPanel(panelBox, panelCtl);
+  }
+
+  function closePanel() {
+    membersPanel = false;
+    panelBox.hidden = true;
+    listEl.style.display = '';
+    formEl.style.display = '';
+    typingEl.style.display = '';
+  }
+
+  /* ---------- 头部操作 ---------- */
+
+  function buildMenu() {
+    if (isGroup) {
+      const owner = myRole === 'owner';
+      menuEl.innerHTML = `
+        <button data-act="members">群成员</button>
+        ${owner ? '<button data-act="rename">修改群名</button>' : ''}
+        ${owner ? '<button data-act="disband" class="warn">解散群聊</button>' : '<button data-act="leave" class="warn">退出群聊</button>'}`;
+      menuEl.querySelectorAll('button').forEach((b) => {
+        b.addEventListener('click', () => {
+          menuEl.hidden = true;
+          const act = b.dataset.act;
+          if (act === 'members') openPanel();
+          if (act === 'rename') renameGroup();
+          if (act === 'disband') disbandGroup();
+          if (act === 'leave') leaveGroup();
+        });
       });
-    });
+      return;
+    }
+    // dm：拉黑/删除好友
+    (async () => {
+      const bj = await GET('/api/blocks').catch(() => ({ ok: false }));
+      blocked = !!(bj.ok && (bj.blocks || []).includes(peer.uid));
+      menuEl.innerHTML = `
+        <button data-act="block">${blocked ? '取消拉黑' : '拉黑对方'}</button>
+        <button data-act="del" class="warn">删除好友</button>`;
+      menuEl.querySelectorAll('button').forEach((b) => {
+        b.addEventListener('click', async () => {
+          menuEl.hidden = true;
+          if (b.dataset.act === 'block') {
+            if (!blocked) {
+              if (!confirm(`拉黑「${peer.display_name}」？对方将无法给你发申请与消息。`)) return;
+              await PUT(`/api/blocks/${peer.uid}`);
+            } else {
+              await DEL(`/api/blocks/${peer.uid}`);
+            }
+            buildMenu();
+            return;
+          }
+          if (b.dataset.act === 'del') {
+            if (!confirm(`删除好友「${peer.display_name}」？会话与聊天记录保留。`)) return;
+            const r = await DEL(`/api/friends/${peer.uid}`);
+            if (r.ok) ctx.onFriendRemoved();
+            else alert('操作失败（' + r.error + '）');
+          }
+        });
+      });
+    })();
+  }
+
+  async function renameGroup() {
+    const name = prompt('新的群名（1-30 字）', conv.name || '');
+    if (name === null) return;
+    const n = name.trim().replace(/\s+/g, ' ');
+    if (!n || n.length > NAME_MAX) { alert('群名需 1-30 字'); return; }
+    const r = await PATCH(`/api/convs/${conv.id}`, { name: n });
+    if (!r.ok) {
+      alert({ name: '群名需 1-30 字', forbidden: '仅群主可以修改群名', rate: '操作太频繁，稍后再试' }[r.error] || '修改失败（' + r.error + '）');
+      return;
+    }
+    conv.name = n;
+    bodyEl.querySelector('#chat-title').textContent = n;
+    ctx.renderSide();
+    gapPull(); // 改名系统消息入流（rename 帧也会补一次，幂等）
+  }
+
+  async function disbandGroup() {
+    if (!confirm(`解散「${conv.name}」？全部成员将被移出，此操作不可恢复。`)) return;
+    const r = await DEL(`/api/convs/${conv.id}`);
+    if (!r.ok) { alert('操作失败（' + r.error + '）'); return; }
+    kickedDone = true; // 服务端 kicked(disbanded) 帧随后到，吞掉防二次弹窗
+    ctx.refreshConvs();
+    ctx.showHome();
+  }
+
+  async function leaveGroup() {
+    if (!confirm(`退出「${conv.name}」？退出后无法回看后续消息，需群主重新邀请才能回来。`)) return;
+    const r = await DEL(`/api/convs/${conv.id}`);
+    if (!r.ok) { alert('操作失败（' + r.error + '）'); return; }
+    kickedDone = true; // 本地已收尾，吞掉自己的 kicked(left) 帧
+    ctx.refreshConvs();
+    ctx.showHome();
   }
 
   bodyEl.querySelector('#chat-menu-btn').addEventListener('click', () => { menuEl.hidden = !menuEl.hidden; });
-  bodyEl.querySelector('#chat-back').addEventListener('click', () => ctx.showHome());
+  bodyEl.querySelector('#chat-back').addEventListener('click', () => {
+    if (membersPanel) closePanel();
+    else ctx.showHome();
+  });
 
   /* ---------- 已读 ---------- */
 
@@ -284,6 +480,8 @@ export function openChat(root, ctx, conv) {
     close() {
       closed = true;
       clearTimeout(peerTypingTimer);
+      for (const t of typists.values()) clearTimeout(t);
+      typists.clear();
       if (wsHandle) wsHandle.close();
     },
   };

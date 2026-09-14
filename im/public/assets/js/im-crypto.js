@@ -159,12 +159,13 @@ async function hkdfWrapKey(sharedBits, ephPubRaw) {
 }
 
 /**
- * 建会话：生成随机会话密钥 K，并为每个成员出一枚信封（含自己，换设备后可自解）。
+ * 建/换会话密钥：生成随机会话密钥 K，并为每个成员出一枚信封（含自己，换设备后可自解）。
  * 共享秘密 = ECDH(本函数临时私钥 × 成员身份公钥)；收件方以 ECDH(身份私钥 × 信封内临时公钥) 还原同一位。
  * @param members [{uid, pub_key}]（pub_key 为 65B raw 的 base64）
+ * @param keyVersion 密钥版本（建会话=1；群组重钥=当前最大+1，M3）
  * @returns { keyVersion, rawKeyB64, envelopes: [{uid, envelope}] }——rawKeyB64 供发起方直接入缓存
  */
-export async function createConvEnvelopes(members) {
+export async function createConvEnvelopes(members, keyVersion = 1) {
   const raw = randBytes(32);
   const envelopes = [];
   for (const m of members) {
@@ -181,7 +182,7 @@ export async function createConvEnvelopes(members) {
     blob.set(new Uint8Array(ct), iv.length + ephRaw.byteLength);
     envelopes.push({ uid: m.uid, envelope: bufToB64(blob.buffer) });
   }
-  return { keyVersion: 1, rawKeyB64: bufToB64(raw.buffer), envelopes };
+  return { keyVersion, rawKeyB64: bufToB64(raw.buffer), envelopes };
 }
 
 /** 解信封 → 会话密钥 raw（base64），用本机身份私钥 */
@@ -223,6 +224,12 @@ export async function encryptMessage(convKey, { convId, senderUid, keyVersion, t
   blob.set(iv, 1);
   blob.set(new Uint8Array(ct), 1 + iv.length);
   return bufToB64(blob.buffer);
+}
+
+/** 窥探消息密文 blob 的 key_version（首字节；群组重钥后按版本选钥解密，M3） */
+export function peekKeyVersion(bodyB64) {
+  const bin = atob(bodyB64);
+  return bin.length ? bin.charCodeAt(0) : 0;
 }
 
 /** 解密一条消息 → { text, keyVersion }；AAD/密钥不符时 reject */

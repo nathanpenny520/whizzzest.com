@@ -8,7 +8,7 @@
  *   src/mail.js            邮箱验证码（im_email_codes 独立表）
  *   src/api/auth.js        双方式注册/登录、资料、E2EE 密钥材料（M1）
  *   src/api/social.js      好友：搜索/申请/处理/删除/拉黑（M2）
- *   src/api/convs.js       会话：dm 幂等/列表/信封/历史/已读（M2）
+ *   src/api/convs.js       会话：dm 幂等/列表/信封/历史/已读（M2）+ 群组建/拉/踢/退/散/名/重钥（M3）
  *   src/ws.js              /ws 升级（验会话+成员资格 → DO）
  *   src/do/room.js         DO IMRoom（每会话一实例，Hibernation）
  *   src/do/rate-limiter.js DO RateLimiter（每 IP，照 workers-chat-demo）
@@ -134,15 +134,26 @@ async function handleApi(request, env, path, url) {
   if (m && method === 'PUT') return socialApi.blockPut(env, user, Number(m[1]));
   if (m && method === 'DELETE') return socialApi.blockDelete(env, user, Number(m[1]));
 
-  /* ---- 会话（M2，方案 §3.2/§6） ---- */
+  /* ---- 会话（M2 dm / M3 群组，方案 §3.2/§6） ---- */
   if (path === '/api/convs' && method === 'GET') return convsApi.convsList(env, user);
   if (path === '/api/convs/dm' && method === 'POST') return convsApi.dmCreate(request, env, user);
+  if (path === '/api/convs/group' && method === 'POST') return convsApi.groupCreate(request, env, user);
   m = path.match(/^\/api\/convs\/(\d+)\/keys$/);
   if (m && method === 'GET') return convsApi.convKeys(env, user, Number(m[1]), url);
   m = path.match(/^\/api\/convs\/(\d+)\/messages$/);
   if (m && method === 'GET') return convsApi.convMessages(env, user, Number(m[1]), url);
   m = path.match(/^\/api\/convs\/(\d+)\/read$/);
   if (m && method === 'POST') return convsApi.convRead(request, env, user, Number(m[1]));
+  m = path.match(/^\/api\/convs\/(\d+)\/members$/);
+  if (m && method === 'GET') return convsApi.membersList(env, user, Number(m[1]));
+  if (m && method === 'POST') return convsApi.membersAdd(request, env, user, Number(m[1]));
+  m = path.match(/^\/api\/convs\/(\d+)\/members\/(\d+)$/);
+  if (m && method === 'DELETE') return convsApi.memberKick(request, env, user, Number(m[1]), Number(m[2]));
+  m = path.match(/^\/api\/convs\/(\d+)\/rekey$/);
+  if (m && method === 'POST') return convsApi.convRekey(request, env, user, Number(m[1]));
+  m = path.match(/^\/api\/convs\/(\d+)$/);
+  if (m && method === 'PATCH') return convsApi.convRename(request, env, user, Number(m[1]));
+  if (m && method === 'DELETE') return convsApi.convLeave(env, user, Number(m[1]));
 
   return json({ ok: false, error: 'not_found' }, 404);
 }

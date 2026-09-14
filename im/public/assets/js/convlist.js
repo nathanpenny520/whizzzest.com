@@ -6,8 +6,9 @@ import { esc, avatarHtml, fmtListTime } from './ui.js';
 export function renderSide(sideEl, ctx) {
   const me = ctx.me;
   const rows = ctx.convs.map((c) => {
-    const name = c.type === 'dm' && c.peer ? c.peer.display_name : (c.name || '会话');
-    const color = c.type === 'dm' && c.peer ? c.peer.avatar_color : 0;
+    const isDm = c.type === 'dm' && c.peer;
+    const name = isDm ? c.peer.display_name : (c.name || '群聊');
+    const color = isDm ? c.peer.avatar_color : (c.id % 8); // 群头像色按会话 id 取预设色
     const active = c.id === ctx.activeConvId ? ' on' : '';
     const badge = c.unread > 0 ? `<span class="im-unread">${c.unread > 99 ? '99+' : c.unread}</span>` : '';
     return `

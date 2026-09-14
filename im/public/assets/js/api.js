@@ -11,4 +11,4 @@ export const GET = (p) => api(p).then((r) => r.j);
 export const POST = (p, d) => api(p, { method: 'POST', body: JSON.stringify(d || {}) }).then((r) => r.j);
 export const PATCH = (p, d) => api(p, { method: 'PATCH', body: JSON.stringify(d || {}) }).then((r) => r.j);
 export const PUT = (p) => api(p, { method: 'PUT' }).then((r) => r.j);
-export const DEL = (p) => api(p, { method: 'DELETE' }).then((r) => r.j);
+export const DEL = (p, d) => api(p, { method: 'DELETE', body: d === undefined ? undefined : JSON.stringify(d) }).then((r) => r.j);
