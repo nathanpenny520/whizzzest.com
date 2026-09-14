@@ -90,8 +90,12 @@ async function boot() {
   await refreshConvs();
   showEmptyMain();
   await refreshPendingIn(); // 好友申请横幅
-  // 其他会话的未读/末条靠轻轮询（本会话实时走 WS；推送 v1 不做，方案 §5）
-  setInterval(() => { if (document.visibilityState === 'visible') refreshConvs(); }, 20000);
+  // 其他会话的未读/末条靠轻轮询（本会话实时走 WS；P2 activity 推送上线后降为兜底，docs/IM在线与实时同步方案.md）
+  setInterval(() => { if (document.visibilityState === 'visible') syncTick(); }, 20000);
+  // P0 同步热修：切回标签页/窗口聚焦/网络恢复立即对齐，不等下一个 20s tick（业主报修「同步延迟大」）
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncTick(); });
+  addEventListener('focus', syncTick);
+  addEventListener('online', syncTick);
 }
 
 /** 下拉菜单点空白即收起（业主反馈 1）：点在菜单外/菜单按钮上的交由各自逻辑 */
@@ -225,8 +229,16 @@ async function refreshConvs() {
   const j = await GET('/api/convs');
   if (!j.ok) return;
   convs = j.convs;
-  previews.clear();
-  renderAll(); // 预览由 previewFor 同步占位 + 异步解密回填
+  renderAll(); // 预览缓存按 seq 失效（previewFor）：未变的会话不再重复解密、无「…」闪烁（P0）
+}
+
+let lastSyncTick = 0;
+/** 立即对齐（20s 轮询/可见性/聚焦/联网共用）：2s 合并——visibilitychange 与 focus 常成对触发 */
+function syncTick() {
+  if (Date.now() - lastSyncTick < 2000) return;
+  lastSyncTick = Date.now();
+  refreshConvs();
+  refreshPendingIn();
 }
 
 /** 会话行预览（同步）：缓存命中直接给文本；否则占位并触发异步解密回填 */
