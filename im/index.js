@@ -10,8 +10,10 @@
  *   src/api/social.js      好友：搜索/申请/处理/删除/拉黑（M2）
  *   src/api/convs.js       会话：dm 幂等/列表/信封/历史/已读（M2）+ 群组建/拉/踢/退/散/名/重钥（M3）
  *   src/api/reports.js     举报：成员校验 + 理由约束 + 限流，落 im_reports（M4）
- *   src/ws.js              /ws 升级（验会话+成员资格 → DO）
+ *   src/api/presence.js    在线查询：好友/同会话可见的在线名单（P1）
+ *   src/ws.js              /ws 升级（无 conv → 用户存在性 DO；有 conv → 验会话+成员资格 → 房间 DO）
  *   src/do/room.js         DO IMRoom（每会话一实例，Hibernation）
+ *   src/do/presence.js     DO IMPresence（每用户一实例：登录即在线常驻心跳，P1）
  *   src/do/rate-limiter.js DO RateLimiter（每 IP，照 workers-chat-demo）
  *   src/pages/auth.js      认证页面板 + /app 壳
  *
@@ -25,6 +27,7 @@ import * as authApi from './src/api/auth.js';
 import * as socialApi from './src/api/social.js';
 import * as convsApi from './src/api/convs.js';
 import * as reportsApi from './src/api/reports.js';
+import * as presenceApi from './src/api/presence.js';
 import { handleWs } from './src/ws.js';
 import { loginPanelHtml, registerPanelHtml, LOGIN_PAGE_JS, REGISTER_PAGE_JS, appShellHtml } from './src/pages/auth.js';
 import { PORTAL_UI } from './src/config.js';
@@ -162,10 +165,14 @@ async function handleApi(request, env, path, url) {
   /* ---- 举报（M4，方案 §6/§8：E2EE 下举报人自愿附说明，站长经 D1 处置） ---- */
   if (path === '/api/reports' && method === 'POST') return reportsApi.createReport(request, env, user);
 
+  /* ---- 在线（P1，docs/IM在线与实时同步方案.md：仅好友/同会话可见） ---- */
+  if (path === '/api/presence' && method === 'GET') return presenceApi.presenceGet(env, user, url);
+
   return json({ ok: false, error: 'not_found' }, 404);
 }
 
 /* ---------------- DO 导出 ---------------- */
 
 export { IMRoom } from './src/do/room.js';
+export { IMPresence } from './src/do/presence.js';
 export { RateLimiter } from './src/do/rate-limiter.js';

@@ -12,6 +12,7 @@ import { icon } from './icons.js';
 import { renderSide } from './convlist.js';
 import { renderProfile, renderSettings } from './profile.js';
 import { openChat } from './chat.js';
+import { connectWs } from './ws.js';
 
 const PREVIEW_PLAIN_MAX = 40;
 
@@ -96,6 +97,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncTick(); });
   addEventListener('focus', syncTick);
   addEventListener('online', syncTick);
+  openPresence(); // P1 登录即在线：常驻存在性 WS（docs/IM在线与实时同步方案.md）
 }
 
 /** 下拉菜单点空白即收起（业主反馈 1）：点在菜单外/菜单按钮上的交由各自逻辑 */
@@ -169,6 +171,7 @@ function openContactsTab(sub) {
 
 function logout() {
   return (async () => {
+    closePresence();
     await fetch('/api/logout', { method: 'POST' });
     await crypto.clearIdentity().catch(() => {});
     location.href = '/';
@@ -239,6 +242,27 @@ function syncTick() {
   lastSyncTick = Date.now();
   refreshConvs();
   refreshPendingIn();
+}
+
+/* ---------------- 存在性连接（P1 登录即在线，docs/IM在线与实时同步方案.md） ---------------- */
+
+const PRESENCE_HEARTBEAT_MS = 25000; // 与服务端 90s 在线窗口配套（≥3 次心跳余量）
+
+let presenceWs = null;
+let presenceTimer = null;
+
+/** 常驻存在性 WS（登录后开一条）：心跳保 im_presence.last_ping 新鲜；断线由 connectWs 指数退避重连 */
+function openPresence() {
+  if (presenceWs) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  presenceWs = connectWs(`${proto}//${location.host}/ws`, {});
+  presenceTimer = setInterval(() => { if (presenceWs) presenceWs.send({ t: 'ping' }); }, PRESENCE_HEARTBEAT_MS);
+}
+
+/** 登出时同步收掉存在性连接（服务器随即落离线） */
+function closePresence() {
+  if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
+  if (presenceWs) { presenceWs.close(); presenceWs = null; }
 }
 
 /** 会话行预览（同步）：缓存命中直接给文本；否则占位并触发异步解密回填 */

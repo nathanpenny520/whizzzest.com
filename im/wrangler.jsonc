@@ -19,6 +19,7 @@
   "durable_objects": {
     "bindings": [
       { "name": "ROOM", "class_name": "IMRoom" },
+      { "name": "PRESENCE", "class_name": "IMPresence" },
       { "name": "LIMITERS", "class_name": "RateLimiter" }
     ]
   },
@@ -26,6 +27,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["IMRoom", "RateLimiter"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["IMPresence"]
     }
   ],
   "assets": {

@@ -1,12 +1,15 @@
 /**
- * 焰境密语 — WebSocket 客户端（每会话一条，指数退避重连）
- * 帧协议见 docs/IM聊天方案.md §5：
- *   收：hello/ msg/ typing/ join/ leave/ err ＋ M3 群组帧：members（成员变更）/ rekey（重钥）/
- *       rename（改名）/ kicked（被移出·退群·解散，服务端随后 close 4003）＋ v2：read（已读回执，{uid, seq}）
- *   发：msg {tag, body 密文} ／ typing
+ * 焰境密语 — WebSocket 客户端（指数退避重连；泛化连接器 + 两种用法）
+ * 帧协议见 docs/IM聊天方案.md §5 与 docs/IM在线与实时同步方案.md：
+ *   会话通道 connectConv（每会话一条，聊天窗打开期间）：
+ *     收：hello/ msg/ typing/ join/ leave/ err ＋ M3 群组帧：members（成员变更）/ rekey（重钥）/
+ *         rename（改名）/ kicked（被移出·退群·解散，服务端随后 close 4003）＋ v2：read（已读回执，{uid, seq}）
+ *     发：msg {tag, body 密文} ／ typing
+ *   存在性通道 connectWs('/ws')（登录后常驻一条，P1 登录即在线）：
+ *     收：hello {you} / pong；发：{t:'ping'}（心跳，保 im_presence.last_ping 新鲜）
  */
 
-export function connectConv(convId, handlers) {
+export function connectWs(url, handlers) {
   let ws = null;
   let closed = false;
   let retries = 0;
@@ -20,8 +23,7 @@ export function connectConv(convId, handlers) {
   }
 
   function connect() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${location.host}/ws?conv=${convId}`);
+    ws = new WebSocket(url);
     ws.onopen = () => {
       retries = 0;
       flush();
@@ -55,4 +57,10 @@ export function connectConv(convId, handlers) {
       try { if (ws) ws.close(); } catch { /* 忽略 */ }
     },
   };
+}
+
+/** 每会话一条（聊天窗打开期间建立、退出即关） */
+export function connectConv(convId, handlers) {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return connectWs(`${proto}//${location.host}/ws?conv=${convId}`, handlers);
 }

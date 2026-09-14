@@ -35,8 +35,12 @@ export function openChat(root, ctx, conv) {
   let lastTypingSent = 0;
 
   // 在线与成员（dm / 群组共用 onlineSet；群组另持成员表供发送者名与管理操作）
+  // onlineSet = 房间实时集（对方开着本会话）；presenceSet = 全局在线集（P1 登录即在线，30s 轮询校正）
   const onlineSet = new Set();
+  const presenceSet = new Set();
   let onlineKnown = false;
+  let presenceKnown = false;
+  let presenceTimer = null;
   let members = new Map();
   let myRole = 'owner';
   let infoOpen = false;
@@ -90,6 +94,8 @@ export function openChat(root, ctx, conv) {
     await loadHistory();
     connect();
     buildMenu();
+    await loadPresence();
+    presenceTimer = setInterval(loadPresence, 30000);
   })();
 
   async function loadHistory() {
@@ -129,6 +135,18 @@ export function openChat(root, ctx, conv) {
   async function loadBlockState() {
     const bj = await GET('/api/blocks').catch(() => ({ ok: false }));
     blocked = !!(bj.ok && (bj.blocks || []).includes(peer.uid));
+  }
+
+  /** 全局在线（P1 登录即在线）：dm 查对方，群查全员；与房间 onlineSet 并集展示（服务端按好友/同会话过滤） */
+  async function loadPresence() {
+    const uids = isGroup ? [...members.keys()] : [peer.uid];
+    if (!uids.length) return;
+    const j = await GET('/api/presence?uids=' + uids.join(',')).catch(() => null);
+    if (!j || !j.ok) return;
+    presenceSet.clear();
+    for (const u of Object.keys(j.online || {})) presenceSet.add(Number(u));
+    presenceKnown = true;
+    renderSub();
   }
 
   function memberName(uid) {
@@ -331,11 +349,14 @@ export function openChat(root, ctx, conv) {
     }
     subEl.classList.remove('live');
     if (isGroup) {
-      subEl.textContent = onlineKnown ? `${members.size || '…'} 人 · ${onlineSet.size} 在线` : `${members.size || '…'} 人`;
+      const onlineN = new Set([...onlineSet, ...presenceSet]).size;
+      subEl.textContent = (onlineKnown || presenceKnown)
+        ? `${members.size || '…'} 人 · ${onlineN} 在线`
+        : `${members.size || '…'} 人`;
       return;
     }
-    const on = onlineSet.has(peer.uid);
-    subEl.textContent = !onlineKnown ? '重连中…' : (on ? '在线' : '离线');
+    const on = onlineSet.has(peer.uid) || presenceSet.has(peer.uid);
+    subEl.textContent = (!onlineKnown && !presenceKnown) ? '重连中…' : (on ? '在线' : '离线');
   }
 
   function markTypist(uid) {
@@ -575,6 +596,7 @@ export function openChat(root, ctx, conv) {
       closed = true;
       for (const t of typists.values()) clearTimeout(t);
       typists.clear();
+      if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
       if (wsHandle) wsHandle.close();
     },
   };
