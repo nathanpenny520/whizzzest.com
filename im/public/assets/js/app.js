@@ -27,6 +27,8 @@ let filter = 'all';           // 会话筛选：all | unread | groups
 let searchQ = '';             // 会话搜索（本地过滤）
 let pendingIn = 0;
 let currentChat = null;       // { close() }
+let selMode = false;          // 列表面板批量选择态（⋮ 进入；状态挂此以抗轮询重绘）
+const selSet = new Set();     // 批量选择勾中的会话 id
 const convKeyCache = new Map(); // convId → Promise<{ byVersion: Map<版本, CryptoKey>, latest: 版本 }>
 const previews = new Map();     // convId → { seq, text }
 
@@ -55,6 +57,12 @@ const ctx = {
   set searchQ(v) { searchQ = v; },
   get pendingIn() { return pendingIn; },
   set pendingIn(v) { pendingIn = v; },
+  get selMode() { return selMode; },
+  set selMode(v) { selMode = v; if (!v) selSet.clear(); },
+  get selSet() { return selSet; },
+  batchSetState,
+  batchMarkRead,
+  batchDelete,
   crypto,
   ui,
   renderSide: renderAll,
@@ -233,6 +241,37 @@ async function refreshConvs() {
   if (!j.ok) return;
   convs = j.convs;
   renderAll(); // 预览缓存按 seq 失效（previewFor）：未变的会话不再重复解密、无「…」闪烁（P0）
+}
+
+/* ---------------- 批量会话操作（业主拍板 ⋮ 改批量选择，2026-09-14） ---------------- */
+
+/** 批量置顶/免打扰：patch = { pinned } / { muted }，布尔值全量统一（混选以「变更为目标态」语义） */
+async function batchSetState(ids, patch) {
+  await Promise.all(ids.map((id) => POST(`/api/convs/${id}/state`, patch).catch(() => null)));
+  await refreshConvs();
+}
+
+/** 批量标为已读：仅对确有未读的会话上报其当前 last_seq */
+async function batchMarkRead(ids) {
+  await Promise.all(
+    convs.filter((c) => ids.includes(c.id) && c.unread > 0)
+      .map((c) => POST(`/api/convs/${c.id}/read`, { seq: c.last_seq }).catch(() => null))
+  );
+  await refreshConvs();
+}
+
+/** 批量删除：1v1 = 隐藏（min_seq 顶满，对方来新消息才重现）；群 = 退群/群主解散（服务端裁决）；完成即退出选择态 */
+async function batchDelete(ids) {
+  const byId = new Map(convs.map((c) => [c.id, c]));
+  await Promise.all(ids.map(async (id) => {
+    const c = byId.get(id);
+    if (!c) return;
+    if (c.type === 'group') await DEL(`/api/convs/${id}`).catch(() => null);
+    else await POST(`/api/convs/${id}/state`, { hidden: true }).catch(() => null);
+  }));
+  selMode = false;
+  selSet.clear();
+  await refreshConvs();
 }
 
 let lastSyncTick = 0;

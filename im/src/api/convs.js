@@ -12,7 +12,7 @@ import { ENVELOPE_MAX, GROUP_ADD_MAX, GROUP_MAX, GROUP_NAME_MAX, GROUP_RATE } fr
 import { isB64, json, limited, readJson } from '../util.js';
 
 async function memberRow(env, convId, uid) {
-  return env.DB.prepare('SELECT user_id, role, last_read_seq, min_seq FROM im_members WHERE conversation_id = ?1 AND user_id = ?2')
+  return env.DB.prepare('SELECT user_id, role, last_read_seq, min_seq, hidden, pinned, muted FROM im_members WHERE conversation_id = ?1 AND user_id = ?2')
     .bind(convId, uid).first();
 }
 
@@ -69,27 +69,32 @@ export async function dmCreate(request, env, user) {
     }
   }
 
-  // 成员幂等补齐（半写自愈）
+  // 成员幂等补齐（半写自愈）；发起方曾被「删除会话」隐藏的就地解除（min_seq 保留，旧史不回灌）
   const mem = await memberRow(env, conv.id, user.uid);
   if (!mem) {
     await env.DB.batch([
       env.DB.prepare("INSERT OR IGNORE INTO im_members (conversation_id, user_id, role) VALUES (?1, ?2, 'member')").bind(conv.id, user.uid),
       env.DB.prepare("INSERT OR IGNORE INTO im_members (conversation_id, user_id, role) VALUES (?1, ?2, 'member')").bind(conv.id, peerId),
     ]);
+  } else if (mem.hidden) {
+    await env.DB.prepare('UPDATE im_members SET hidden = 0 WHERE conversation_id = ?1 AND user_id = ?2').bind(conv.id, user.uid).run();
   }
 
-  // 信封先到先得（批内原子）：NOT EXISTS 行级守卫 + 单批事务——并发双建整批要么全写要么零写，
-  // 杜绝「两边各写一枚」混钥；零写（先到者已在）→ keys_written=false，客户端弃自造 K 走信封解包
+  // 信封先到先得（批内原子）：计数与写入同一 D1 batch 事务（D1 单写者串行化 batch）——
+  // 计数为 0 → 本批全量写入并 keys_written=true；已有信封（先到者/并发先至）→ 零写入且
+  // keys_written=false，客户端弃自造 K 走信封解包。杜绝「两边各写一枚」混钥。
+  // （不用 INSERT…SELECT…WHERE NOT EXISTS：D1 对其 meta.changes 缺失/不可靠）
   const want = new Set([user.uid, peerId]);
   const got = new Set(envelopes.map((e) => e.uid));
   if (got.size !== want.size || [...want].some((u) => !got.has(u))) return json({ ok: false, error: 'keys' }, 400);
-  const insRes = await env.DB.batch(envelopes.map((e) =>
-    env.DB.prepare(
-      'INSERT INTO im_conv_keys (conversation_id, key_version, uid, envelope) ' +
-      'SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM im_conv_keys WHERE conversation_id = ?1 AND key_version = ?2)'
-    ).bind(conv.id, keyVersion, e.uid, e.envelope)
-  ));
-  const keysWritten = insRes.every((r) => (r.meta && r.meta.changes) === 1);
+  const insRes = await env.DB.batch([
+    env.DB.prepare('SELECT COUNT(*) AS n FROM im_conv_keys WHERE conversation_id = ?1 AND key_version = ?2').bind(conv.id, keyVersion),
+    ...envelopes.map((e) =>
+      env.DB.prepare('INSERT OR IGNORE INTO im_conv_keys (conversation_id, key_version, uid, envelope) VALUES (?1, ?2, ?3, ?4)')
+        .bind(conv.id, keyVersion, e.uid, e.envelope)
+    ),
+  ]);
+  const keysWritten = Array.isArray(insRes[0]?.results) && insRes[0].results[0]?.n === 0;
 
   const peer = await env.DB.prepare('SELECT id, display_name, avatar_color FROM im_users WHERE id = ?1').bind(peerId).first();
   return json({
@@ -104,7 +109,7 @@ export async function dmCreate(request, env, user) {
 export async function convsList(env, user) {
   const rows = await env.DB.prepare(
     `SELECT c.id, c.type, c.name, c.created_at,
-            m.last_read_seq,
+            m.last_read_seq, m.pinned, m.muted,
             (SELECT m2.last_read_seq FROM im_members m2 WHERE m2.conversation_id = c.id AND m2.user_id != ?1 LIMIT 1) AS peer_last_read,
             (SELECT COALESCE(MAX(seq), 0) FROM im_messages WHERE conversation_id = c.id) AS last_seq,
             (SELECT COUNT(*) FROM im_messages WHERE conversation_id = c.id
@@ -115,8 +120,8 @@ export async function convsList(env, user) {
      LEFT JOIN im_messages lm
        ON lm.conversation_id = c.id
       AND lm.seq = (SELECT MAX(seq) FROM im_messages WHERE conversation_id = c.id)
-     WHERE m.user_id = ?1
-     ORDER BY last_seq DESC, c.id DESC`
+     WHERE m.user_id = ?1 AND m.hidden = 0
+     ORDER BY m.pinned DESC, last_seq DESC, c.id DESC`
   ).bind(user.uid).all();
 
   // dm 会话补对方信息（显示名/头像色/公钥——公钥供聊天窗指纹核验与 M3 群信封）
@@ -144,6 +149,9 @@ export async function convsList(env, user) {
       created_at: r.created_at,
       last_seq: r.last_seq,
       last_read_seq: r.last_read_seq,
+      // 批量会话操作（008 迁移）：置顶/免打扰随行直出；hidden 行已被 WHERE 过滤不外露
+      pinned: !!r.pinned,
+      muted: !!r.muted,
       // 已读回执（UI v2）：仅 1v1 回对方已读位，群聊不做回执（对齐 WhatsApp）
       peer_last_read: r.type === 'dm' ? (r.peer_last_read || 0) : undefined,
       unread: r.unread,
@@ -224,6 +232,49 @@ export async function convRead(request, env, user, convId) {
     await notifyRoom(env, convId, [], { t: 'read', uid: user.uid, seq });
   }
   return json({ ok: true });
+}
+
+/* ---------------- 会话状态（批量操作 v1：置顶/免打扰/删除=隐藏） ---------------- */
+
+export async function convState(request, env, user, convId) {
+  const body = await readJson(request);
+  if (!body) return json({ ok: false, error: 'format' }, 400);
+  const m = await memberRow(env, convId, user.uid);
+  if (!m) return json({ ok: false, error: 'forbidden' }, 403);
+
+  const sets = [];
+  const binds = [];
+  const add = (col, val) => { sets.push(`${col} = ?${binds.length + 1}`); binds.push(val); };
+  // hidden 仅 1v1（群走退群/解散 DELETE /api/convs/:id）；隐藏即旧史弃看——min_seq 与已读位
+  // 同步顶到当前最大 seq，对端来新消息经 room.js 发送钩子解除隐藏后旧历史不回灌
+  if (body.hidden !== undefined) {
+    const conv = await convRow(env, convId);
+    if (!conv || conv.type !== 'dm') return json({ ok: false, error: 'format' }, 400);
+    add('hidden', body.hidden ? 1 : 0);
+    if (body.hidden) {
+      const top = await maxSeq(env, convId);
+      sets.push(`min_seq = ?${binds.length + 1}`);
+      binds.push(top);
+      sets.push(`last_read_seq = MAX(COALESCE(last_read_seq, 0), ?${binds.length + 1})`);
+      binds.push(top);
+    }
+  }
+  for (const k of ['pinned', 'muted']) {
+    if (body[k] === undefined) continue;
+    add(k, body[k] ? 1 : 0);
+  }
+  if (!sets.length) return json({ ok: false, error: 'format' }, 400);
+  const convPh = binds.length + 1;
+  const userPh = binds.length + 2;
+  binds.push(convId, user.uid);
+  await env.DB.prepare(`UPDATE im_members SET ${sets.join(', ')} WHERE conversation_id = ?${convPh} AND user_id = ?${userPh}`)
+    .bind(...binds).run();
+  return json({ ok: true });
+}
+
+async function maxSeq(env, convId) {
+  const r = await env.DB.prepare('SELECT COALESCE(MAX(seq), 0) AS s FROM im_messages WHERE conversation_id = ?1').bind(convId).first();
+  return r.s;
 }
 
 /* ==================================================================

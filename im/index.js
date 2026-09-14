@@ -151,6 +151,8 @@ async function handleApi(request, env, path, url) {
   if (m && method === 'GET') return convsApi.convMessages(env, user, Number(m[1]), url);
   m = path.match(/^\/api\/convs\/(\d+)\/read$/);
   if (m && method === 'POST') return convsApi.convRead(request, env, user, Number(m[1]));
+  m = path.match(/^\/api\/convs\/(\d+)\/state$/);
+  if (m && method === 'POST') return convsApi.convState(request, env, user, Number(m[1]));
   m = path.match(/^\/api\/convs\/(\d+)\/members$/);
   if (m && method === 'GET') return convsApi.membersList(env, user, Number(m[1]));
   if (m && method === 'POST') return convsApi.membersAdd(request, env, user, Number(m[1]));

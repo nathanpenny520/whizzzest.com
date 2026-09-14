@@ -427,6 +427,26 @@ button { font-family: inherit; }
   border-top: 9px solid var(--bubble-out);
   border-left: 8px solid transparent;
 }
+/* 现代浏览器：弧形尾鳍替代 border 三角（业主反馈硬拼三角与圆角衔接生硬）——
+   外弧圆肩 + 贴底连续 + 软尖；z-index:-1 垫到气泡背景之下，盒内重叠段不压时间/回执文字，盒外浮在壁纸之上 */
+@supports (clip-path: path('M0 0 L1 1')) {
+  .im-msgrow.theirs .im-bubble::before,
+  .im-msgrow.mine .im-bubble::after {
+    width: 20px; height: 15px;
+    border: 0;
+    z-index: -1;
+  }
+  .im-msgrow.theirs .im-bubble::before {
+    left: -8px;
+    background: var(--bubble-in);
+    clip-path: path('M10,0 Q5,0 2.5,4 Q0.5,7.5 1,11 Q1.4,13.8 4,15 L10,15 Z');
+  }
+  .im-msgrow.mine .im-bubble::after {
+    right: -8px;
+    background: var(--bubble-out);
+    clip-path: path('M10,0 Q15,0 17.5,4 Q19.5,7.5 19,11 Q18.6,13.8 16,15 L10,15 Z');
+  }
+}
 .im-bubble.fail { opacity: .6; outline: 1px dashed var(--danger); outline-offset: 1px; }
 .im-cant { font-size: 12.5px; color: inherit; opacity: .75; font-style: italic; }
 
@@ -730,3 +750,59 @@ button { font-family: inherit; }
 
   .im-chat-head .im-chat-sub { display: block; }
 }
+
+/* ============ 批量选择会话（业主拍板 ⋮ 改批量操作，2026-09-14，文件尾追加） ============ */
+
+.im-selmode .im-row { position: relative; padding-left: 46px; }
+.im-selck {
+  display: none;
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px;
+  border: 1.6px solid var(--ink-2);
+  border-radius: 50%;
+  align-items: center; justify-content: center;
+  color: #fff;
+  flex: 0 0 auto;
+}
+.im-selmode .im-selck { display: inline-flex; }
+.im-selck.on { background: var(--accent); border-color: var(--accent); }
+.im-selmode .im-row.picked { background: var(--panel-hi); }
+
+.im-selhead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 20px 8px;
+  font-size: 13px; color: var(--ink-2);
+}
+.im-selhead b { color: var(--ink); }
+.im-selhead button {
+  border: 0; background: transparent;
+  font: inherit; font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.im-selhead button:hover { text-decoration: underline; }
+
+.im-selbar {
+  display: flex; gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  flex: none;
+}
+.im-selbar button {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: transparent;
+  font: inherit; font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 8px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.im-selbar button:hover:not(:disabled) { background: var(--panel-hi); }
+.im-selbar button:disabled { opacity: .4; cursor: default; }
+.im-selbar button.warn { color: var(--danger); }
+
+/* 免打扰角标（行内时间旁，抑制红色未读徽标） */
+.im-mutic { color: var(--ink-2); margin-left: 5px; vertical-align: -2px; }

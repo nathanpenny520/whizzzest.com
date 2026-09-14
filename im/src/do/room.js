@@ -147,6 +147,9 @@ export class IMRoom {
       console.error('im room insert failed:', err);
       return fail('retry');
     }
+    // 「删除会话」隐藏解除：任一方来新消息即恢复列表可见（min_seq 挡旧史，见 convs.js convState）
+    await this.env.DB.prepare('UPDATE im_members SET hidden = 0 WHERE conversation_id = ?1 AND hidden = 1')
+      .bind(this.convId).run().catch((err) => console.error('im unhide failed:', err));
     // 广播含发送者自己（tag 回显 = 发送确认 + 去重）
     this.broadcast({ t: 'msg', conv: this.convId, seq: row ? row.seq : 0, uid: att.uid, body, at: row ? row.created_at : null, tag });
   }
