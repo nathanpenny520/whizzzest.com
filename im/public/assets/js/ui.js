@@ -15,7 +15,7 @@ export function avatarHtml(name, color, size) {
   return `<span class="im-avatar" style="width:${size}px;height:${size}px;background:hsl(${hue} 62% 46%);font-size:${Math.round(size * 0.42)}px">${ch}</span>`;
 }
 
-/** 公钥指纹（SHA-256 前 8 字节，4×4 十六进制组）——M4 换安全数字核验，现在仅作展示 */
+/** 公钥指纹（SHA-256 前 8 字节，4×4 十六进制组）——群成员面板逐员展示用 */
 export async function fingerprint(pubKeyB64) {
   const bin = atob(pubKeyB64);
   const u = new Uint8Array(bin.length);
@@ -23,6 +23,22 @@ export async function fingerprint(pubKeyB64) {
   const digest = await crypto.subtle.digest('SHA-256', u);
   const hex = [...new Uint8Array(digest)].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
   return hex.replace(/(..)(..)(..)(..)/, '$1 $2 $3 $4').toUpperCase();
+}
+
+/**
+ * 安全数字（M4，1v1 核验）：双方公钥按字节序拼接后的 SHA-256，取 30 位十六进制分 6 组。
+ * 两端各自算出同一串 ⇒ 目录里对方公钥未被中间替换（对齐 §3.4「服务器作恶换公钥」的可用核验）；
+ * 定长 b64 的字典序 = 字节序，直接比较串即可。
+ */
+export async function safetyNumber(pubA, pubB) {
+  const raw = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+  const [a, b] = pubA < pubB ? [raw(pubA), raw(pubB)] : [raw(pubB), raw(pubA)];
+  const joined = new Uint8Array(a.length + b.length);
+  joined.set(a, 0);
+  joined.set(b, a.length);
+  const digest = await crypto.subtle.digest('SHA-256', joined);
+  const hex = [...new Uint8Array(digest)].slice(0, 15).map((x) => x.toString(16).padStart(2, '0')).join('');
+  return hex.replace(/(.{5})(.{5})(.{5})(.{5})(.{5})(.{5})/, '$1 $2 $3 $4 $5 $6').toUpperCase();
 }
 
 /** D1 时间戳（'YYYY-MM-DD HH:MM:SS' UTC）或 Date → Date（本地时区展示） */

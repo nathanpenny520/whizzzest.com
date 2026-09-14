@@ -5,25 +5,24 @@
  *   - seq 分配（v1.3 修订）：不再用 DO 内存计数器——M3 起系统消息由 REST 侧插入，分配器必须共用。
  *     改为「INSERT 内 MAX(seq)+1 标量子查询」（D1 单语句原子），DO/REST 撞不了号；
  *     分配后落库失败留空洞无害（拉历史按 seq 排序）
- *   - 消息流：成员校验（信任 attachment）→ 限流 → 拉黑拒收（仅 dm，群聊不按私聊拉黑拦截）→ 写 D1 →
- *     广播（含发送者，tag 回显确认）
+ *   - 消息流：成员校验（信任 attachment）→ 限流（每会话 10条/10s + 注册<1h 新号 5条/min + 全局 RateLimiter
+ *     按发送者 IP 分键）→ 拉黑拒收（仅 dm，群聊不按私聊拉黑拦截）→ 写 D1 → 广播（含发送者，tag 回显确认）
  *   - 在线：hello 名单 + join/leave 广播；typing 纯转发不落库
  *   - /sys（仅 Worker 经 binding 可达）：成员变更通知——kick 名单收 kicked 帧并 close(4003)，frame 广播余员
  */
 
-import { MSG_BODY_MAX, WS_PER_UID_LIMIT } from '../config.js';
+import { MSG_BODY_MAX, NEW_ACCT_SEND, SEND_MAX_PER_WINDOW, SEND_WINDOW_MS, WS_PER_UID_LIMIT } from '../config.js';
+import { dbTimeMs } from '../util.js';
 import { RateLimiterClient } from './rate-limiter.js';
-
-const SEND_WINDOW_MS = 10_000;
-const SEND_MAX_PER_WINDOW = 10; // 每会话每 uid 10 条/10s（方案 §8）
 
 export class IMRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
     this.convId = Number(String(state.id.name || '').replace(/^c/, '')) || 0;
-    this.sends = new Map();   // uid → 最近发送时间戳
-    this.rl = null;
+    this.sends = new Map();      // uid → 最近发送时间戳（保留 60s 供新号限流复用）
+    this.rls = new Map();        // 发送者 IP → RateLimiterClient（M4 顺修：原整会话共用首个发送者的 IP 键，他人会互相消耗预算）
+    this.acctAge = new Map();    // uid → 'new' | 'old'（账号年龄缓存，每 uid 每实例查一次 D1）
   }
 
   async fetch(request) {
@@ -106,21 +105,25 @@ export class IMRoom {
     if (body.length > MSG_BODY_MAX) return fail('too_long');
 
     const now = Date.now();
-    const hits = (this.sends.get(att.uid) || []).filter((t) => now - t < SEND_WINDOW_MS);
+    const hits = (this.sends.get(att.uid) || []).filter((t) => now - t < NEW_ACCT_SEND.windowMs);
     hits.push(now);
     this.sends.set(att.uid, hits);
-    if (hits.length > SEND_MAX_PER_WINDOW) return fail('rate');
+    // 每会话每 uid 10 条/10s（方案 §8）
+    if (hits.filter((t) => now - t < SEND_WINDOW_MS).length > SEND_MAX_PER_WINDOW) return fail('rate');
+    // 注册<1h 新号 5 条/min（方案 §8，M4 落地；per-conv 粒度，与全局每 IP 限流叠加兜底）
+    if ((await this.isNewAccount(att.uid)) && hits.length > NEW_ACCT_SEND.max) return fail('rate');
 
-    // 全局限流（每 IP 一个 RateLimiter DO，照 workers-chat-demo）
+    // 全局限流（每 IP 一个 RateLimiter DO，照 workers-chat-demo；按发送者 IP 分键，M4 顺修）
     // 修复（随 M3）：原实现漏了 .get()——把 DO ID 当 stub 用，首条消息后 callLimiter 必错、
     // inCooldown 永久卡死（人工慢节奏 + DO 快速逐出掩盖至今）
-    if (!this.rl) {
-      this.rl = new RateLimiterClient(
-        () => this.env.LIMITERS.get(this.env.LIMITERS.idFromName(att.ip || 'room' + this.convId)),
+    const rlKey = att.ip || 'u' + att.uid;
+    if (!this.rls.has(rlKey)) {
+      this.rls.set(rlKey, new RateLimiterClient(
+        () => this.env.LIMITERS.get(this.env.LIMITERS.idFromName(rlKey)),
         (err) => console.error('im rate limiter:', err)
-      );
+      ));
     }
-    if (!this.rl.checkLimit()) return fail('rate');
+    if (!this.rls.get(rlKey).checkLimit()) return fail('rate');
 
     // 拉黑双向 → 拒收：仅 1v1 生效（群聊不按私聊拉黑拦截，v1.3）；不落库不广播，仅发送方收错误帧（方案 §8）
     if (att.type !== 'group') {
@@ -159,6 +162,20 @@ export class IMRoom {
   }
 
   /* ---- 内部 ---- */
+
+  /** 账号是否注册<1h（结果按 uid 缓存：实例生命周期内判定不变，查一次即可） */
+  async isNewAccount(uid) {
+    if (this.acctAge.has(uid)) return this.acctAge.get(uid) === 'new';
+    let isNew = false;
+    try {
+      const row = await this.env.DB.prepare('SELECT created_at FROM im_users WHERE id = ?1').bind(uid).first();
+      isNew = !row || (Date.now() - dbTimeMs(row.created_at)) < NEW_ACCT_SEND.ageMs;
+    } catch (err) {
+      console.error('im room account age:', err); // 查询失败按老号放行（per-conv 与全局限流仍在）
+    }
+    this.acctAge.set(uid, isNew ? 'new' : 'old');
+    return isNew;
+  }
 
   peerOf(uid) {
     return this.env.DB.prepare('SELECT user_id AS peer FROM im_members WHERE conversation_id = ?1 AND user_id != ?2 LIMIT 1')

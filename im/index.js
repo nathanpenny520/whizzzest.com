@@ -9,6 +9,7 @@
  *   src/api/auth.js        双方式注册/登录、资料、E2EE 密钥材料（M1）
  *   src/api/social.js      好友：搜索/申请/处理/删除/拉黑（M2）
  *   src/api/convs.js       会话：dm 幂等/列表/信封/历史/已读（M2）+ 群组建/拉/踢/退/散/名/重钥（M3）
+ *   src/api/reports.js     举报：成员校验 + 理由约束 + 限流，落 im_reports（M4）
  *   src/ws.js              /ws 升级（验会话+成员资格 → DO）
  *   src/do/room.js         DO IMRoom（每会话一实例，Hibernation）
  *   src/do/rate-limiter.js DO RateLimiter（每 IP，照 workers-chat-demo）
@@ -23,6 +24,7 @@ import { sendEmailCode } from './src/mail.js';
 import * as authApi from './src/api/auth.js';
 import * as socialApi from './src/api/social.js';
 import * as convsApi from './src/api/convs.js';
+import * as reportsApi from './src/api/reports.js';
 import { handleWs } from './src/ws.js';
 import { loginPanelHtml, registerPanelHtml, LOGIN_PAGE_JS, REGISTER_PAGE_JS, appShellHtml } from './src/pages/auth.js';
 import { PORTAL_UI } from './src/config.js';
@@ -154,6 +156,9 @@ async function handleApi(request, env, path, url) {
   m = path.match(/^\/api\/convs\/(\d+)$/);
   if (m && method === 'PATCH') return convsApi.convRename(request, env, user, Number(m[1]));
   if (m && method === 'DELETE') return convsApi.convLeave(env, user, Number(m[1]));
+
+  /* ---- 举报（M4，方案 §6/§8：E2EE 下举报人自愿附说明，站长经 D1 处置） ---- */
+  if (path === '/api/reports' && method === 'POST') return reportsApi.createReport(request, env, user);
 
   return json({ ok: false, error: 'not_found' }, 404);
 }

@@ -8,7 +8,7 @@
 
 import { connectConv } from './ws.js';
 import { GET, POST, PUT, DEL, PATCH } from './api.js';
-import { esc, avatarHtml, fingerprint, fmtTime, fmtDayLabel, utf8Len } from './ui.js';
+import { esc, avatarHtml, fingerprint, safetyNumber, fmtTime, fmtDayLabel, utf8Len } from './ui.js';
 import { renderMembersPanel } from './members.js';
 
 const PLAIN_MAX_BYTES = 1400;  // 密文 b64 ≤2000 的安全线（理论明文上限 1471B，方案 §3.3）
@@ -42,6 +42,7 @@ export function openChat(root, ctx, conv) {
   let membersPanel = false;
   let kickedDone = false;
   let rekeyBusy = false;
+  let blocked = false;        // dm：是否已拉黑（M4 顺修：原未声明，严格模式下赋值抛 ReferenceError，菜单按钮渲染不出）
 
   bodyEl.innerHTML = `
     <div class="im-chat">
@@ -78,8 +79,11 @@ export function openChat(root, ctx, conv) {
 
   (async function boot() {
     if (!isGroup && peer.pub_key) {
-      fingerprint(peer.pub_key).then((fp) => {
-        bodyEl.querySelector('#chat-fp').textContent = fp;
+      // 安全数字（M4）：双方公钥联合指纹，两端一致即可信（替代 M2 单侧指纹展示）
+      safetyNumber(ctx.me.pub_key || '', peer.pub_key).then((sn) => {
+        const el = bodyEl.querySelector('#chat-fp');
+        el.textContent = sn;
+        el.title = '安全数字：双方公钥的联合指纹。与对方当面/另行核对一致，即可确认没有中间人。';
       }).catch(() => {});
     }
     try { keyInfo = await ctx.ensureConvKeys(conv); } catch { keyInfo = null; }
@@ -383,6 +387,7 @@ export function openChat(root, ctx, conv) {
       menuEl.innerHTML = `
         <button data-act="members">群成员</button>
         ${owner ? '<button data-act="rename">修改群名</button>' : ''}
+        <button data-act="report">举报</button>
         ${owner ? '<button data-act="disband" class="warn">解散群聊</button>' : '<button data-act="leave" class="warn">退出群聊</button>'}`;
       menuEl.querySelectorAll('button').forEach((b) => {
         b.addEventListener('click', () => {
@@ -392,6 +397,7 @@ export function openChat(root, ctx, conv) {
           if (act === 'rename') renameGroup();
           if (act === 'disband') disbandGroup();
           if (act === 'leave') leaveGroup();
+          if (act === 'report') reportConv();
         });
       });
       return;
@@ -402,6 +408,7 @@ export function openChat(root, ctx, conv) {
       blocked = !!(bj.ok && (bj.blocks || []).includes(peer.uid));
       menuEl.innerHTML = `
         <button data-act="block">${blocked ? '取消拉黑' : '拉黑对方'}</button>
+        <button data-act="report">举报</button>
         <button data-act="del" class="warn">删除好友</button>`;
       menuEl.querySelectorAll('button').forEach((b) => {
         b.addEventListener('click', async () => {
@@ -416,6 +423,10 @@ export function openChat(root, ctx, conv) {
             buildMenu();
             return;
           }
+          if (b.dataset.act === 'report') {
+            reportConv();
+            return;
+          }
           if (b.dataset.act === 'del') {
             if (!confirm(`删除好友「${peer.display_name}」？会话与聊天记录保留。`)) return;
             const r = await DEL(`/api/friends/${peer.uid}`);
@@ -425,6 +436,19 @@ export function openChat(root, ctx, conv) {
         });
       });
     })();
+  }
+
+  /** 举报本会话（M4，方案 §6/§8）：整段 seq 区间 + 说明；明文不出端，站长只收说明（自愿附引用文 v1 未做） */
+  async function reportConv() {
+    const reason = prompt('举报说明（1-200 字）。\n聊天内容端到端加密，站长无法查看——请尽量描述问题（骚扰、诈骗、违规内容等）。');
+    if (reason === null) return;
+    const r = await POST('/api/reports', { conversation_id: conv.id, seq_from: 0, seq_to: lastSeq, reason: reason.trim() });
+    if (r.ok) { alert('已收到举报，感谢反馈。'); return; }
+    alert({
+      rate: '举报太频繁，请稍后再试',
+      reason: '请填写 1-200 字的举报说明',
+      not_found: '会话不存在或你已不在其中',
+    }[r.error] || '举报失败（' + r.error + '）');
   }
 
   async function renameGroup() {
