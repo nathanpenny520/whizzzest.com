@@ -3,7 +3,7 @@
  * 职责：承载「登录即在线」的常驻存在性 WS——连接/心跳写 im_presence.last_ping（内存节流），
  *       最后一条连接断开即删行；在线判定读时按 90s 窗口计算（异常断线自愈，无需 alarm）。
  * 隐私边界：查询侧（src/api/presence.js）只对「好友或同会话成员」返回在线，本 DO 不做可见性判断。
- * P2 预留：本实例将兼任该用户的推送枢纽（/deliver → 全部 socket 扇出），见方案文档 P2 章。
+ * P2 枢纽：本实例兼任该用户的推送枢纽（/deliver → 全部 socket 扇出轻量帧），见方案文档 P2 章。
  */
 
 import { PRESENCE_WRITE_THROTTLE_MS, WS_PER_UID_LIMIT } from '../config.js';
@@ -19,6 +19,7 @@ export class IMPresence {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === '/connect') return this.connect(request);
+    if (url.pathname === '/deliver' && request.method === 'POST') return this.deliver(request);
     return new Response('not found', { status: 404 });
   }
 
@@ -75,6 +76,22 @@ export class IMPresence {
 
   async webSocketError(ws) {
     try { ws.close(1011, 'error'); } catch { /* 已关 */ }
+  }
+
+  /* ---- P2 枢纽投递（仅 Worker 经 binding 可达，同 /sys 约束） ----
+   * 轻量帧：{t:'activity', conv, seq}（会话有动静）/ {t:'contact'}（好友/群事件有变）。
+   * 扇出给该用户全部存在性 socket；前端节流回源拉权威数据，枢纽不经手任何密文。 */
+
+  async deliver(request) {
+    let f;
+    try { f = await request.json(); } catch { return new Response('bad request', { status: 400 }); }
+    if (f && (f.t === 'activity' || f.t === 'contact')) {
+      const s = JSON.stringify(f);
+      for (const ws of this.state.getWebSockets()) {
+        try { ws.send(s); } catch { /* 死连接交给 webSocketClose/Error */ }
+      }
+    }
+    return new Response('ok');
   }
 
   /* ---- 内部 ---- */

@@ -13,6 +13,7 @@
 
 import { MSG_BODY_MAX, NEW_ACCT_SEND, SEND_MAX_PER_WINDOW, SEND_WINDOW_MS, WS_PER_UID_LIMIT } from '../config.js';
 import { dbTimeMs } from '../util.js';
+import { deliverIfOnline } from '../api/presence.js';
 import { RateLimiterClient } from './rate-limiter.js';
 
 export class IMRoom {
@@ -23,6 +24,7 @@ export class IMRoom {
     this.sends = new Map();      // uid → 最近发送时间戳（保留 60s 供新号限流复用）
     this.rls = new Map();        // 发送者 IP → RateLimiterClient（M4 顺修：原整会话共用首个发送者的 IP 键，他人会互相消耗预算）
     this.acctAge = new Map();    // uid → 'new' | 'old'（账号年龄缓存，每 uid 每实例查一次 D1）
+    this.memberIds = null;       // 会话成员 uid 缓存（P2 activity 投递用；/sys 成员变更时失效）
   }
 
   async fetch(request) {
@@ -76,7 +78,17 @@ export class IMRoom {
         try { ws.close(4003, 'removed'); } catch { /* 已关 */ }
       }
     }
-    if (m && m.frame && typeof m.frame === 'object') this.broadcast(m.frame);
+    if (m && m.frame && typeof m.frame === 'object') {
+      this.broadcast(m.frame);
+      // P2：成员/重钥/改名帧对未打开会话的成员也意味着列表有变（系统消息入流）——经枢纽投 activity；
+      // read 帧不影响列表，不投。kicked 成员已离场，不投。
+      if (m.frame.t === 'members' || m.frame.t === 'rekey' || m.frame.t === 'rename') {
+        this.memberIds = null; // 成员名单可能已变
+        const kickedUids = kick.map((k) => Number(k && k.uid));
+        const targets = (await this.memberUids()).filter((uid) => !this.onlineSet().has(uid) && !kickedUids.includes(uid));
+        await deliverIfOnline(this.env, targets, { t: 'activity', conv: this.convId });
+      }
+    }
     return new Response('ok');
   }
 
@@ -152,6 +164,10 @@ export class IMRoom {
       .bind(this.convId).run().catch((err) => console.error('im unhide failed:', err));
     // 广播含发送者自己（tag 回显 = 发送确认 + 去重）
     this.broadcast({ t: 'msg', conv: this.convId, seq: row ? row.seq : 0, uid: att.uid, body, at: row ? row.created_at : null, tag });
+    // P2 activity 投递：不在本房间（未打开本会话）但在线的成员，经其存在性枢纽收轻量信号 → 前端节流回源刷新列表；
+    // 房间内成员已在上面收到完整帧，跳过。hidden 解除等库变更已先行完成，回源即见一致状态。
+    const targets = (await this.memberUids()).filter((uid) => !this.onlineSet().has(uid));
+    await deliverIfOnline(this.env, targets, { t: 'activity', conv: this.convId, seq: row ? row.seq : 0 });
   }
 
   async webSocketClose(ws) {
@@ -191,6 +207,25 @@ export class IMRoom {
       try { const a = ws.deserializeAttachment(); if (a && a.uid) set.add(a.uid); } catch { /* 忽略 */ }
     }
     return [...set];
+  }
+
+  onlineSet() {
+    return new Set(this.onlineUids());
+  }
+
+  /** 会话成员 uid（P2 投递用；实例级缓存，成员变更帧/kick 时置 null 失效） */
+  async memberUids() {
+    if (!this.memberIds) {
+      try {
+        const rows = await this.env.DB.prepare('SELECT user_id AS uid FROM im_members WHERE conversation_id = ?1')
+          .bind(this.convId).all();
+        this.memberIds = rows.results.map((r) => r.uid);
+      } catch (err) {
+        console.error('im room members lookup:', err);
+        return [];
+      }
+    }
+    return this.memberIds;
   }
 
   broadcast(frame, except) {

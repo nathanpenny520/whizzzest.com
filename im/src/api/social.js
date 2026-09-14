@@ -6,6 +6,7 @@
 
 import { normalizePhone } from '../../../shared/phone.js';
 import { EMAIL_RE, RATE_SEARCH, RATE_FRIEND_REQ, FRIEND_REQ_MSG_MAX } from '../config.js';
+import { deliverIfOnline } from './presence.js';
 import { json, limited, readJson } from '../util.js';
 
 const USER_CARD = 'id, display_name, bio, avatar_color, pub_key';
@@ -81,6 +82,7 @@ export async function requestCreate(request, env, user) {
     return json({ ok: true });
   }
   await env.DB.prepare('INSERT INTO im_friend_requests (from_uid, to_uid, message) VALUES (?1, ?2, ?3)').bind(user.uid, targetId, message).run();
+  await deliverIfOnline(env, [targetId], { t: 'contact' }); // P2：申请横幅秒级出现
   return json({ ok: true });
 }
 
@@ -122,6 +124,7 @@ export async function requestHandle(request, env, user, reqId, action) {
     env.DB.prepare('INSERT OR IGNORE INTO im_friendships (user_id, friend_id) VALUES (?1, ?2)').bind(user.uid, row.from_uid),
     env.DB.prepare('INSERT OR IGNORE INTO im_friendships (user_id, friend_id) VALUES (?1, ?2)').bind(row.from_uid, user.uid),
   ]);
+  await deliverIfOnline(env, [row.from_uid], { t: 'contact' }); // P2：申请人侧好友列表即时可刷
   return json({ ok: true });
 }
 
@@ -152,6 +155,7 @@ export async function friendDelete(env, user, friendId) {
     env.DB.prepare('DELETE FROM im_friendships WHERE user_id = ?1 AND friend_id = ?2').bind(friendId, user.uid),
   ]);
   if (!r[0].meta.changes) return json({ ok: false, error: 'not_friends' }, 404);
+  await deliverIfOnline(env, [friendId], { t: 'contact' }); // P2：被删方联系人页/会话状态可即时校正
   return json({ ok: true });
 }
 

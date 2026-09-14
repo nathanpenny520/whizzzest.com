@@ -56,7 +56,10 @@ A/B 取舍备忘：全量帧推送（B）省一次 REST 往返但要求全部帧
 - 真浏览器（本地 dev，双账号）：B 仅登录（未开会话）→ A 的 dm 头部显示**在线**（房间集必为空，「在线」只能来自 presence）；断开 B → 重开会话显示**离线**；console 零报错。
 - bundle（check-frontend esbuild 全模块）+ wrangler dry-run + check-i18n 全绿。
 
-## 5. P2 · 轻量 activity 通知（业主选 A，待实施）
+## 5. P2 · 轻量 activity 通知（业主选 A，已实施）
+
+> 实施落档（2026-09-14）：§5.1 设计如约落地，补充细节——IMRoom 实例级成员缓存 `memberUids()`（/sys 成员变更帧与 kick 时失效）；投递目标=「im_presence 90s 窗口内在线 ∖ 本房间 socket 持有者」（离线者唤醒 DO 无意义，先查库过滤）；room /sys 的 members/rekey/rename 帧也投 activity（read 帧不投）；社交事件埋点=好友申请（目标）/申请同意（申请人）/删除好友（被删方），经 `deliverIfOnline()`；contact 帧前端仅在联系人面板**列表页**（无输入态）就地重绘，子页表单不打断（v2 交互铁律）；兜底轮询 20s→60s。
+> 验收：本地 p2-test.mjs **12 断言全过**（未打开会话收 activity{conv,seq}/房间内完整帧照旧且枢纽零重复投/非成员不投/contact 秒达/存在性离线仅房间在线照常收发）+ 真浏览器（B 发消息 → A 列表未读徽标 2→3 **无刷新自动更新**，console 零报错）+ bundle + dry-run + check-i18n 全绿。
 
 ### 5.1 设计
 - **服务端**：IMRoom 在现有广播之外，对「非本房间在线」的成员无法触达——新增枢纽投递：广播帧时对每个成员 uid `env.PRESENCE.get(idFromName('u'+uid)).fetch('/deliver', …)`；IMPresence /deliver 把**轻量信号**扇出给该用户全部存在性 socket：

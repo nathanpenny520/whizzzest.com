@@ -99,8 +99,8 @@ async function boot() {
   await refreshConvs();
   showEmptyMain();
   await refreshPendingIn(); // 好友申请横幅
-  // 其他会话的未读/末条靠轻轮询（本会话实时走 WS；P2 activity 推送上线后降为兜底，docs/IM在线与实时同步方案.md）
-  setInterval(() => { if (document.visibilityState === 'visible') syncTick(); }, 20000);
+  // 会话列表兜底轮询（P2 后主路径=activity 推送：60s 校正未读精确计数等；仅可见时跑）
+  setInterval(() => { if (document.visibilityState === 'visible') syncTick(); }, 60000);
   // P0 同步热修：切回标签页/窗口聚焦/网络恢复立即对齐，不等下一个 20s tick（业主报修「同步延迟大」）
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncTick(); });
   addEventListener('focus', syncTick);
@@ -283,18 +283,36 @@ function syncTick() {
   refreshPendingIn();
 }
 
-/* ---------------- 存在性连接（P1 登录即在线，docs/IM在线与实时同步方案.md） ---------------- */
+/* ---------------- 存在性连接（P1 登录即在线 + P2 枢纽推送，docs/IM在线与实时同步方案.md） ---------------- */
 
 const PRESENCE_HEARTBEAT_MS = 25000; // 与服务端 90s 在线窗口配套（≥3 次心跳余量）
+const PUSH_MERGE_MS = 2000;          // 推送回源节流：突发多条 activity/contact 合并成一次拉取
 
 let presenceWs = null;
 let presenceTimer = null;
+let lastActivityPull = 0;
+let lastContactPull = 0;
 
-/** 常驻存在性 WS（登录后开一条）：心跳保 im_presence.last_ping 新鲜；断线由 connectWs 指数退避重连 */
+/** 常驻存在性 WS（登录后开一条）：心跳保 im_presence.last_ping 新鲜；断线由 connectWs 指数退避重连；
+ * P2 起同链路收枢纽轻量帧（不含密文）：activity→回源刷会话列表，contact→回源刷好友申请/联系人 */
 function openPresence() {
   if (presenceWs) return;
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  presenceWs = connectWs(`${proto}//${location.host}/ws`, {});
+  presenceWs = connectWs(`${proto}//${location.host}/ws`, {
+    onFrame(f) {
+      if (!f) return;
+      const now = Date.now();
+      if (f.t === 'activity' && now - lastActivityPull >= PUSH_MERGE_MS) {
+        lastActivityPull = now;
+        refreshConvs();
+      } else if (f.t === 'contact' && now - lastContactPull >= PUSH_MERGE_MS) {
+        lastContactPull = now;
+        refreshPendingIn();
+        // 联系人面板仅在无输入态的列表页就地进行重绘（子页表单不打断，v2 交互铁律）
+        if (panel === 'contacts' && contactsSub === 'list') renderSideNow();
+      }
+    },
+  });
   presenceTimer = setInterval(() => { if (presenceWs) presenceWs.send({ t: 'ping' }); }, PRESENCE_HEARTBEAT_MS);
 }
 

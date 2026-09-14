@@ -37,3 +37,33 @@ export async function presenceGet(env, user, url) {
   }
   return json({ ok: true, online });
 }
+
+/* ---------------- P2 枢纽投递（docs/IM在线与实时同步方案.md §5） ----------------
+ * 向在线成员的存在性 DO 转发轻量帧（activity/contact）；离线者跳过（唤醒 DO 无意义）。
+ * 在线判定复用 im_presence 90s 窗口（与 presenceGet 同口径）；投递失败只记日志不抛（尽力而为）。 */
+
+export async function deliverIfOnline(env, uids, frame) {
+  const ids = [...new Set((uids || []).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length || !env.PRESENCE) return;
+  let online = [];
+  try {
+    for (let i = 0; i < ids.length; i += 40) {
+      const chunk = ids.slice(i, i + 40);
+      const ph = chunk.map(() => '?').join(',');
+      const rows = await env.DB.prepare(
+        'SELECT uid FROM im_presence WHERE uid IN (' + ph + ') AND last_ping > ?'
+      ).bind(...chunk, Date.now() - PRESENCE_WINDOW_MS).all();
+      online = online.concat(rows.results.map((r) => r.uid));
+    }
+  } catch (err) {
+    console.error('im deliver lookup:', err);
+    return;
+  }
+  await Promise.allSettled(online.map((uid) =>
+    env.PRESENCE.get(env.PRESENCE.idFromName('u' + uid)).fetch('https://do/deliver', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(frame),
+    }).catch((err) => console.error('im presence deliver:', err))
+  ));
+}
