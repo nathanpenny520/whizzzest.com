@@ -329,7 +329,7 @@ Whizzzest (焰境·万载) was founded by university students in Beijing who lov
 
 Copyright © **Whizzzest (焰境·万载) team**. All rights reserved.
 
-This repository is public for showcase and learning purposes only. Without prior written permission from the copyright holders, you may not copy, modify, distribute, sublicense, or use it for commercial purposes, train AI/ML models on its content, or publicly deploy replica / mirror sites. See [LICENSE](LICENSE).
+This repository is public for showcase and learning purposes only. Without prior written permission from the copyright holders, you may not copy, modify, distribute, sublicense, or use it for commercial purposes, train AI/ML models on its content, or publicly deploy replica / mirror sites. See [LICENSE](LICENSE) for the authoritative terms (Chinese) and [LICENSE.en.md](LICENSE.en.md) for an English reference translation.
 
 ---
 
