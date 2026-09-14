@@ -131,3 +131,40 @@ WhatsApp 设置页式：头像大图（首字+色）+ 昵称/简介/头像色编
 | 10 | 设置与个人资料拆分 | 头像入口=个人资料（资料编辑+账号+邮箱绑定）；⚙=设置（加密身份/关于/退出登录） |
 
 另随回归发现并修复：① 会话 20s 轮询会重绘侧栏、打断联系人面板填表 → 非「聊天态」跳过侧栏重绘；② chips/搜索回调因 ctx 只有 getter 抛 TypeError → 补 setter；③ `.im-menu`/`.im-info` 的 `display:flex` 压过 `hidden` 属性 → 补 `[hidden]{display:none}`；④ `app.js` 群主踢人用了未导入的 `DEL`（M3 遗留 ReferenceError）→ 补导入。
+
+## 8. 移动端 WhatsApp 化 v2.1（2026-09-14 业主拍板，待实施）
+
+> 背景业主截图对照 WhatsApp iOS 版：v2 移动端只是「桌面三栏压扁」，缺 WhatsApp 手机版的结构特征。业主三项拍板：**主题保持焰橙（不切 WhatsApp 绿，D1）**、**底部 4 tab 收敛**、**聊天 tab 加未读数字胶囊（样式 a）**。
+
+### 8.1 列表态（≤720px，改动最大）
+
+- 头部重排 WhatsApp iOS 两段式：顶行 = 左 ⋯ 菜单（现有按钮挪位）+ 右 ✎ 改**实心 brand 色圆形钮**；标题行「焰境密语」放大 ~30px 加粗（现 19px）；
+- 会话行：头像 49→54px、行距加大；未读行名字与时间加粗（现仅预览变亮）；dm 自己发的末条预览前显示 ✓/✓✓（`peer_last_read` 已有，纯前端判断）；未读徽标色挪独立 `--unread` 变量（初值沿用焰红 --brand，为未来主题预留）；
+- 列表 rows 底部常驻 E2E 提示：🔒「焰境密语的个人消息均经端到端加密」（icons.js 增 `lock`）；
+- 搜索框/chips/申请横幅结构不动，微调圆角与选中态。
+
+### 8.2 聊天态（微调）
+
+- 输入框有内容时发送钮由灰变实心 accent 色、空时灰（WhatsApp 行为）；
+- 真机核验键盘顶起时 `100dvh` 表现，必要时补 `interactive-widget=resizes-content`。
+
+### 8.3 底部 tab
+
+- 5 钮收敛 **4 tab：聊天 / 联系人 / 设置 / 我（头像）**，每 tab = 图标 + 11px 文字标签，激活态胶囊底 + accent（对齐 WhatsApp 截图 Chats 选中样式）；
+- rail 独立「退出」钮移除（个人资料页 pf-logout 已有入口，入口不丢）；
+- 聊天 tab 图标右上**未读数字胶囊**（全部会话 unread 前端求和、99+ 封顶），人在任意 tab 均可见新消息。
+
+### 8.4 动效
+
+列表 ↔ 聊天 iOS 式推拉（`.im-main` translateX 240ms ease-out，返回反向）；`prefers-reduced-motion` 下关闭。
+
+### 8.5 范围
+
+- **不动**：后端零改动（API/WS/E2EE/限流）、桌面 ≥721px 布局、主题色、esc 铁律（新增文案静态串/esc()）；
+- **改动**：`im.css`（移动段重写+动效 ~150 行）、`convlist.js`（头部/行结构+E2E 提示）、`app.js`（tab 收敛/胶囊/发送键态）、`im/src/pages/auth.js`（rail 壳加 label 结构）、`icons.js`（+lock）；
+- 大标题滚动收缩、右滑返回手势：列后续 v1.3 可选，本轮不做；
+- **前置条件**：等看板「IM 反馈热修会话」与「IM 报修会话」（dm 竞态+图标+⋮ 批量选择改造）均 ✅ 落 commit 再动手——后者同样占 convlist.js/app.js/icons.js/im.css 四文件；其 ⋮ 批量模式若拍板实施，本方案头部重排保留 ⋯ 钮位兼容。
+
+### 8.6 验收
+
+esbuild bundle + wrangler dry-run + check-i18n 全绿；本地 wrangler dev 真浏览器 390px 视口逐项截图（列表态/聊天态/4 tab/胶囊/抽屉/未读/动效）+ 1280px 桌面回归无影响；push 走 CI 自动部署后线上真机核验。改动集中前端 5 文件，一次提交一次验收。
