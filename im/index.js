@@ -119,6 +119,7 @@ async function handleApi(request, env, path, url) {
 
   if (path === '/api/me' && method === 'GET') return authApi.meGet(env, user);
   if (path === '/api/me' && method === 'PATCH') return authApi.mePatch(request, env, user);
+  if (path === '/api/me/email' && method === 'POST') return authApi.meEmail(request, env, user);
 
   /* ---- 好友（M2，方案 §6/§8） ---- */
   if (path === '/api/users/search' && method === 'GET') return socialApi.userSearch(request, env, user, url);

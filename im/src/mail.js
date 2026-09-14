@@ -6,6 +6,7 @@
 
 import { sendMail } from '../../worker/smtp.js';
 import { EMAIL_RE, IM_HOME, SITE, CONTACT_EMAIL } from './config.js';
+import { currentUser } from './session.js';
 import { dbTimeMs, json, limited, readJson, sha256Hex, timingSafeEqual } from './util.js';
 
 export async function sendEmailCode(request, env) {
@@ -13,7 +14,8 @@ export async function sendEmailCode(request, env) {
 
   const body = await readJson(request);
   if (!body) return json({ ok: false, error: 'format' }, 400);
-  const purpose = String(body.purpose || '') === 'register' ? 'im-register' : 'im-login';
+  const p = String(body.purpose || '');
+  const purpose = p === 'register' ? 'im-register' : p === 'bind' ? 'im-bind' : 'im-login';
   const email = String(body.email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 100) return json({ ok: false, error: 'format' }, 400);
 
@@ -22,6 +24,12 @@ export async function sendEmailCode(request, env) {
 
   if (purpose === 'im-register') {
     const dup = await env.DB.prepare('SELECT id FROM im_users WHERE email = ?1').bind(email).first();
+    if (dup) return json({ ok: false, error: 'taken' }, 400);
+  } else if (purpose === 'im-bind') {
+    // 绑定邮箱须登录态（未登录不给任意邮箱发码）
+    const viewer = await currentUser(request, env);
+    if (!viewer || viewer.status === 'disabled') return json({ ok: false, error: 'auth' }, 401);
+    const dup = await env.DB.prepare('SELECT id FROM im_users WHERE email = ?1 AND id != ?2').bind(email, viewer.uid).first();
     if (dup) return json({ ok: false, error: 'taken' }, 400);
   } else {
     // 登录用途：邮箱未注册时不发码不落库，仍返回成功（防枚举）
@@ -72,7 +80,7 @@ export async function verifyEmailCode(env, email, purpose, code) {
 /* ---------------- 邮件模板（照三门户验证码邮件版式） ---------------- */
 
 async function sendCodeEmail(env, email, code, purpose) {
-  const action = purpose === 'im-register' ? '注册焰境密语' : '登录焰境密语';
+  const action = purpose === 'im-register' ? '注册焰境密语' : purpose === 'im-bind' ? '绑定邮箱' : '登录焰境密语';
   const FONT = "-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif";
   await sendMail({
     user: env.SMTP_USER,

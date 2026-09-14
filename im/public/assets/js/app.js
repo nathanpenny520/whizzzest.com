@@ -1,16 +1,16 @@
 /**
- * 焰境密语 — /app SPA 控制器（M2 + M3 群组）
- * 状态中枢：me/identity/convs + 会话密钥缓存；视图 = 会话列表（侧栏）× {欢迎资料 | 好友 | 聊天}（主区）。
- * 模块拆分（业主 2026-09-13 拍板「文件分块」）：api/ui/ws/profile/convlist/contacts/chat 各管一摊。
+ * 焰境密语 — /app SPA 控制器（UI v2 三栏：icon 栏 + 列表面板 + 主区，docs/IM-UI改版方案.md）
+ * 状态中枢：me/identity/convs + 会话密钥缓存；主区视图 = 空态 | 聊天 | 设置；侧栏两态 = 聊天列表 | 联系人。
+ * 模块拆分（业主 2026-09-13 拍板「文件分块」）：api/ui/ws/icons/profile/convlist/contacts/chat 各管一摊。
  * 群组（M3）：会话密钥按版本缓存（重钥后多版并存）；建群/拉人/重钥的信封生成集中在本文件。
  */
 
-import { GET, POST } from './api.js';
+import { GET, POST, DEL } from './api.js';
 import * as ui from './ui.js';
 import * as crypto from '/assets/js/im-crypto.js';
+import { icon } from './icons.js';
 import { renderSide } from './convlist.js';
-import { renderProfile } from './profile.js';
-import { renderContacts } from './contacts.js';
+import { renderProfile, renderSettings } from './profile.js';
 import { openChat } from './chat.js';
 
 const PREVIEW_PLAIN_MAX = 40;
@@ -19,7 +19,11 @@ let me = null;
 let identity = null;          // { uid, publicKeyB64, privateKeyJwk } | null
 let convs = [];
 let activeConvId = 0;
-let contactsOpen = false;
+let panel = 'chats';          // 侧栏两态：'chats' 会话列表 | 'contacts' 联系人面板
+let contactsSub = 'list';     // 联系人面板子页：list | requests | add | group
+let settingsOpen = false;     // 主区设置视图开关
+let filter = 'all';           // 会话筛选：all | unread | groups
+let searchQ = '';             // 会话搜索（本地过滤）
 let pendingIn = 0;
 let currentChat = null;       // { close() }
 const convKeyCache = new Map(); // convId → Promise<{ byVersion: Map<版本, CryptoKey>, latest: 版本 }>
@@ -27,6 +31,13 @@ const previews = new Map();     // convId → { seq, text }
 
 const sideEl = document.getElementById('im-side');
 const mainEl = document.getElementById('im-main');
+const railEls = {
+  chats: document.getElementById('rail-chats'),
+  contacts: document.getElementById('rail-contacts'),
+  settings: document.getElementById('rail-settings'),
+  me: document.getElementById('rail-me'),
+  logout: document.getElementById('rail-logout'),
+};
 
 /* ---------------- 上下文（视图模块回调） ---------------- */
 
@@ -35,12 +46,17 @@ const ctx = {
   get identity() { return identity; },
   get convs() { return convs; },
   get activeConvId() { return activeConvId; },
-  get contactsOpen() { return contactsOpen; },
+  get panel() { return panel; },
+  get contactsSub() { return contactsSub; },
+  get filter() { return filter; },
+  set filter(v) { filter = v; },
+  get searchQ() { return searchQ; },
+  set searchQ(v) { searchQ = v; },
   get pendingIn() { return pendingIn; },
   set pendingIn(v) { pendingIn = v; },
   crypto,
   ui,
-  renderSide: () => renderSide(sideEl, ctx),
+  renderSide: renderAll,
   previewFor,
   ensureConvKeys,
   clearConvKeys,
@@ -52,7 +68,10 @@ const ctx = {
   kickMember,
   rekeyGroup,
   showHome,
-  toggleContacts,
+  setPanel,
+  openSettings,
+  openProfile,
+  openContactsTab,
   refreshConvs,
   onConvRead,
   onConvActivity,
@@ -65,11 +84,134 @@ async function boot() {
   if (!r.ok) { location.href = '/'; return; }
   me = r;
   identity = await crypto.loadIdentity().catch(() => null);
-  ctx.renderSide();
+  wireRail();
+  wireMenuOutsideClose();
+  renderSideNow();
   await refreshConvs();
-  showHome();
+  showEmptyMain();
+  await refreshPendingIn(); // 好友申请横幅
   // 其他会话的未读/末条靠轻轮询（本会话实时走 WS；推送 v1 不做，方案 §5）
   setInterval(() => { if (document.visibilityState === 'visible') refreshConvs(); }, 20000);
+}
+
+/** 下拉菜单点空白即收起（业主反馈 1）：点在菜单外/菜单按钮上的交由各自逻辑 */
+function wireMenuOutsideClose() {
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (t.closest('[data-menu-btn]') || t.closest('.im-menu')) return;
+    document.querySelectorAll('.im-menu:not([hidden])').forEach((m) => { m.hidden = true; });
+  });
+}
+
+/* ---------------- 三栏路由 ---------------- */
+
+function renderSideNow() {
+  renderSide(sideEl, ctx);
+  syncRail();
+}
+
+/** 常规重绘：仅聊天态重绘侧栏（联系人面板可能正在填表单，轮询/回执不打断）；面板切换走 renderSideNow 强制 */
+function renderAll() {
+  if (panel === 'chats') renderSideNow();
+  else syncRail();
+}
+
+function syncRail() {
+  railEls.chats.classList.toggle('on', !settingsOpen && panel === 'chats');
+  railEls.contacts.classList.toggle('on', !settingsOpen && panel === 'contacts');
+  railEls.settings.classList.toggle('on', settingsOpen);
+  if (me) railEls.me.innerHTML = ui.avatarHtml(me.display_name, me.avatar_color, 30);
+}
+
+/** 移动端（≤720px）：有聊天/设置占主区时主区覆盖列表 */
+function syncMobile() {
+  document.body.classList.toggle('im-mobile-chat', settingsOpen || activeConvId > 0);
+}
+
+function wireRail() {
+  railEls.chats.innerHTML = icon('chats');
+  railEls.contacts.innerHTML = icon('users');
+  railEls.settings.innerHTML = icon('gear');
+  railEls.logout.innerHTML = icon('logout');
+  railEls.chats.addEventListener('click', () => {
+    settingsOpen = false;
+    if (activeConvId > 0) return openConv(activeConvId);
+    panel = 'chats';
+    showEmptyMain();
+    renderAll();
+  });
+  railEls.contacts.addEventListener('click', () => {
+    settingsOpen = false;
+    setPanel('contacts');
+  });
+  railEls.settings.addEventListener('click', openSettings);
+  railEls.me.addEventListener('click', openProfile);
+  railEls.logout.addEventListener('click', logout);
+}
+
+/** 侧栏切到联系人面板（sub 可选：直接落子页，缺省回顶层）；主区保持现状（开着聊天不关） */
+function setPanel(p, sub) {
+  panel = p;
+  contactsSub = p === 'contacts' ? (sub || 'list') : 'list';
+  renderSideNow();
+  syncMobile();
+}
+
+/** 横幅/快捷入口直达联系人面板子页 */
+function openContactsTab(sub) {
+  setPanel('contacts', sub);
+}
+
+function logout() {
+  return (async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    await crypto.clearIdentity().catch(() => {});
+    location.href = '/';
+  })();
+}
+
+/** 主区空态（无聊天打开时的欢迎页） */
+function showEmptyMain() {
+  activeConvId = 0;
+  closeChat();
+  syncMobile();
+  const keyOk = !!(identity && me && identity.uid === me.uid);
+  mainEl.innerHTML = `
+    <div class="im-empty-main">
+      <div class="im-empty-art">${icon('flame')}</div>
+      <h2>焰境密语</h2>
+      <p>端到端加密的站内聊天 · 服务器只递信，不看信</p>
+      <div class="im-empty-acts">
+        <button class="im-ghostbtn" id="ea-chat">${icon('newchat', 16)} 找人开聊</button>
+        <button class="im-ghostbtn" id="ea-group">${icon('users', 16)} 新建群聊</button>
+        <button class="im-ghostbtn" id="ea-set">${icon('gear', 16)} 个人资料</button>
+      </div>
+      ${keyOk
+        ? '<span class="im-badge ok">端到端加密已就绪（本机密钥已解锁）</span>'
+        : '<span class="im-badge warn">本机未解锁密钥：退出后重新登录并输入密码以恢复</span>'}
+    </div>`;
+  mainEl.querySelector('#ea-chat').addEventListener('click', () => setPanel('contacts'));
+  mainEl.querySelector('#ea-group').addEventListener('click', () => setPanel('contacts', 'group'));
+  mainEl.querySelector('#ea-set').addEventListener('click', openProfile);
+}
+
+/** 主区视图开关（设置与个人资料拆分，业主反馈 10）：头像入口=个人资料，⚙=其他设置 */
+function openView(render) {
+  settingsOpen = true;
+  activeConvId = 0;
+  closeChat();
+  syncMobile();
+  render(mainEl, ctx);
+  syncRail();
+}
+
+function openSettings() {
+  openView(renderSettings);
+}
+
+function openProfile() {
+  openView(renderProfile);
 }
 
 /* ---------------- 数据 ---------------- */
@@ -84,7 +226,7 @@ async function refreshConvs() {
   if (!j.ok) return;
   convs = j.convs;
   previews.clear();
-  ctx.renderSide(); // 预览由 previewFor 同步占位 + 异步解密回填
+  renderAll(); // 预览由 previewFor 同步占位 + 异步解密回填
 }
 
 /** 会话行预览（同步）：缓存命中直接给文本；否则占位并触发异步解密回填 */
@@ -108,7 +250,7 @@ async function decryptPreview(conv) {
   } catch { /* 保持占位 */ }
   decrypting.delete(conv.id);
   previews.set(conv.id, { seq: conv.last_msg.seq, text });
-  ctx.renderSide();
+  renderAll();
 }
 
 /** 会话密钥缓存（全版本：群组重钥后新旧版并存，按消息 blob 标的版本取钥；Promise 共享防并发重复解包） */
@@ -157,36 +299,29 @@ function closeChat() {
   if (currentChat) { currentChat.close(); currentChat = null; }
 }
 
+/** 回列表（聊天窗返回/被移出/退群/解散/删好友统一收口）：主区落空态，侧栏回会话列表 */
 function showHome() {
-  activeConvId = 0;
-  contactsOpen = false;
-  closeChat();
-  ctx.renderSide();
-  renderProfile(mainEl, ctx);
-}
-
-function toggleContacts() {
-  if (contactsOpen) return showHome();
-  contactsOpen = true;
-  activeConvId = 0;
-  closeChat();
-  ctx.renderSide();
-  renderContacts(mainEl, ctx).then(() => refreshPendingIn());
+  settingsOpen = false;
+  panel = 'chats';
+  showEmptyMain();
+  renderSideNow();
 }
 
 async function refreshPendingIn() {
   const j = await GET('/api/friends/requests?box=in').catch(() => null);
   pendingIn = j && j.ok ? j.requests.length : 0;
-  ctx.renderSide();
+  renderAll();
 }
 
 async function openConv(id) {
   const conv = convs.find((c) => c.id === id);
   if (!conv) return;
-  contactsOpen = false;
+  panel = 'chats';
+  settingsOpen = false;
   activeConvId = id;
   closeChat();
-  ctx.renderSide();
+  renderSideNow();
+  syncMobile();
   currentChat = openChat(mainEl, ctx, conv);
 }
 
@@ -314,7 +449,7 @@ async function onConvActivity(convId, lastMsg) {
   conv.last_msg = lastMsg;
   conv.last_seq = Math.max(conv.last_seq || 0, lastMsg.seq);
   previews.delete(convId);
-  ctx.renderSide(); // previewFor 触发异步解密，回填后自行重绘
+  renderAll(); // previewFor 触发异步解密，回填后自行重绘
 }
 
 async function onConvRead(convId, seq) {
@@ -322,7 +457,7 @@ async function onConvRead(convId, seq) {
   if (!conv) return;
   conv.last_read_seq = Math.max(conv.last_read_seq || 0, seq);
   if (conv.last_seq <= seq) conv.unread = 0; // 精确计数随下次轮询校正
-  ctx.renderSide();
+  renderAll();
 }
 
 function onFriendRemoved() {

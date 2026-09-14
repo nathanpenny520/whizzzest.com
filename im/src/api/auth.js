@@ -168,6 +168,25 @@ export async function mePatch(request, env, user) {
   return json({ ok: true });
 }
 
+/** 绑定/换绑邮箱（UI v2 业主反馈增补）：im-bind 验证码核验后写入，邮箱全局唯一 */
+export async function meEmail(request, env, user) {
+  const body = await readJson(request);
+  if (!body) return json({ ok: false, error: 'format' }, 400);
+  const email = String(body.email || '').trim().toLowerCase();
+  const code = String(body.code || '').replace(/\s/g, '');
+  if (!EMAIL_RE.test(email) || email.length > 100) return json({ ok: false, error: 'email' }, 400);
+  if (!/^\d{6}$/.test(code)) return json({ ok: false, error: 'code' }, 400);
+
+  const verr = await verifyEmailCode(env, email, 'im-bind', code);
+  if (verr) return json({ ok: false, error: verr }, 401);
+
+  const dup = await env.DB.prepare('SELECT id FROM im_users WHERE email = ?1 AND id != ?2').bind(email, user.uid).first();
+  if (dup) return json({ ok: false, error: 'taken' }, 409);
+
+  await env.DB.prepare('UPDATE im_users SET email = ?1 WHERE id = ?2').bind(email, user.uid).run();
+  return json({ ok: true });
+}
+
 /* ---------------- E2EE 密钥材料 ---------------- */
 
 /** 登录响应附带的密钥备份（浏览器用密码本地解包，方案 §3.1 换机恢复） */

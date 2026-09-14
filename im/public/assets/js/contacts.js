@@ -1,102 +1,123 @@
 /**
- * 焰境密语 — 好友视图（M2：列表/申请/添加；M3 增建群 Tab）
- * 好友行点击 = 开私聊（dm 幂等建会话 + 信封随建提交）；建群 = 好友多选 + 群名（信封随建提交，app 层生成）。
+ * 焰境密语 — 联系人面板（UI v2，WhatsApp「新聊天」面板式）
+ * 顶层 = 入口行（新群聊/添加好友/好友申请）+ 好友列表（行点击=开私聊）；
+ * 申请/添加/建群为面板内子页（←返回），请求逻辑沿用 M2/M3。
+ * 好友行点击 = dm 幂等建会话 + 信封随建提交（app 层）；明文一律 esc 渲染。
  */
 
 import { GET, POST, DEL, PUT } from './api.js';
 import { esc, avatarHtml, fingerprint } from './ui.js';
+import { icon } from './icons.js';
 
-export async function renderContacts(root, ctx) {
-  root.innerHTML = `
-    <div class="im-contacts">
-      <div class="im-tabs">
-        <button class="im-tab on" data-tab="friends">好友</button>
-        <button class="im-tab" data-tab="requests">申请</button>
-        <button class="im-tab" data-tab="add">添加</button>
-        <button class="im-tab" data-tab="group">建群</button>
-      </div>
-      <div class="im-tab-body" id="tab-body"></div>
-    </div>`;
-
-  const body = root.querySelector('#tab-body');
-  const show = {
-    friends: () => renderFriends(body, ctx),
-    requests: () => renderRequests(body, ctx),
-    add: () => renderAdd(body, ctx),
-    group: () => renderGroupBuild(body, ctx),
-  };
-  root.querySelectorAll('.im-tab').forEach((t) => {
-    t.addEventListener('click', () => {
-      root.querySelectorAll('.im-tab').forEach((x) => x.classList.toggle('on', x === t));
-      show[t.dataset.tab]();
-    });
-  });
-  await show.friends();
+/** 联系人态入口：按子页分派（子页状态存 ctx.contactsSub） */
+export function renderContactsPanel(sideEl, ctx) {
+  const sub = ctx.contactsSub || 'list';
+  if (sub === 'requests') return renderRequestsPage(sideEl, ctx);
+  if (sub === 'add') return renderAddPage(sideEl, ctx);
+  if (sub === 'group') return renderGroupPage(sideEl, ctx);
+  renderListPage(sideEl, ctx);
 }
 
-/* ---------------- 好友列表 ---------------- */
+/** 面板子页骨架：← 返回 + 标题 + 内容（backTo=null 时返回键由调用方自绑） */
+function scaffold(sideEl, title, ctx, bodyHtml, backTo = 'list') {
+  sideEl.innerHTML = `
+    <div class="im-c-head">
+      <button class="im-ibtn" id="c-back" title="返回">${icon('back', 20)}</button>
+      <b>${esc(title)}</b>
+    </div>
+    ${bodyHtml}`;
+  if (backTo) sideEl.querySelector('#c-back').addEventListener('click', () => ctx.setPanel('contacts', backTo));
+}
 
-async function renderFriends(body, ctx) {
+/* ---------------- 顶层：入口 + 好友列表 ---------------- */
+
+async function renderListPage(sideEl, ctx) {
+  scaffold(sideEl, '新聊天', ctx, `
+    <div class="im-rows" id="c-rows">
+      <button class="im-entry" data-e="group">
+        <span class="im-entry-ic">${icon('users', 22)}</span><span>发起群聊</span>
+      </button>
+      <button class="im-entry" data-e="add">
+        <span class="im-entry-ic">${icon('userplus', 22)}</span><span>添加好友</span>
+      </button>
+      <button class="im-entry" data-e="requests">
+        <span class="im-entry-ic">${icon('flag', 22)}</span><span>好友申请</span>
+        ${ctx.pendingIn > 0 ? `<span class="im-unread">${ctx.pendingIn}</span>` : ''}
+      </button>
+      <div class="im-sec-label" id="c-friends-label">好友</div>
+      <div id="c-friends"></div>
+    </div>`, null);
+  sideEl.querySelector('#c-back').addEventListener('click', () => ctx.setPanel('chats'));
+
+  sideEl.querySelectorAll('.im-entry').forEach((b) => {
+    b.addEventListener('click', () => ctx.setPanel('contacts', b.dataset.e));
+  });
+  await renderFriends(sideEl, ctx);
+}
+
+async function renderFriends(sideEl, ctx) {
+  const box = sideEl.querySelector('#c-friends');
+  if (!box) return;
   const j = await GET('/api/friends');
-  if (!j.ok) { body.innerHTML = '<p class="im-empty">加载失败</p>'; return; }
+  if (!j.ok) { box.innerHTML = '<p class="im-empty">加载失败</p>'; return; }
   const blocks = (await GET('/api/blocks')).blocks || [];
+  const label = sideEl.querySelector('#c-friends-label');
+  if (label) label.textContent = `好友（${j.friends.length}）`;
   if (!j.friends.length) {
-    body.innerHTML = '<p class="im-empty">还没有好友<br><small>用「添加」按邮箱或手机号搜索</small></p>';
+    box.innerHTML = '<p class="im-empty">还没有好友<br><small>用「添加好友」按邮箱或手机号搜索</small></p>';
     return;
   }
-  body.innerHTML = j.friends.map((f) => `
+  box.innerHTML = j.friends.map((f) => `
     <div class="im-friend" data-uid="${f.uid}">
-      ${avatarHtml(f.display_name, f.avatar_color, 40)}
+      ${avatarHtml(f.display_name, f.avatar_color, 49)}
       <div class="im-friend-txt">
         <b>${esc(f.display_name)}</b>
-        <span>${esc(f.bio || 'UID ' + f.uid)}</span>
+        <span>${esc(f.bio || '')}</span>
       </div>
-      <span class="im-fp" data-pub="${esc(f.pub_key)}">指纹…</span>
-      <button class="im-minibtn" data-act="chat">私聊</button>
-      <button class="im-minibtn warn" data-act="${blocks.includes(f.uid) ? 'unblock' : 'block'}">${blocks.includes(f.uid) ? '取消拉黑' : '拉黑'}</button>
-      <button class="im-minibtn warn" data-act="del">删除</button>
+      <button class="im-fact" data-act="${blocks.includes(f.uid) ? 'unblock' : 'block'}" title="${blocks.includes(f.uid) ? '取消拉黑' : '拉黑'}">${icon('ban', 17)}</button>
+      <button class="im-fact" data-act="del" title="删除好友">${icon('trash', 17)}</button>
     </div>`).join('');
 
-  body.querySelectorAll('.im-friend').forEach((row) => {
+  box.querySelectorAll('.im-friend').forEach((row) => {
     const uid = Number(row.dataset.uid);
     const friend = j.friends.find((f) => f.uid === uid);
-    fingerprint(friend.pub_key).then((fp) => { row.querySelector('.im-fp').textContent = fp; });
-    row.querySelectorAll('.im-minibtn').forEach((btn) => {
+    row.addEventListener('click', () => ctx.openDm(friend));
+    row.querySelectorAll('.im-fact').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const act = btn.dataset.act;
-        if (act === 'chat') return ctx.openDm(friend);
         if (act === 'del') {
           if (!confirm(`删除好友「${friend.display_name}」？聊天记录保留。`)) return;
           const r = await DEL(`/api/friends/${uid}`);
           alert(r.ok ? '已删除' : '删除失败（' + r.error + '）');
-          if (r.ok) renderFriends(body, ctx);
+          if (r.ok) renderListPage(sideEl, ctx);
           return;
         }
         if (act === 'block') {
           if (!confirm(`拉黑「${friend.display_name}」？对方将无法给你发申请与消息。`)) return;
           await PUT(`/api/blocks/${uid}`);
-          renderFriends(body, ctx);
+          renderFriends(sideEl, ctx);
           return;
         }
         if (act === 'unblock') {
           await DEL(`/api/blocks/${uid}`);
-          renderFriends(body, ctx);
+          renderFriends(sideEl, ctx);
         }
       });
     });
   });
 }
 
-/* ---------------- 好友申请 ---------------- */
+/* ---------------- 子页：好友申请 ---------------- */
 
-async function renderRequests(body, ctx) {
+async function renderRequestsPage(sideEl, ctx) {
+  scaffold(sideEl, '好友申请', ctx, '<div class="im-rows" id="c-req"></div>');
+  const body = sideEl.querySelector('#c-req');
   const [tin, tout] = await Promise.all([GET('/api/friends/requests?box=in'), GET('/api/friends/requests?box=out')]);
-  ctx.pendingIn = tin.requests.length;
-  ctx.renderSide();
+  ctx.pendingIn = tin.requests.length; // 返回顶层/回聊天列表随下次 renderAll 生效（此处重渲染会死循环）
   const item = (r, actions) => `
-    <div class="im-friend">
-      ${avatarHtml(r.user.display_name, r.user.avatar_color, 40)}
+    <div class="im-friend" style="cursor:default">
+      ${avatarHtml(r.user.display_name, r.user.avatar_color, 42)}
       <div class="im-friend-txt">
         <b>${esc(r.user.display_name)}</b>
         <span>${esc(r.message || r.user.bio || 'UID ' + r.user.uid)}</span>
@@ -112,54 +133,63 @@ async function renderRequests(body, ctx) {
     ? tout.requests.map((r) => item(r, `<button class="im-minibtn warn" data-out-cancel="${r.id}">撤回</button>`)).join('')
     : '<p class="im-hint">没有发出的申请</p>';
   body.innerHTML = `
-    <h3 class="im-sec">收到的申请</h3>${inHtml}
-    <h3 class="im-sec">发出的申请</h3>${outHtml}`;
+    <div class="im-sec-label">收到的申请</div>${inHtml}
+    <div class="im-sec-label">发出的申请</div>${outHtml}`;
 
   body.querySelectorAll('[data-in-accept]').forEach((b) => b.addEventListener('click', async () => {
     const r = await POST(`/api/friends/requests/${b.dataset.inAccept}/accept`);
     if (!r.ok) alert('操作失败（' + r.error + '）');
-    renderRequests(body, ctx);
+    renderRequestsPage(sideEl, ctx);
   }));
   body.querySelectorAll('[data-in-reject]').forEach((b) => b.addEventListener('click', async () => {
     await POST(`/api/friends/requests/${b.dataset.inReject}/reject`);
-    renderRequests(body, ctx);
+    renderRequestsPage(sideEl, ctx);
   }));
   body.querySelectorAll('[data-out-cancel]').forEach((b) => b.addEventListener('click', async () => {
     await DEL(`/api/friends/requests/${b.dataset.outCancel}`);
-    renderRequests(body, ctx);
+    renderRequestsPage(sideEl, ctx);
   }));
 }
 
-/* ---------------- 添加好友（精确搜索） ---------------- */
+/* ---------------- 子页：添加好友（精确搜索） ---------------- */
 
-async function renderAdd(body, ctx) {
-  body.innerHTML = `
+async function renderAddPage(sideEl, ctx) {
+  scaffold(sideEl, '添加好友', ctx, `
     <div class="im-add">
-      <label class="im-f"><span>对方邮箱或手机号（含区号，如 +8613800000000）</span>
-        <input id="add-q" maxlength="120" placeholder="name@example.com 或 +86…">
-      </label>
+      <div class="im-f"><input id="add-q" maxlength="120" placeholder="对方邮箱或带区号手机号"></div>
       <button class="im-primary" id="add-go">搜索</button>
       <p class="im-msg" id="add-msg"></p>
       <div id="add-result"></div>
-    </div>`;
+    </div>`);
+  const body = sideEl.querySelector('.im-add');
+  const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
+  const isPhone = (s) => /^\+\d{5,20}$/.test(s);
   const doSearch = async () => {
     const q = body.querySelector('#add-q').value.trim();
     const msg = body.querySelector('#add-msg');
     const box = body.querySelector('#add-result');
     box.innerHTML = '';
-    if (!q) { msg.textContent = '请输入邮箱或手机号'; msg.className = 'im-msg err'; return; }
+    if (!isEmail(q) && !isPhone(q)) {
+      msg.textContent = q ? '格式不对：请输入邮箱，或带区号的手机号（如 +8613800000000）' : '请输入对方的邮箱或带区号手机号';
+      msg.className = 'im-msg err';
+      return;
+    }
     msg.textContent = '搜索中…'; msg.className = 'im-msg';
     const j = await GET('/api/users/search?q=' + encodeURIComponent(q));
     if (!j.ok) { msg.textContent = '搜索失败（' + (j.error === 'rate' ? '太频繁，1 小时后再试' : j.error) + '）'; msg.className = 'im-msg err'; return; }
-    msg.textContent = '';
-    if (!j.user) { box.innerHTML = '<p class="im-hint">没有找到该用户——请确认邮箱/手机号与对方注册时完全一致。</p>'; return; }
+    if (!j.user) {
+      msg.textContent = '没有找到该用户——请确认对方已注册焰境密语，且输入与注册时完全一致';
+      msg.className = 'im-msg err';
+      return;
+    }
+    msg.textContent = ''; msg.className = 'im-msg';
     const u = j.user;
     box.innerHTML = `
-      <div class="im-friend found">
+      <div class="im-friend found" style="cursor:default">
         ${avatarHtml(u.display_name, u.avatar_color, 44)}
         <div class="im-friend-txt">
           <b>${esc(u.display_name)}</b>
-          <span>${esc(u.bio || 'UID ' + u.id)}</span>
+          <span>${esc(u.bio || '')}</span>
         </div>
         <code class="im-fp" id="add-fp"></code>
       </div>
@@ -181,39 +211,39 @@ async function renderAdd(body, ctx) {
   body.querySelector('#add-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
 }
 
-/* ---------------- 建群（M3，方案 §11.1：群主从好友直接拉入，上限 100 人） ---------------- */
+/* ---------------- 子页：建群（方案 §11.1：群主从好友直接拉入，上限 100 人） ---------------- */
 
-async function renderGroupBuild(body, ctx) {
+async function renderGroupPage(sideEl, ctx) {
+  scaffold(sideEl, '发起群聊', ctx, '<div class="im-add" id="grp-box"></div>');
+  const box = sideEl.querySelector('#grp-box');
   const j = await GET('/api/friends');
-  if (!j.ok) { body.innerHTML = '<p class="im-empty">好友列表加载失败</p>'; return; }
+  if (!j.ok) { box.innerHTML = '<p class="im-empty">好友列表加载失败</p>'; return; }
   if (!j.friends.length) {
-    body.innerHTML = '<p class="im-empty">还没有好友，先去「添加」找到人，再回来建群。</p>';
+    box.innerHTML = '<p class="im-empty">还没有好友，先去「添加好友」找到人，再回来建群。</p>';
     return;
   }
-  body.innerHTML = `
-    <div class="im-add">
-      <label class="im-f"><span>群名（1-30 字）</span>
-        <input id="grp-name" maxlength="30" placeholder="比如：周末爬山小队">
-      </label>
-      <p class="im-hint">勾选要拉入的好友（≤99 人，群成员上限 100）：</p>
-      <div class="im-pick-list" id="grp-list">${j.friends.map((f) => `
-        <label class="im-member im-pick">
-          <input type="checkbox" value="${f.uid}">
-          ${avatarHtml(f.display_name, f.avatar_color, 34)}
-          <div class="im-member-txt">
-            <b>${esc(f.display_name)}</b>
-            <span>${esc(f.bio || 'UID ' + f.uid)}</span>
-          </div>
-        </label>`).join('')}</div>
-      <button class="im-primary" id="grp-go">创建群聊</button>
-      <p class="im-msg" id="grp-msg"></p>
-    </div>`;
+  box.innerHTML = `
+    <label class="im-f"><span>群名（1-30 字）</span>
+      <input id="grp-name" maxlength="30" placeholder="比如：周末爬山小队">
+    </label>
+    <p class="im-hint">勾选要拉入的好友（≤99 人，群成员上限 100）：</p>
+    <div class="im-pick-list" id="grp-list">${j.friends.map((f) => `
+      <label class="im-member im-pick">
+        <input type="checkbox" value="${f.uid}">
+        ${avatarHtml(f.display_name, f.avatar_color, 34)}
+        <div class="im-member-txt">
+          <b>${esc(f.display_name)}</b>
+          <span>${esc(f.bio || '')}</span>
+        </div>
+      </label>`).join('')}</div>
+    <button class="im-primary" id="grp-go">创建群聊</button>
+    <p class="im-msg" id="grp-msg"></p>`;
 
-  body.querySelector('#grp-go').addEventListener('click', () => {
-    const msg = body.querySelector('#grp-msg');
-    const name = body.querySelector('#grp-name').value.trim().replace(/\s+/g, ' ');
+  box.querySelector('#grp-go').addEventListener('click', () => {
+    const msg = box.querySelector('#grp-msg');
+    const name = box.querySelector('#grp-name').value.trim().replace(/\s+/g, ' ');
     if (!name || name.length > 30) { msg.textContent = '群名需 1-30 字'; msg.className = 'im-msg err'; return; }
-    const checked = [...body.querySelectorAll('#grp-list input:checked')].map((c) => Number(c.value));
+    const checked = [...box.querySelectorAll('#grp-list input:checked')].map((c) => Number(c.value));
     const sel = j.friends.filter((f) => checked.includes(f.uid));
     if (!sel.length) { msg.textContent = '至少勾选 1 位好友'; msg.className = 'im-msg err'; return; }
     if (sel.length > 99) { msg.textContent = '一次最多拉 99 位好友（群上限 100 人）'; msg.className = 'im-msg err'; return; }

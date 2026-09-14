@@ -15,6 +15,12 @@ export function avatarHtml(name, color, size) {
   return `<span class="im-avatar" style="width:${size}px;height:${size}px;background:hsl(${hue} 62% 46%);font-size:${Math.round(size * 0.42)}px">${ch}</span>`;
 }
 
+/** 群发送者名颜色（UI v2）：按 avatar_color 色相取亮档，暗底可读 */
+export function senderColor(color) {
+  const hue = AVATAR_HUES[(Number(color) || 0) % 8] ?? 14;
+  return `hsl(${hue} 58% 68%)`;
+}
+
 /** 公钥指纹（SHA-256 前 8 字节，4×4 十六进制组）——群成员面板逐员展示用 */
 export async function fingerprint(pubKeyB64) {
   const bin = atob(pubKeyB64);

@@ -2,7 +2,7 @@
  * 焰境密语 — WebSocket 客户端（每会话一条，指数退避重连）
  * 帧协议见 docs/IM聊天方案.md §5：
  *   收：hello/ msg/ typing/ join/ leave/ err ＋ M3 群组帧：members（成员变更）/ rekey（重钥）/
- *       rename（改名）/ kicked（被移出·退群·解散，服务端随后 close 4003）
+ *       rename（改名）/ kicked（被移出·退群·解散，服务端随后 close 4003）＋ v2：read（已读回执，{uid, seq}）
  *   发：msg {tag, body 密文} ／ typing
  */
 

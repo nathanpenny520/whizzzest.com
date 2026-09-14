@@ -125,6 +125,7 @@ im_reports          id, reporter_uid, conversation_id, seq_from, seq_to, reason,
 - **消息流**：client `{t:'msg', tag:'<uuid>', body:<密文>}` → DO 校验成员+限流（RateLimiterClient 模式）→ 写 D1 → 广播 `{t:'msg', conv, seq, uid, body, at, tag}`（含发送者，tag 回显去重/确认）。
 - **在线/typing**：接入广播在线表；`{t:'typing', uid}` 纯转发不落库。
 - **成员变更（v1.3 落地）**：REST 会话管理 API 变更成员后经 DO 内部端点 `/sys`（仅 Worker 经 binding 可达）通知：被移出/退群/解散者的 WS 收 `{t:'kicked', why}` 并 close(4003)；余员广播 `members`（成员增删+重钥版本）/`rekey`/`rename` 帧，客户端据此刷成员表、弃密钥缓存、补拉系统消息。
+- **已读回执（v2 落地，UI 改版方案 §4）**：REST `/read` 在 seq 推进时经 `/sys` 广播 `{t:'read', uid, seq}`；1v1 聊天窗据此把己方气泡 ✓ 翻 ✓✓（群聊不渲染回执）。
 - **拉黑与通道**：拉黑拒收仅对 1v1 生效（v1.3；升级链把会话类型注入 DO attachment）——群聊不按私聊拉黑拦截。
 - **断线补拉**：重连 REST `?after_seq=` 拉增量再上 WS；不搞 DO 内回放。
 - **推送**：v1 不做（Web Push 后议；iOS PWA 后台推送本就不承诺）。
@@ -135,6 +136,7 @@ im_reports          id, reporter_uid, conversation_id, seq_from, seq_to, reason,
 POST /api/register/phone | /api/register/email     注册（双方式；含 pub_key/enc_priv_key/kdf_salt 上传）
 POST /api/login/phone   | /api/login/email         登录（响应含 enc_priv_key+kdf_salt 供恢复私钥）
 POST /api/logout ／ GET|PATCH /api/me               会话/资料
+POST /api/me/email {email, code}                    绑定/换绑邮箱（im-bind 验证码核验 + 全局唯一；UI v2.1）
 GET  /api/users/search?q=<完整邮箱|手机号>          精确匹配，仅回 id/display_name/bio/avatar_color/pub_key
 POST /api/friends/requests（+GET ?box=in|out、POST /<id>/accept|reject、DELETE /<id> 撤回、DELETE /api/friends/<uid> 删好友）
 PUT|DELETE /api/blocks/<uid>
@@ -220,6 +222,8 @@ GET  /ws?conv=<id>                                  WS 升级
 | 12 | **拉黑仅拦 1v1**：群聊消息不按私聊拉黑拦截（会话类型随升级链注入 DO）；新成员可见消息边界改 `seq > min_seq`（修正原 `>=` 的 off-by-one） | 2026-09-14 |
 | 13 | **安全数字定稿**（§3.4 可选项转正）：1v1 头部展示双方公钥按字节序联合 SHA-256（30 位十六进制 6 组，定长 b64 字典序=字节序）；群成员仍逐员指纹 | 2026-09-14 |
 | 14 | **新号限流落点**：注册<1h 账号 5 条/min 在 DO IMRoom 内判定（按 uid 查 created_at，实例级缓存；per-conv 粒度，与全局每 IP 限流叠加兜底）；全局限流器改按发送者 IP 分键（原整会话共用首个发送者 IP 键属顺修缺陷） | 2026-09-14 |
+| 15 | **UI 改版 v2（WhatsApp Web 风格）**：三栏布局 + 暗色专用（颜色全走 CSS 变量预留亮色）+ 设置面板管个人资料 + 1v1 已读回执（`read` 帧 + convs 带 `peer_last_read`）；细节见 [IM-UI改版方案.md](./IM-UI改版方案.md) | 2026-09-14 |
+| 16 | **UI v2 体验反馈 10 项修订**（菜单外点关闭/Enter 发送/消息贴边/**安全数字不外显**/邮箱绑定 `POST /api/me/email`/UID 全站隐藏/搜索框简化校验/抽屉 X 常显/设置与资料拆分；图片头像列为后续拍板）——逐项处理见改版方案 §7 | 2026-09-14 |
 
 ## 13. 代码模块划分（业主拍板「文件分块」，v1.2 入档）
 

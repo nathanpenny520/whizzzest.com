@@ -105,6 +105,7 @@ export async function convsList(env, user) {
   const rows = await env.DB.prepare(
     `SELECT c.id, c.type, c.name, c.created_at,
             m.last_read_seq,
+            (SELECT m2.last_read_seq FROM im_members m2 WHERE m2.conversation_id = c.id AND m2.user_id != ?1 LIMIT 1) AS peer_last_read,
             (SELECT COALESCE(MAX(seq), 0) FROM im_messages WHERE conversation_id = c.id) AS last_seq,
             (SELECT COUNT(*) FROM im_messages WHERE conversation_id = c.id
               AND seq > m.last_read_seq AND sender_id != ?1) AS unread,
@@ -143,6 +144,8 @@ export async function convsList(env, user) {
       created_at: r.created_at,
       last_seq: r.last_seq,
       last_read_seq: r.last_read_seq,
+      // 已读回执（UI v2）：仅 1v1 回对方已读位，群聊不做回执（对齐 WhatsApp）
+      peer_last_read: r.type === 'dm' ? (r.peer_last_read || 0) : undefined,
       unread: r.unread,
       last_msg: r.last_body == null ? null : {
         seq: r.last_seq, sender_id: r.last_sender, type: r.last_type, body: r.last_body, created_at: r.last_at,
@@ -213,9 +216,13 @@ export async function convRead(request, env, user, convId) {
   const body = await readJson(request);
   const seq = Number(body && body.seq);
   if (!Number.isInteger(seq) || seq < 0) return json({ ok: false, error: 'seq' }, 400);
-  await env.DB.prepare(
-    'UPDATE im_members SET last_read_seq = MAX(last_read_seq, ?2) WHERE conversation_id = ?1 AND user_id = ?3'
-  ).bind(convId, seq, user.uid).run();
+  if (seq > (m.last_read_seq || 0)) {
+    await env.DB.prepare(
+      'UPDATE im_members SET last_read_seq = MAX(last_read_seq, ?2) WHERE conversation_id = ?1 AND user_id = ?3'
+    ).bind(convId, seq, user.uid).run();
+    // 已读回执（UI v2，改版方案 §4）：seq 真推进才经 /sys 广播 read 帧（对端 1v1 据此翻 ✓✓）
+    await notifyRoom(env, convId, [], { t: 'read', uid: user.uid, seq });
+  }
   return json({ ok: true });
 }
 

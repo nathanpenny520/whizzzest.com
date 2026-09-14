@@ -1,15 +1,16 @@
 /**
- * 焰境密语 — 聊天窗（M2：1v1；M3：群组）
- * 历史分页解密 → WS 实时收发（tag 确认/去重 + 缺口补拉）→ 已读上报 → typing/在线。
- * 群组（M3）：发送者名标注、系统消息居中条、成员面板（拉人/移出，members.js）、
- * 改名/退群/解散、成员变更/重钥/改名/被移出帧（members/rekey/rename/kicked）。
+ * 焰境密语 — 聊天窗（M2：1v1；M3：群组；UI v2 改版）
+ * 历史分页解密 → WS 实时收发（tag 确认/去重 + 缺口补拉）→ 已读上报 → typing/在线入头部副标。
+ * UI v2：带尾气泡 + 时间内嵌 + 1v1 回执（✓ 发送确认 / ✓✓ 已读，read 帧驱动）+ 未读分割线 +
+ *        群消息彩色发送者名/小头像 + 信息抽屉（dm 安全数字与操作；群信息/成员管理迁入）。
  * 明文一律 esc 渲染；发送前 UTF-8 字节预检（密文 b64 存库 ≤2000）。
  */
 
 import { connectConv } from './ws.js';
 import { GET, POST, PUT, DEL, PATCH } from './api.js';
-import { esc, avatarHtml, fingerprint, safetyNumber, fmtTime, fmtDayLabel, utf8Len } from './ui.js';
-import { renderMembersPanel } from './members.js';
+import { esc, avatarHtml, senderColor, fmtTime, fmtDayLabel, utf8Len } from './ui.js';
+import { icon } from './icons.js';
+import { renderGroupInfo } from './members.js';
 
 const PLAIN_MAX_BYTES = 1400;  // 密文 b64 ≤2000 的安全线（理论明文上限 1471B，方案 §3.3）
 const NAME_MAX = 30;
@@ -30,62 +31,54 @@ export function openChat(root, ctx, conv) {
   const seenSeq = new Set();
   const pending = new Map();  // tag → 待确认气泡
   let inbox = Promise.resolve();
-  let peerTypingTimer = null;
-  const typists = new Map();  // uid → 过期定时器（群组多人 typing）
+  const typists = new Map();  // uid → 过期定时器（typing 入头部副标）
   let lastTypingSent = 0;
 
   // 在线与成员（dm / 群组共用 onlineSet；群组另持成员表供发送者名与管理操作）
   const onlineSet = new Set();
   let onlineKnown = false;
   let members = new Map();
-  let myRole = 'member';
-  let membersPanel = false;
+  let myRole = 'owner';
+  let infoOpen = false;
   let kickedDone = false;
   let rekeyBusy = false;
-  let blocked = false;        // dm：是否已拉黑（M4 顺修：原未声明，严格模式下赋值抛 ReferenceError，菜单按钮渲染不出）
+  let blocked = false;        // dm：是否已拉黑
+  let peerLastRead = Number(conv.peer_last_read || 0); // 1v1 回执基准（read 帧推进）
 
   bodyEl.innerHTML = `
     <div class="im-chat">
-      <div class="im-chat-head">
-        <button class="im-back" id="chat-back" title="返回">‹</button>
-        ${avatarHtml(title, titleColor, 38)}
-        <div class="im-chat-who">
-          <b id="chat-title">${esc(title)}</b>
-          <span class="im-online" id="chat-online"><i class="off"></i><em>连接中…</em></span>
+      <div class="im-chat-col">
+        <div class="im-chat-head">
+          <button class="im-back" id="chat-back" title="返回">${icon('back', 22)}</button>
+          ${avatarHtml(title, titleColor, 40)}
+          <div class="im-chat-who">
+            <b id="chat-title">${esc(title)}</b>
+            <span class="im-chat-sub" id="chat-sub">连接中…</span>
+          </div>
+          <button class="im-ibtn" id="chat-info-btn" title="信息">${icon('info', 20)}</button>
+          <button class="im-ibtn" id="chat-menu-btn" data-menu-btn title="菜单">${icon('dots', 20)}</button>
+          <div class="im-menu" id="chat-menu" hidden></div>
         </div>
-        <code class="im-fp" id="chat-fp"${isGroup ? ' hidden' : ''}></code>
-        <button class="im-minibtn" id="chat-menu-btn">⋯</button>
-        <div class="im-menu" id="chat-menu" hidden></div>
+        <div class="im-chat-body" id="chat-body"><div class="im-chat-inner" id="chat-list"></div></div>
+        <form class="im-chat-input" id="chat-form">
+          <textarea id="chat-text" rows="1" placeholder="加载中…"></textarea>
+          <button class="im-send" id="chat-send" type="submit" title="发送" disabled>${icon('send', 19)}</button>
+        </form>
       </div>
-      <div class="im-chat-body" id="chat-body"></div>
-      <div class="im-members" id="chat-members" hidden></div>
-      <div class="im-typing" id="chat-typing" hidden></div>
-      <form class="im-chat-input" id="chat-form">
-        <textarea id="chat-text" rows="1" placeholder="加载中…"></textarea>
-        <button class="im-primary" id="chat-send" type="submit" disabled>发送</button>
-      </form>
+      <aside class="im-info" id="chat-info" hidden></aside>
     </div>`;
 
-  const listEl = bodyEl.querySelector('#chat-body');
-  const panelBox = bodyEl.querySelector('#chat-members');
-  const typingEl = bodyEl.querySelector('#chat-typing');
+  const listEl = bodyEl.querySelector('#chat-list');
+  const infoEl = bodyEl.querySelector('#chat-info');
   const formEl = bodyEl.querySelector('#chat-form');
   const textEl = bodyEl.querySelector('#chat-text');
   const sendBtn = bodyEl.querySelector('#chat-send');
-  const onlineEl = bodyEl.querySelector('#chat-online');
+  const subEl = bodyEl.querySelector('#chat-sub');
   const menuEl = bodyEl.querySelector('#chat-menu');
 
   /* ---------- 启动 ---------- */
 
   (async function boot() {
-    if (!isGroup && peer.pub_key) {
-      // 安全数字（M4）：双方公钥联合指纹，两端一致即可信（替代 M2 单侧指纹展示）
-      safetyNumber(ctx.me.pub_key || '', peer.pub_key).then((sn) => {
-        const el = bodyEl.querySelector('#chat-fp');
-        el.textContent = sn;
-        el.title = '安全数字：双方公钥的联合指纹。与对方当面/另行核对一致，即可确认没有中间人。';
-      }).catch(() => {});
-    }
     try { keyInfo = await ctx.ensureConvKeys(conv); } catch { keyInfo = null; }
     canCrypt = !!(keyInfo && ctx.identity);
     textEl.placeholder = canCrypt ? '输入消息（端到端加密）…' : '本机未解锁密钥，无法收发——退出后重新登录可恢复';
@@ -93,6 +86,7 @@ export function openChat(root, ctx, conv) {
     sendBtn.disabled = !canCrypt;
 
     if (isGroup) await loadMembers(); // 先取成员表：历史渲染需要发送者名
+    else await loadBlockState();      // dm：拉黑态供菜单/抽屉
     await loadHistory();
     connect();
     buildMenu();
@@ -104,7 +98,17 @@ export function openChat(root, ctx, conv) {
     listEl.innerHTML = '';
     if (!j.ok) { listEl.innerHTML = '<p class="im-empty">历史加载失败</p>'; return; }
     lastSeq = j.last_seq || 0;
-    for (const row of j.messages) await appendRow(row, { scroll: false });
+    // 未读分割线（UI v2）：首个「比我已读位新」的他人消息前插线
+    const unreadFrom = conv.unread > 0 ? (conv.last_read_seq || 0) + 1 : null;
+    let dividerPlaced = false;
+    for (const row of j.messages) {
+      if (unreadFrom !== null && !dividerPlaced && row.type !== 'system'
+        && row.sender_id !== ctx.me.uid && row.seq >= unreadFrom) {
+        listEl.insertAdjacentHTML('beforeend', '<div class="im-unreadline">未读消息</div>');
+        dividerPlaced = true;
+      }
+      await appendRow(row, { scroll: false });
+    }
     scrollBottom();
     markRead(lastSeq);
   }
@@ -118,13 +122,25 @@ export function openChat(root, ctx, conv) {
       conv.name = j.name;
       bodyEl.querySelector('#chat-title').textContent = j.name;
     }
-    setOnlineUI(onlineKnown);
+    renderSub();
     ctx.renderSide();
   }
 
+  async function loadBlockState() {
+    const bj = await GET('/api/blocks').catch(() => ({ ok: false }));
+    blocked = !!(bj.ok && (bj.blocks || []).includes(peer.uid));
+  }
+
   function memberName(uid) {
+    if (uid === peer.uid) return peer.display_name;
     const m = members.get(uid);
     return m ? m.display_name : 'UID ' + uid;
+  }
+
+  function memberColor(uid) {
+    if (uid === peer.uid) return peer.avatar_color;
+    const m = members.get(uid);
+    return (m && m.avatar_color) ?? (uid % 8);
   }
 
   /* ---------- WS ---------- */
@@ -132,7 +148,7 @@ export function openChat(root, ctx, conv) {
   function connect() {
     wsHandle = connectConv(conv.id, {
       onOpen: () => { /* hello 帧带在线名单；离线缺口由 hello 前的 lastSeq 对齐 */ gapPull(); },
-      onClose: () => setOnlineUI(false),
+      onClose: () => { onlineKnown = false; renderSub(); },
       onFrame,
     });
   }
@@ -146,14 +162,18 @@ export function openChat(root, ctx, conv) {
     if (f.t === 'hello') {
       onlineSet.clear();
       (Array.isArray(f.online) ? f.online : []).forEach((u) => onlineSet.add(u));
-      setOnlineUI(true);
+      onlineKnown = true;
+      renderSub();
       return;
     }
-    if (f.t === 'join') { onlineSet.add(f.uid); setOnlineUI(true); return; }
-    if (f.t === 'leave') { onlineSet.delete(f.uid); setOnlineUI(true); return; }
-    if (f.t === 'typing') {
-      if (isGroup) markTypist(f.uid);
-      else if (f.uid === peer.uid) showPeerTyping();
+    if (f.t === 'join') { onlineSet.add(f.uid); onlineKnown = true; renderSub(); return; }
+    if (f.t === 'leave') { onlineSet.delete(f.uid); renderSub(); return; }
+    if (f.t === 'typing') { markTypist(f.uid); return; }
+    if (f.t === 'read') { // 已读回执（UI v2）：对方读到了 → 己方气泡 ✓ 翻 ✓✓
+      if (!isGroup && f.uid === peer.uid) {
+        peerLastRead = Math.max(peerLastRead, Number(f.seq) || 0);
+        updateTicks();
+      }
       return;
     }
     if (f.t === 'err') {
@@ -161,9 +181,9 @@ export function openChat(root, ctx, conv) {
       if (el) {
         pending.delete(f.tag);
         el.querySelector('.im-bubble').classList.add('fail');
-        el.querySelector('.im-msgmeta').textContent = ({
+        el.querySelector('.im-meta').innerHTML = `<span>${esc({
           rate: '发送太快，稍后再试', blocked: '无法送达', too_long: '消息过长', retry: '发送失败',
-        }[f.error] || '发送失败');
+        }[f.error] || '发送失败')}</span><span class="tick-err">${icon('x', 13)}</span>`;
       }
       return;
     }
@@ -184,6 +204,7 @@ export function openChat(root, ctx, conv) {
       conv.name = f.name;
       bodyEl.querySelector('#chat-title').textContent = f.name;
       ctx.renderSide();
+      if (infoOpen) renderGroupInfo(infoEl, groupCtl);
       await gapPull(); // 改名系统消息入流
       return;
     }
@@ -197,7 +218,7 @@ export function openChat(root, ctx, conv) {
           keyInfo = await ctx.ensureConvKeys(conv).catch(() => null);
         } finally { rekeyBusy = false; }
       }
-      if (membersPanel) renderMembersPanel(panelBox, panelCtl);
+      if (infoOpen) renderGroupInfo(infoEl, groupCtl);
       await gapPull(); // 成员变更系统消息入流
       return;
     }
@@ -208,7 +229,8 @@ export function openChat(root, ctx, conv) {
         seenSeq.add(f.seq);
         lastSeq = Math.max(lastSeq, f.seq);
         el.dataset.seq = f.seq;
-        el.querySelector('.im-msgmeta').textContent = fmtTime(f.at || new Date());
+        el.querySelector('.im-meta').innerHTML =
+          `<span>${esc(fmtTime(f.at || new Date()))}</span>${tickHtml('ok', f.seq)}`;
         scrollBottom();
       } else if (!seenSeq.has(f.seq)) {
         if (f.seq > lastSeq + 1) await gapPull();          // 缺口 → 整段补拉（含本帧）
@@ -253,8 +275,16 @@ export function openChat(root, ctx, conv) {
     const label = fmtDayLabel(t);
     if (label !== lastDayLabel) {
       lastDayLabel = label;
-      listEl.insertAdjacentHTML('beforeend', `<div class="im-daysep">${esc(label)}</div>`);
+      listEl.insertAdjacentHTML('beforeend', `<div class="im-daysep"><span>${esc(label)}</span></div>`);
     }
+  }
+
+  /** 回执图标（UI v2）：发出中 🕐 / 失败 ✕ / 1v1 己方 ✓→✓✓（群聊不渲染回执） */
+  function tickHtml(state, seq) {
+    if (state === 'sending') return icon('clock', 13);
+    if (state === 'fail') return `<span class="tick-err">${icon('x', 13)}</span>`;
+    if (!isGroup && seq && seq <= peerLastRead) return `<span class="tick-read">${icon('checks', 14)}</span>`;
+    return isGroup ? '' : icon('check', 13);
   }
 
   function bubbleHtml(row, text, state) {
@@ -263,51 +293,56 @@ export function openChat(root, ctx, conv) {
     }
     const mine = row.sender_id === ctx.me.uid;
     const inner = text === null ? '<span class="im-cant">[无法解密的消息]</span>' : esc(text).replace(/\n/g, '<br>');
-    const senderLine = isGroup && !mine ? `<div class="im-sender">${esc(memberName(row.sender_id))}</div>` : '';
-    const meta = state === 'sending' ? '发送中…' : fmtTime(row.created_at);
-    return `<div class="im-msgrow ${mine ? 'mine' : 'theirs'}" ${row.tag ? `data-tag="${esc(row.tag)}"` : ''}${row.seq ? ` data-seq="${row.seq}"` : ''}>
-      ${senderLine}
-      <div class="im-bubble${state === 'failed' ? ' fail' : ''}">${inner}</div>
-      <div class="im-msgmeta">${meta}</div>
+    const timeText = state === 'sending' ? fmtTime(new Date()) : fmtTime(row.created_at);
+    // 回执只在己方气泡上（收到的消息只显示时间）
+    const meta = `<span class="im-meta"><span>${esc(timeText)}</span>${mine ? tickHtml(state, row.seq || 0) : ''}</span>`;
+    const bubble = `<div class="im-bubble${state === 'failed' ? ' fail' : ''}">${inner}${meta}</div>`;
+    const showAv = isGroup && !mine;
+    const av = showAv ? `<span class="im-mav">${avatarHtml(memberName(row.sender_id), memberColor(row.sender_id), 26)}</span>` : '';
+    const senderLine = showAv
+      ? `<div class="im-sender" style="color:${senderColor(memberColor(row.sender_id))}">${esc(memberName(row.sender_id))}</div>` : '';
+    const body = mine ? bubble : `<div class="im-bwrap">${senderLine}${bubble}</div>`;
+    return `<div class="im-msgrow ${mine ? 'mine' : `theirs${isGroup ? ' grp' : ''}`}" ${row.tag ? `data-tag="${esc(row.tag)}"` : ''}${row.seq ? ` data-seq="${row.seq}"` : ''} data-time="${esc(timeText)}">
+      ${av}${body}
     </div>`;
   }
 
-  function scrollBottom() {
-    listEl.scrollTop = listEl.scrollHeight;
+  /** 对方已读位推进 → 重绘全部己方气泡回执 */
+  function updateTicks() {
+    if (isGroup) return;
+    listEl.querySelectorAll('.im-msgrow.mine[data-seq]').forEach((el) => {
+      const meta = el.querySelector('.im-meta');
+      if (meta) meta.innerHTML = `<span>${esc(el.dataset.time || '')}</span>${tickHtml('ok', Number(el.dataset.seq))}`;
+    });
   }
 
-  function setOnlineUI(known) {
-    onlineKnown = known;
-    const dot = onlineEl.querySelector('i');
-    const txt = onlineEl.querySelector('em');
+  function scrollBottom() {
+    const body = listEl.parentElement;
+    body.scrollTop = body.scrollHeight;
+  }
+
+  /** 头部副标：typing 优先，否则在线/离线/人数 */
+  function renderSub() {
+    const names = [...typists.keys()].map(memberName);
+    if (names.length) {
+      subEl.textContent = `${names.join('、')} 正在输入…`;
+      subEl.classList.add('live');
+      return;
+    }
+    subEl.classList.remove('live');
     if (isGroup) {
-      dot.className = 'on';
-      txt.textContent = known ? `${members.size} 人 · ${onlineSet.size} 在线` : `${members.size || '…'} 人`;
+      subEl.textContent = onlineKnown ? `${members.size || '…'} 人 · ${onlineSet.size} 在线` : `${members.size || '…'} 人`;
       return;
     }
     const on = onlineSet.has(peer.uid);
-    dot.className = !known ? 'off' : (on ? 'on' : 'off');
-    txt.textContent = !known ? '重连中…' : (on ? '在线' : '离线');
-  }
-
-  function showPeerTyping() {
-    typingEl.hidden = false;
-    typingEl.textContent = `${peer.display_name} 正在输入…`;
-    clearTimeout(peerTypingTimer);
-    peerTypingTimer = setTimeout(() => { typingEl.hidden = true; }, 3000);
+    subEl.textContent = !onlineKnown ? '重连中…' : (on ? '在线' : '离线');
   }
 
   function markTypist(uid) {
     if (uid === ctx.me.uid) return;
     clearTimeout(typists.get(uid));
-    typists.set(uid, setTimeout(() => { typists.delete(uid); renderTypists(); }, 3000));
-    renderTypists();
-  }
-
-  function renderTypists() {
-    const names = [...typists.keys()].map(memberName);
-    typingEl.hidden = !names.length;
-    typingEl.textContent = names.length ? `${names.join('、')} 正在输入…` : '';
+    typists.set(uid, setTimeout(() => { typists.delete(uid); renderSub(); }, 3000));
+    renderSub();
   }
 
   /* ---------- 发送 ---------- */
@@ -320,6 +355,7 @@ export function openChat(root, ctx, conv) {
     sendText(text);
     textEl.value = '';
     textEl.style.height = 'auto';
+    sendBtn.disabled = true;
   });
 
   async function sendText(text) {
@@ -340,105 +376,103 @@ export function openChat(root, ctx, conv) {
     }
   }
 
+  // Enter 发送 / Shift+Enter 换行（业主反馈 2）
+  textEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      formEl.requestSubmit();
+    }
+  });
+
   textEl.addEventListener('input', () => {
+    sendBtn.disabled = !canCrypt || !textEl.value.trim();
     const now = Date.now();
     if (now - lastTypingSent > 2000) { lastTypingSent = now; if (wsHandle) wsHandle.send({ t: 'typing' }); }
     textEl.style.height = 'auto';
     textEl.style.height = Math.min(96, textEl.scrollHeight) + 'px';
   });
 
-  /* ---------- 群成员面板（members.js 渲染） ---------- */
+  /* ---------- 信息抽屉（dm 资料 / 群信息） ---------- */
 
-  const panelCtl = {
+  const groupCtl = {
     conv,
     ctx,
     members: () => members,
     myRole: () => myRole,
     onChanged: async () => { // 变更成功后双保险：帧也会推 members（幂等）
       await loadMembers();
-      if (membersPanel) renderMembersPanel(panelBox, panelCtl);
+      if (infoOpen) renderGroupInfo(infoEl, groupCtl);
       keyInfo = await ctx.ensureConvKeys(conv).catch(() => null);
       gapPull();
     },
+    actions: {}, // boot 后填（rename/leave/disband/report 定义在下方）
   };
 
-  function openPanel() {
-    membersPanel = true;
-    panelBox.hidden = false;
-    listEl.style.display = 'none';
-    formEl.style.display = 'none';
-    typingEl.style.display = 'none';
-    renderMembersPanel(panelBox, panelCtl);
+  function openInfo() {
+    infoOpen = true;
+    infoEl.hidden = false;
+    if (isGroup) renderGroupInfo(infoEl, groupCtl);
+    else renderDmInfo();
   }
 
-  function closePanel() {
-    membersPanel = false;
-    panelBox.hidden = true;
-    listEl.style.display = '';
-    formEl.style.display = '';
-    typingEl.style.display = '';
+  function closeInfo() {
+    infoOpen = false;
+    infoEl.hidden = true;
+    infoEl.innerHTML = '';
   }
 
-  /* ---------- 头部操作 ---------- */
-
-  function buildMenu() {
-    if (isGroup) {
-      const owner = myRole === 'owner';
-      menuEl.innerHTML = `
-        <button data-act="members">群成员</button>
-        ${owner ? '<button data-act="rename">修改群名</button>' : ''}
-        <button data-act="report">举报</button>
-        ${owner ? '<button data-act="disband" class="warn">解散群聊</button>' : '<button data-act="leave" class="warn">退出群聊</button>'}`;
-      menuEl.querySelectorAll('button').forEach((b) => {
-        b.addEventListener('click', () => {
-          menuEl.hidden = true;
-          const act = b.dataset.act;
-          if (act === 'members') openPanel();
-          if (act === 'rename') renameGroup();
-          if (act === 'disband') disbandGroup();
-          if (act === 'leave') leaveGroup();
-          if (act === 'report') reportConv();
-        });
+  async function renderDmInfo() {
+    // 业主反馈 4/6：安全数字等底层细节不外显，用户只须知「端到端加密」；UID 无检索用途故隐藏
+    infoEl.innerHTML = `
+      <div class="im-info-top">联系信息
+        <button class="im-ibtn im-info-close" id="info-close" title="关闭">${icon('x', 20)}</button>
+      </div>
+      <div class="im-info-head">
+        ${avatarHtml(title, titleColor, 96)}
+        <h3>${esc(title)}</h3>
+        <p>${esc(peer.bio || '')}</p>
+      </div>
+      <div class="im-info-sec">${icon('shield', 16)}
+        <span class="im-hint" style="display:inline;vertical-align:2px">此聊天中的消息经端到端加密，服务器只递信，不看信。</span>
+      </div>
+      <div class="im-info-acts">
+        <button class="im-act" data-act="block">${icon('ban', 18)} ${blocked ? '取消拉黑' : '拉黑对方'}</button>
+        <button class="im-act warn" data-act="del">${icon('trash', 18)} 删除好友</button>
+        <button class="im-act warn" data-act="report">${icon('flag', 18)} 举报</button>
+      </div>`;
+    infoEl.querySelector('#info-close').addEventListener('click', closeInfo);
+    infoEl.querySelectorAll('.im-act').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const act = b.dataset.act;
+        if (act === 'block') await toggleBlock();
+        if (act === 'del') await deleteFriend();
+        if (act === 'report') reportConv();
+        if (infoOpen && act === 'block') renderDmInfo(); // 拉黑态变更后刷新抽屉文案
       });
-      return;
+    });
+  }
+
+  /* ---------- 头部菜单与动作（菜单/抽屉共用） ---------- */
+
+  async function toggleBlock() {
+    if (!blocked) {
+      if (!confirm(`拉黑「${peer.display_name}」？对方将无法给你发申请与消息。`)) return;
+      await PUT(`/api/blocks/${peer.uid}`);
+    } else {
+      await DEL(`/api/blocks/${peer.uid}`);
     }
-    // dm：拉黑/删除好友
-    (async () => {
-      const bj = await GET('/api/blocks').catch(() => ({ ok: false }));
-      blocked = !!(bj.ok && (bj.blocks || []).includes(peer.uid));
-      menuEl.innerHTML = `
-        <button data-act="block">${blocked ? '取消拉黑' : '拉黑对方'}</button>
-        <button data-act="report">举报</button>
-        <button data-act="del" class="warn">删除好友</button>`;
-      menuEl.querySelectorAll('button').forEach((b) => {
-        b.addEventListener('click', async () => {
-          menuEl.hidden = true;
-          if (b.dataset.act === 'block') {
-            if (!blocked) {
-              if (!confirm(`拉黑「${peer.display_name}」？对方将无法给你发申请与消息。`)) return;
-              await PUT(`/api/blocks/${peer.uid}`);
-            } else {
-              await DEL(`/api/blocks/${peer.uid}`);
-            }
-            buildMenu();
-            return;
-          }
-          if (b.dataset.act === 'report') {
-            reportConv();
-            return;
-          }
-          if (b.dataset.act === 'del') {
-            if (!confirm(`删除好友「${peer.display_name}」？会话与聊天记录保留。`)) return;
-            const r = await DEL(`/api/friends/${peer.uid}`);
-            if (r.ok) ctx.onFriendRemoved();
-            else alert('操作失败（' + r.error + '）');
-          }
-        });
-      });
-    })();
+    blocked = !blocked;
+    buildMenu();
   }
 
-  /** 举报本会话（M4，方案 §6/§8）：整段 seq 区间 + 说明；明文不出端，站长只收说明（自愿附引用文 v1 未做） */
+  async function deleteFriend() {
+    if (!confirm(`删除好友「${peer.display_name}」？会话与聊天记录保留。`)) return;
+    const r = await DEL(`/api/friends/${peer.uid}`);
+    if (r.ok) ctx.onFriendRemoved();
+    else alert('操作失败（' + r.error + '）');
+  }
+
+  /** 举报本会话（M4，方案 §6/§8）：整段 seq 区间 + 说明；明文不出端，站长只收说明 */
   async function reportConv() {
     const reason = prompt('举报说明（1-200 字）。\n聊天内容端到端加密，站长无法查看——请尽量描述问题（骚扰、诈骗、违规内容等）。');
     if (reason === null) return;
@@ -464,6 +498,7 @@ export function openChat(root, ctx, conv) {
     conv.name = n;
     bodyEl.querySelector('#chat-title').textContent = n;
     ctx.renderSide();
+    if (infoOpen) renderGroupInfo(infoEl, groupCtl);
     gapPull(); // 改名系统消息入流（rename 帧也会补一次，幂等）
   }
 
@@ -485,9 +520,44 @@ export function openChat(root, ctx, conv) {
     ctx.showHome();
   }
 
+  groupCtl.actions = { rename: renameGroup, leave: leaveGroup, disband: disbandGroup, report: reportConv, close: closeInfo };
+
+  function buildMenu() {
+    if (isGroup) {
+      const owner = myRole === 'owner';
+      menuEl.innerHTML = `
+        <button data-act="info">${icon('info', 16)} 群信息</button>
+        ${owner ? `<button data-act="rename">${icon('edit', 16)} 修改群名</button>` : ''}
+        <button data-act="report">${icon('flag', 16)} 举报</button>
+        ${owner
+          ? `<button data-act="disband" class="warn">${icon('trash', 16)} 解散群聊</button>`
+          : `<button data-act="leave" class="warn">${icon('logout', 16)} 退出群聊</button>`}`;
+    } else {
+      menuEl.innerHTML = `
+        <button data-act="info">${icon('info', 16)} 联系信息</button>
+        <button data-act="block">${icon('ban', 16)} ${blocked ? '取消拉黑' : '拉黑对方'}</button>
+        <button data-act="report">${icon('flag', 16)} 举报</button>
+        <button data-act="del" class="warn">${icon('trash', 16)} 删除好友</button>`;
+    }
+    menuEl.querySelectorAll('button').forEach((b) => {
+      b.addEventListener('click', async () => {
+        menuEl.hidden = true;
+        const act = b.dataset.act;
+        if (act === 'info') openInfo();
+        if (act === 'rename') renameGroup();
+        if (act === 'disband') disbandGroup();
+        if (act === 'leave') leaveGroup();
+        if (act === 'report') reportConv();
+        if (act === 'block') { await toggleBlock(); if (infoOpen) renderDmInfo(); }
+        if (act === 'del') deleteFriend();
+      });
+    });
+  }
+
+  bodyEl.querySelector('#chat-info-btn').addEventListener('click', () => { menuEl.hidden = true; infoOpen ? closeInfo() : openInfo(); });
   bodyEl.querySelector('#chat-menu-btn').addEventListener('click', () => { menuEl.hidden = !menuEl.hidden; });
   bodyEl.querySelector('#chat-back').addEventListener('click', () => {
-    if (membersPanel) closePanel();
+    if (infoOpen) closeInfo();
     else ctx.showHome();
   });
 
@@ -503,7 +573,6 @@ export function openChat(root, ctx, conv) {
   return {
     close() {
       closed = true;
-      clearTimeout(peerTypingTimer);
       for (const t of typists.values()) clearTimeout(t);
       typists.clear();
       if (wsHandle) wsHandle.close();

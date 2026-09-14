@@ -302,20 +302,31 @@ export const REGISTER_PAGE_JS = `
 })();
 `;
 
-/** /app 壳：会话已由服务端校验；bootstrap 数据由 /api/me 拉取 */
+/** /app 壳（UI v2 三栏：icon 栏 + 会话列表面板 + 聊天主区）；会话已由服务端校验；bootstrap 数据由 /api/me 拉取 */
 export function appShellHtml() {
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="${LOGO_URI}">
 <title>焰境密语 — 加密聊天</title>
 <link rel="stylesheet" href="/assets/css/im.css">
 </head>
 <body class="im-app">
-<div class="im-layout">
+<div class="im-shell">
+  <nav class="im-rail" id="im-rail">
+    <div class="im-rail-top">
+      <button class="im-rail-btn" id="rail-chats" title="聊天"></button>
+      <button class="im-rail-btn" id="rail-contacts" title="联系人"></button>
+      <button class="im-rail-btn" id="rail-settings" title="设置"></button>
+    </div>
+    <div class="im-rail-bottom">
+      <button class="im-rail-btn" id="rail-me" title="我的资料"></button>
+      <button class="im-rail-btn" id="rail-logout" title="退出登录"></button>
+    </div>
+  </nav>
   <aside class="im-side" id="im-side"></aside>
   <main class="im-main" id="im-main"></main>
 </div>
