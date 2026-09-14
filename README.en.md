@@ -8,7 +8,7 @@
 
 A modern culture & tourism platform for Wanzai, Jiangxi — "the Home of Fireworks in China". Fireworks heritage, intangible cultural heritage, local cuisine, travel routes, an in-browser fireworks simulator, an AI travel guide, an online arcade and end-to-end encrypted chat, all in one place.
 
-[**🌐 whizzzest.com**](https://whizzzest.com) · [▶ Digital Fireworks](https://whizzzest.com/digital-fireworks/) · [🕹 Whizzzest Arcade](https://game.whizzzest.com/) · [📺 Wanzai TV](https://whizzzest.com/tv/) · [💬 Yanjing Whisper](https://im.whizzzest.com/) · [🤖 AI Guide](https://whizzzest.com/)
+[**🌐 whizzzest.com**](https://whizzzest.com) · [▶ Digital Fireworks](https://whizzzest.com/digital-fireworks/) · [🕹 Whizzzest Arcade](https://game.whizzzest.com/) · [📺 Wanzai TV](https://whizzzest.com/tv/) · [💬 Whizzzest Whisper](https://im.whizzzest.com/) · [🤖 AI Guide](https://whizzzest.com/)
 
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers%20·%20D1%20·%20R2%20·%20Vectorize-F48120?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 [![Frontend](https://img.shields.io/badge/frontend%20runtime%20deps-0-brightgreen)](#engineering-deep-dives)
@@ -42,19 +42,19 @@ A modern culture & tourism platform for Wanzai, Jiangxi — "the Home of Firewor
 
 ## Live Experience
 
-> The main site needs no sign-up; the whole site is a PWA — installable on desktop and mobile. 💬 Yanjing Whisper requires a free account — chats are end-to-end encrypted.
+> The main site needs no sign-up; the whole site is a PWA — installable on desktop and mobile. 💬 Whizzzest Whisper requires a free account — chats are end-to-end encrypted.
 
 | Entry | Link | Highlights |
 | --- | --- | --- |
 | 🏠 Main site | [whizzzest.com](https://whizzzest.com/) | Full-screen fireworks hero, all modules |
 | 🎆 Digital Fireworks | [whizzzest.com/digital-fireworks](https://whizzzest.com/digital-fireworks/) | Pure in-browser fireworks simulator |
 | 🕹 Whizzzest Arcade | [game.whizzzest.com](https://game.whizzzest.com/) | Online game center: 40 classic titles + a retro DOS zone, in English and Chinese |
-| 💬 Yanjing Whisper | [im.whizzzest.com](https://im.whizzzest.com/) | End-to-end encrypted chat: friends, DMs / groups, read receipts |
+| 💬 Whizzzest Whisper | [im.whizzzest.com](https://im.whizzzest.com/) | End-to-end encrypted chat: friends, DMs / groups, read receipts |
 | 🤖 "Huanuo" AI Guide | [whizzzest.com](https://whizzzest.com/) (bottom-left on any page) | On-site RAG Q&A with traceable sources |
 | 📺 Wanzai TV | [whizzzest.com/tv](https://whizzzest.com/tv/) | Original drama series, promos, live fireworks |
 | 🎵 Wanzai Music | [whizzzest.com/music](https://whizzzest.com/music/) | Local music player |
-| 📚 Yanjing Library | [whizzzest.com/library](https://whizzzest.com/library/) | Serialized fiction by local authors |
-| 🏪 Yanjing Shops | [whizzzest.com/merchants](https://whizzzest.com/merchants/) | Merchant directory + self-service onboarding |
+| 📚 Whizzzest Library | [whizzzest.com/library](https://whizzzest.com/library/) | Serialized fiction by local authors |
+| 🏪 Whizzzest Shops | [whizzzest.com/merchants](https://whizzzest.com/merchants/) | Merchant directory + self-service onboarding |
 
 ---
 
@@ -74,7 +74,7 @@ A modern culture & tourism platform for Wanzai, Jiangxi — "the Home of Firewor
 - **Global edge computing**: fully hosted on Cloudflare's 300+ edge locations; static assets served from the edge, dynamic pages rendered nearby by Workers
 - **Immersive interaction**: a Canvas + Web Audio fireworks simulator — pick your shells, choreograph the show, light up Wanzai's night sky in the browser
 - **Complete merchant loop**: listing, self-service onboarding, email-code login, certification & pinned ranking — end to end
-- **End-to-end encrypted IM**: "Yanjing Whisper" (焰境密语) — private keys never leave the device (password-wrapped backup for device migration); friends, group chats and read receipts, with the server only ever seeing ciphertext
+- **End-to-end encrypted IM**: "Whizzzest Whisper" (焰境密语) — private keys never leave the device (password-wrapped backup for device migration); friends, group chats and read receipts, with the server only ever seeing ciphertext
 - **Game center**: "Whizzzest Arcade" (焰境之梦) — 40 classic titles (H5 / WebGL / Flash-Ruffle / DOS), bilingual, all assets delivered from edge object storage
 - **Zero privacy leakage**: no third-party analytics / ads / font scripts anywhere
 
@@ -93,11 +93,11 @@ A modern culture & tourism platform for Wanzai, Jiangxi — "the Home of Firewor
 | Travel routes | [/tourism](https://whizzzest.com/tourism/) | Fireworks / heritage / food / landscape themed routes |
 | Wanzai TV | [/tv](https://whizzzest.com/tv/) | Video channel with backend streaming uploads |
 | Wanzai Music | [/music](https://whizzzest.com/music/) | Player with loop modes / download / share / deep links |
-| Yanjing Library | [/library](https://whizzzest.com/library/) | Serialized platform with two-level content review |
+| Whizzzest Library | [/library](https://whizzzest.com/library/) | Serialized platform with two-level content review |
 | Digital Fireworks | [/digital-fireworks](https://whizzzest.com/digital-fireworks/) | Multi-shell, multi-effect fireworks simulator |
-| Yanjing Shops | [/merchants](https://whizzzest.com/merchants/) | Merchant directory, self-service onboarding, certification |
+| Whizzzest Shops | [/merchants](https://whizzzest.com/merchants/) | Merchant directory, self-service onboarding, certification |
 | Online games | [game.whizzzest.com](https://game.whizzzest.com/) | Whizzzest Arcade: 40 classic titles + a DOS zone, in English and Chinese |
-| Yanjing Whisper | [im.whizzzest.com](https://im.whizzzest.com/) | End-to-end encrypted chat: friends, DMs / groups, read receipts |
+| Whizzzest Whisper | [im.whizzzest.com](https://im.whizzzest.com/) | End-to-end encrypted chat: friends, DMs / groups, read receipts |
 | AI guide | any page | "Huanuo" on-site RAG Q&A |
 
 <table>
@@ -107,7 +107,7 @@ A modern culture & tourism platform for Wanzai, Jiangxi — "the Home of Firewor
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/readme/tv.jpg" alt="Wanzai TV"><br><sub>Wanzai TV — video channel with large-file streaming uploads</sub></td>
-    <td width="50%"><img src="docs/assets/readme/merchants.jpg" alt="Yanjing Shops"><br><sub>Yanjing Shops — search / category filters / certified-merchant badge</sub></td>
+    <td width="50%"><img src="docs/assets/readme/merchants.jpg" alt="Whizzzest Shops"><br><sub>Whizzzest Shops — search / category filters / certified-merchant badge</sub></td>
   </tr>
 </table>
 
@@ -118,7 +118,7 @@ A modern culture & tourism platform for Wanzai, Jiangxi — "the Home of Firewor
 | Admin console | `admin.whizzzest.com` | Multi-account management, content review, visitor analytics, media uploads (Cloudflare Access + app password / Passkey double gate) |
 | Merchant portal | `merchant.whizzzest.com` | Merchant onboarding, listing management, certification |
 | Writer portal | `writer.whizzzest.com` | Writer sign-up, work / chapter management, review submission |
-| Yanjing Whisper | `im.whizzzest.com` | End-to-end encrypted instant messaging: friends, DMs / groups, report moderation (its own account system) |
+| Whizzzest Whisper | `im.whizzzest.com` | End-to-end encrypted instant messaging: friends, DMs / groups, report moderation (its own account system) |
 | Whizzzest Arcade | `game.whizzzest.com` | Online game center: 40 classic titles + a DOS zone, in English and Chinese |
 
 ---
@@ -132,7 +132,7 @@ flowchart TB
     EDGE -->|"static assets"| ASSETS["Static Assets<br/>images / CSS / JS / fonts"]
     EDGE -->|"dynamic requests"| MAIN["Main Worker<br/>page rendering · REST API · streaming uploads"]
     EDGE -->|"AI Q&A"| AIW["Huanuo AI service<br/>Workers AI + Vectorize"]
-    EDGE -->|"realtime chat"| IM["Yanjing Whisper IM<br/>E2EE · Durable Objects"]
+    EDGE -->|"realtime chat"| IM["Whizzzest Whisper IM<br/>E2EE · Durable Objects"]
     EDGE -->|"game requests"| GAME["Arcade Worker<br/>40 classic titles · bilingual"]
 
     MAIN --> D1[("Cloudflare D1<br/>SQLite at the edge · 30 tables")]
@@ -203,7 +203,7 @@ Pure in-browser Canvas particle system with Web Audio sound: multiple shells, ef
 **7. The full merchant loop**
 Email-code login → self-service onboarding → back-office review → certification and pinned ranking; images stored in R2 and proxied by a Worker; paired with a visitor analytics dashboard — an operable local merchant ecosystem.
 
-**8. End-to-end encrypted IM ("Yanjing Whisper")**
+**8. End-to-end encrypted IM ("Whizzzest Whisper")**
 Private keys are generated on-device and never leave it (ECDH P-256), wrapped by the login password for backup and restored with the password on a new device; DMs and group chats use sealed envelopes, and group membership changes trigger automatic rekeying — the server only ever stores ciphertext. Durable Objects (Hibernation WebSockets) carry realtime delivery / typing / presence / read receipts; friend and unread events arrive as lightweight activity frames; send-rate limiting is keyed per sender. Code in `im/`.
 
 **9. The game center ("Whizzzest Arcade")**
@@ -292,13 +292,13 @@ Core tables (30 in total; [schema.sql](schema.sql) is the full main-site bluepri
 | `admin_users` | Admin accounts (PBKDF2 hashes / permissions) |
 | `visitors` | Visitor analytics (path / UA / truncated IP) |
 | `ai_knowledge` | AI knowledge base (content / vectors / sources / category) |
-| `im_users` and 10 more `im_*` tables | Yanjing Whisper IM (accounts / friends / conversations / key directory / message ciphertext / presence / reports) |
+| `im_users` and 10 more `im_*` tables | Whizzzest Whisper IM (accounts / friends / conversations / key directory / message ciphertext / presence / reports) |
 
 ---
 
 ## Team & Partners
 
-Whizzzest (焰境·万载) was founded by university students in Beijing who love their hometown culture — a core team of 6 plus an AI teammate:
+Whizzzest (焰境·万载) was founded by university students in Beijing who love their hometown culture — a core team of 5 plus an AI teammate:
 
 | Member | Role | Focus |
 | --- | --- | --- |
@@ -329,7 +329,7 @@ Whizzzest (焰境·万载) was founded by university students in Beijing who lov
 
 Copyright © **Whizzzest (焰境·万载) team**. All rights reserved.
 
-This repository is public for showcase and learning purposes only. Without prior written permission from the copyright holders, you may not copy, modify, distribute, sublicense, or use it for commercial purposes. See [LICENSE](LICENSE).
+This repository is public for showcase and learning purposes only. Without prior written permission from the copyright holders, you may not copy, modify, distribute, sublicense, or use it for commercial purposes, train AI/ML models on its content, or publicly deploy replica / mirror sites. See [LICENSE](LICENSE).
 
 ---
 
