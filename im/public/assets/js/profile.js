@@ -18,7 +18,7 @@ export async function renderProfile(root, ctx) {
       <div class="im-set-box">
         <h2>个人资料</h2>
         <section class="im-set-card im-set-me">
-          ${avatarHtml(me.display_name, me.avatar_color, 72)}
+          ${avatarHtml(me.display_name, me.avatar_color, 72).replace('<span class="im-avatar"', '<span class="im-avatar" id="pf-avatar"')}
           <div class="im-set-me-fields">
             <label class="im-f"><span>昵称</span><input id="pf-name" maxlength="20" value="${esc(me.display_name)}"></label>
             <label class="im-f"><span>简介</span><input id="pf-bio" maxlength="100" value="${esc(me.bio || '')}" placeholder="一句话介绍（可选）"></label>
@@ -56,18 +56,24 @@ export async function renderProfile(root, ctx) {
 
   root.querySelector('#pf-save').addEventListener('click', async () => {
     const msg = root.querySelector('#pf-msg');
+    // api.js 的 PATCH 直接返回响应体（非 {status, j} 包装）——原 r2.j.ok 二次解包恒 undefined，
+    // 保存虽入库但 UI 抛 TypeError 致「要刷新才显示」（M1 遗留，v2 顺修）
     const r2 = await PATCH('/api/me', {
       display_name: root.querySelector('#pf-name').value,
       bio: root.querySelector('#pf-bio').value,
       avatar_color: Number(colorBox.dataset.val || 0),
     });
-    msg.textContent = r2.j.ok
+    msg.textContent = r2.ok
       ? '已保存'
-      : ({ display_name: '昵称需 1-20 字', bio: '简介最长 100 字', avatar_color: '头像色无效' }[r2.j.error] || '保存失败');
-    msg.className = 'im-msg ' + (r2.j.ok ? 'ok' : 'err');
-    if (r2.j.ok) {
+      : ({ display_name: '昵称需 1-20 字', bio: '简介最长 100 字', avatar_color: '头像色无效' }[r2.error] || '保存失败');
+    msg.className = 'im-msg ' + (r2.ok ? 'ok' : 'err');
+    if (r2.ok) {
       await ctx.reloadMe();
       ctx.renderSide(); // rail 头像/会话行同步新资料
+      // 大头像就地刷新（业主反馈：保存头像色不该要刷新才变）
+      const av = root.querySelector('#pf-avatar');
+      if (av) av.outerHTML = avatarHtml(root.querySelector('#pf-name').value.trim(), Number(colorBox.dataset.val || 0), 72)
+        .replace('<span class="im-avatar"', '<span class="im-avatar" id="pf-avatar"');
     }
   });
 
@@ -125,9 +131,13 @@ function renderEmailBox(box, ctx) {
     if (!/^\d{6}$/.test(code)) return show('请输入 6 位验证码', false);
     const r = await POST('/api/me/email', { email, code });
     if (r.ok) {
-      show('邮箱绑定成功', true);
       await ctx.reloadMe();
-      renderEmailBox(box, ctx); // 显示新 masked 邮箱 + 换绑按钮
+      // 账号卡「邮箱」行就地刷新（业主反馈：绑定成功不该要刷新才显示）
+      const ddEmail = box.parentElement.querySelectorAll('.im-kv dd')[1];
+      if (ddEmail) ddEmail.textContent = ctx.me.login_email || '已绑定';
+      renderEmailBox(box, ctx); // 重挂为「换绑邮箱」并收起表单
+      const fresh = box.querySelector('#em-msg');
+      if (fresh) { fresh.textContent = '邮箱绑定成功'; fresh.className = 'im-msg ok'; }
     } else {
       show({ bad: '验证码不正确', expired: '验证码已过期，请重新发送', taken: '该邮箱已被其他账号绑定', code: '请输入 6 位验证码', email: '邮箱格式不正确' }[r.error] || '绑定失败（' + r.error + '）', false);
     }
