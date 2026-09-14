@@ -78,23 +78,23 @@ export async function dmCreate(request, env, user) {
     ]);
   }
 
-  // 信封先到先得：本版本一枚都没有时才写入（后建方经 /keys 拉先建方的）
-  const haveKeys = await env.DB.prepare(
-    'SELECT COUNT(*) AS n FROM im_conv_keys WHERE conversation_id = ?1 AND key_version = ?2'
-  ).bind(conv.id, keyVersion).first();
-  if (!haveKeys.n) {
-    const want = new Set([user.uid, peerId]);
-    const got = new Set(envelopes.map((e) => e.uid));
-    if (got.size !== want.size || [...want].some((u) => !got.has(u))) return json({ ok: false, error: 'keys' }, 400);
-    await env.DB.batch(envelopes.map((e) =>
-      env.DB.prepare('INSERT OR IGNORE INTO im_conv_keys (conversation_id, key_version, uid, envelope) VALUES (?1, ?2, ?3, ?4)')
-        .bind(conv.id, keyVersion, e.uid, e.envelope)
-    ));
-  }
+  // 信封先到先得（批内原子）：NOT EXISTS 行级守卫 + 单批事务——并发双建整批要么全写要么零写，
+  // 杜绝「两边各写一枚」混钥；零写（先到者已在）→ keys_written=false，客户端弃自造 K 走信封解包
+  const want = new Set([user.uid, peerId]);
+  const got = new Set(envelopes.map((e) => e.uid));
+  if (got.size !== want.size || [...want].some((u) => !got.has(u))) return json({ ok: false, error: 'keys' }, 400);
+  const insRes = await env.DB.batch(envelopes.map((e) =>
+    env.DB.prepare(
+      'INSERT INTO im_conv_keys (conversation_id, key_version, uid, envelope) ' +
+      'SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM im_conv_keys WHERE conversation_id = ?1 AND key_version = ?2)'
+    ).bind(conv.id, keyVersion, e.uid, e.envelope)
+  ));
+  const keysWritten = insRes.every((r) => (r.meta && r.meta.changes) === 1);
 
   const peer = await env.DB.prepare('SELECT id, display_name, avatar_color FROM im_users WHERE id = ?1').bind(peerId).first();
   return json({
     ok: true,
+    keys_written: keysWritten,
     conv: { id: conv.id, type: 'dm', peer: { uid: peer.id, display_name: peer.display_name, avatar_color: peer.avatar_color } },
   });
 }

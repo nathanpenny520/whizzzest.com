@@ -185,7 +185,7 @@ function showEmptyMain() {
       <div class="im-empty-acts">
         <button class="im-ghostbtn" id="ea-chat">${icon('newchat', 16)} 找人开聊</button>
         <button class="im-ghostbtn" id="ea-group">${icon('users', 16)} 新建群聊</button>
-        <button class="im-ghostbtn" id="ea-set">${icon('gear', 16)} 个人资料</button>
+        <button class="im-ghostbtn" id="ea-set">${icon('user', 16)} 个人资料</button>
       </div>
       ${keyOk
         ? '<span class="im-badge ok">端到端加密已就绪（本机密钥已解锁）</span>'
@@ -343,7 +343,10 @@ async function openDm(friend) {
       alert({ not_friends: '对方已不是好友', blocked: '存在拉黑关系，无法发起会话', keys: '密钥材料无效' }[j.error] || '建会话失败（' + j.error + '）');
       return;
     }
-    cacheKit(j.conv.id, kit);
+    // 服务端信封先到先得：仅当本方信封真写入时本地自造 K 才是会话真钥；
+    // 落败（先到者已在/并发落败）时弃 K，openConv 经 /keys 信封解包取服务端真钥
+    if (j.keys_written) cacheKit(j.conv.id, kit);
+    else clearConvKeys(j.conv.id);
     await refreshConvs();
     conv = convs.find((c) => c.id === j.conv.id);
   }
