@@ -6,7 +6,7 @@
  */
 
 import { GET, POST, DEL, PUT } from './api.js';
-import { esc, avatarHtml, fingerprint } from './ui.js';
+import { esc, avatarHtml } from './ui.js';
 import { icon } from './icons.js';
 
 /** 联系人态入口：按子页分派（子页状态存 ctx.contactsSub） */
@@ -115,40 +115,56 @@ async function renderRequestsPage(sideEl, ctx) {
   const body = sideEl.querySelector('#c-req');
   const [tin, tout] = await Promise.all([GET('/api/friends/requests?box=in'), GET('/api/friends/requests?box=out')]);
   ctx.pendingIn = tin.requests.length; // 返回顶层/回聊天列表随下次 renderAll 生效（此处重渲染会死循环）
-  const item = (r, actions) => `
+  let inList = tin.requests;
+  let outList = tout.requests;
+  // 兜底文案不带 UID（业主反馈：UID 仅内部用，不外显）
+  const item = (r, actions, fallback) => `
     <div class="im-friend" style="cursor:default">
       ${avatarHtml(r.user.display_name, r.user.avatar_color, 42)}
       <div class="im-friend-txt">
         <b>${esc(r.user.display_name)}</b>
-        <span>${esc(r.message || r.user.bio || 'UID ' + r.user.uid)}</span>
+        <span>${esc(r.message || r.user.bio || fallback)}</span>
       </div>
       ${actions}
     </div>`;
-  const inHtml = tin.requests.length
-    ? tin.requests.map((r) => item(r, `
-        <button class="im-minibtn" data-in-accept="${r.id}">同意</button>
-        <button class="im-minibtn warn" data-in-reject="${r.id}">拒绝</button>`)).join('')
-    : '<p class="im-hint">没有待处理的申请</p>';
-  const outHtml = tout.requests.length
-    ? tout.requests.map((r) => item(r, `<button class="im-minibtn warn" data-out-cancel="${r.id}">撤回</button>`)).join('')
-    : '<p class="im-hint">没有发出的申请</p>';
-  body.innerHTML = `
-    <div class="im-sec-label">收到的申请</div>${inHtml}
-    <div class="im-sec-label">发出的申请</div>${outHtml}`;
-
-  body.querySelectorAll('[data-in-accept]').forEach((b) => b.addEventListener('click', async () => {
-    const r = await POST(`/api/friends/requests/${b.dataset.inAccept}/accept`);
-    if (!r.ok) alert('操作失败（' + r.error + '）');
-    renderRequestsPage(sideEl, ctx);
-  }));
-  body.querySelectorAll('[data-in-reject]').forEach((b) => b.addEventListener('click', async () => {
-    await POST(`/api/friends/requests/${b.dataset.inReject}/reject`);
-    renderRequestsPage(sideEl, ctx);
-  }));
-  body.querySelectorAll('[data-out-cancel]').forEach((b) => b.addEventListener('click', async () => {
-    await DEL(`/api/friends/requests/${b.dataset.outCancel}`);
-    renderRequestsPage(sideEl, ctx);
-  }));
+  // 就地重绘（无网络等待）：原整页 re-fetch 期间标题与列表一起消失，业主报「收到的申请」字样闪没
+  const paint = () => {
+    const inHtml = inList.length
+      ? inList.map((r) => item(r, `
+          <button class="im-minibtn" data-in-accept="${r.id}">同意</button>
+          <button class="im-minibtn warn" data-in-reject="${r.id}">拒绝</button>`, '想加你为好友')).join('')
+      : '<p class="im-hint">没有待处理的申请</p>';
+    const outHtml = outList.length
+      ? outList.map((r) => item(r, `<button class="im-minibtn warn" data-out-cancel="${r.id}">撤回</button>`, '等待对方处理')).join('')
+      : '<p class="im-hint">没有发出的申请</p>';
+    body.innerHTML = `
+      <div class="im-sec-label">收到的申请</div>${inHtml}
+      <div class="im-sec-label">发出的申请</div>${outHtml}`;
+    bind();
+  };
+  const bind = () => {
+    body.querySelectorAll('[data-in-accept]').forEach((b) => b.addEventListener('click', async () => {
+      const r = await POST(`/api/friends/requests/${b.dataset.inAccept}/accept`);
+      if (!r.ok) { alert('操作失败（' + r.error + '）'); return; }
+      inList = inList.filter((x) => String(x.id) !== b.dataset.inAccept);
+      ctx.pendingIn = inList.length;
+      paint();
+    }));
+    body.querySelectorAll('[data-in-reject]').forEach((b) => b.addEventListener('click', async () => {
+      const r = await POST(`/api/friends/requests/${b.dataset.inReject}/reject`);
+      if (!r.ok) { alert('操作失败（' + r.error + '）'); return; }
+      inList = inList.filter((x) => String(x.id) !== b.dataset.inReject);
+      ctx.pendingIn = inList.length;
+      paint();
+    }));
+    body.querySelectorAll('[data-out-cancel]').forEach((b) => b.addEventListener('click', async () => {
+      const r = await DEL(`/api/friends/requests/${b.dataset.outCancel}`);
+      if (!r.ok) { alert('操作失败（' + r.error + '）'); return; }
+      outList = outList.filter((x) => String(x.id) !== b.dataset.outCancel);
+      paint();
+    }));
+  };
+  paint();
 }
 
 /* ---------------- 子页：添加好友（精确搜索） ---------------- */
@@ -191,12 +207,10 @@ async function renderAddPage(sideEl, ctx) {
           <b>${esc(u.display_name)}</b>
           <span>${esc(u.bio || '')}</span>
         </div>
-        <code class="im-fp" id="add-fp"></code>
       </div>
-      <label class="im-f"><span>附言（可选，≤100 字）</span><input id="add-note" maxlength="100" placeholder="我是…"></label>
+      <label class="im-f im-f-note"><span>附言（可选，≤100 字）</span><textarea id="add-note" maxlength="100" rows="2" placeholder="介绍自己，让对方知道你是谁…"></textarea></label>
       <button class="im-primary" id="add-send">发送好友申请</button>
       <p class="im-msg" id="add-send-msg"></p>`;
-    fingerprint(u.pub_key).then((fp) => { body.querySelector('#add-fp').textContent = fp; });
     body.querySelector('#add-send').addEventListener('click', async () => {
       const sm = body.querySelector('#add-send-msg');
       const r = await POST('/api/friends/requests', { uid: u.id, message: body.querySelector('#add-note').value.trim() });

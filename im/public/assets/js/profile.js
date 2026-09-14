@@ -6,7 +6,7 @@
  */
 
 import { POST, PATCH } from './api.js';
-import { esc, avatarHtml, fingerprint } from './ui.js';
+import { esc, avatarHtml } from './ui.js';
 import { icon } from './icons.js';
 
 /* ---------------- 个人资料（头像入口） ---------------- */
@@ -149,7 +149,6 @@ function renderEmailBox(box, ctx) {
 export async function renderSettings(root, ctx) {
   const me = ctx.me;
   const localId = ctx.identity;
-  const fp = await fingerprint(me.pub_key);
   const keyState = localId && localId.uid === me.uid
     ? '<span class="im-badge ok">本机密钥已解锁，消息可正常收发</span>'
     : '<span class="im-badge warn">本机未解锁密钥：退出后重新登录并输入密码以恢复（消息暂不可读/不可发）</span>';
@@ -161,7 +160,7 @@ export async function renderSettings(root, ctx) {
         <section class="im-set-card">
           <h3>加密</h3>
           <dl class="im-kv">
-            <dt>方式</dt><dd>端到端加密（ECDH P-256 + AES-256-GCM）</dd>
+            <dt>方式</dt><dd>端到端加密</dd>
             <dt>密码备份</dt><dd>${me.has_backup ? '已开启（换设备可用密码恢复）' : '未开启'}</dd>
           </dl>
           <p class="im-msg" style="margin-top:12px">${keyState}</p>
@@ -170,7 +169,6 @@ export async function renderSettings(root, ctx) {
           <h3>关于</h3>
           <dl class="im-kv">
             <dt>注册时间</dt><dd>${esc(String(me.created_at || '').replace('T', ' ').slice(0, 16))} UTC</dd>
-            <dt>公钥指纹</dt><dd><code>${fp}</code></dd>
           </dl>
         </section>
         <button class="im-ghostbtn" id="pf-logout">${icon('logout', 16)} 退出登录</button>

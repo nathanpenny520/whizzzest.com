@@ -86,7 +86,8 @@ async function handlePage(request, env, path) {
     if (!user) return redirect('/');
     return html(appShellHtml());
   }
-  if (user) return redirect('/app');
+  // 仅 / 登录页对已登录态跳 /app；/register 恒出注册表单（业主反馈：已登录点「注册焰境密语」不该像自动登录）
+  if (user && path === '/') return redirect('/app');
   if (path === '/register') {
     return html(authPage(PORTAL_UI, {
       titleTag: '注册',

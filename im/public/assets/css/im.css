@@ -392,12 +392,13 @@ button { font-family: inherit; }
 .im-unreadline::before, .im-unreadline::after { content: ''; flex: 1; height: 1px; background: var(--accent-dim); }
 
 /* 气泡 */
-.im-msgrow { display: flex; margin-bottom: 9px; max-width: 72%; }
+/* 限宽 72% 加在气泡/包裹层而非整行：行宽被压 72% 时 justify-content:flex-end 只能靠到 72% 处，己方消息贴不到右边 */
+.im-msgrow { display: flex; margin-bottom: 9px; }
 .im-msgrow.mine { justify-content: flex-end; }
 .im-msgrow.theirs { justify-content: flex-start; }
 .im-msgrow.theirs.grp { gap: 8px; align-items: flex-end; }
 .im-msgrow .im-mav { flex: 0 0 auto; margin-bottom: 2px; }
-.im-bwrap { min-width: 0; max-width: 100%; }
+.im-bwrap { min-width: 0; max-width: 72%; }
 
 .im-sender { font-size: 12px; font-weight: 600; margin: 0 0 3px 6px; }
 
@@ -413,7 +414,7 @@ button { font-family: inherit; }
   max-width: 100%;
 }
 .im-msgrow.theirs .im-bubble { background: var(--bubble-in); color: var(--ink); border-bottom-left-radius: 3px; }
-.im-msgrow.mine .im-bubble { background: var(--bubble-out); color: var(--on-out); border-bottom-right-radius: 3px; }
+.im-msgrow.mine .im-bubble { background: var(--bubble-out); color: var(--on-out); border-bottom-right-radius: 3px; max-width: 72%; }
 .im-msgrow.theirs .im-bubble::before {
   content: '';
   position: absolute; left: -7px; bottom: 0;
@@ -631,7 +632,8 @@ button { font-family: inherit; }
 /* ============ 表单 ============ */
 
 .im-f { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; font-size: 13px; color: var(--ink-2); }
-.im-f input {
+.im-f input,
+.im-f textarea {
   border: 1px solid transparent;
   border-radius: 10px;
   padding: 10px 12px;
@@ -640,8 +642,13 @@ button { font-family: inherit; }
   background: var(--panel-hi);
   outline: none;
 }
-.im-f input:focus { border-color: var(--accent-dim); }
-.im-f input::placeholder { color: var(--ink-3); }
+.im-f textarea { min-height: 56px; resize: none; line-height: 1.55; }
+.im-f input:focus,
+.im-f textarea:focus { border-color: var(--accent-dim); }
+.im-f input::placeholder,
+.im-f textarea::placeholder { color: var(--ink-3); }
+/* 附言等需要用户主动填写的字段：标签提亮加粗，避免被当成纯展示文字 */
+.im-f-note > span { color: var(--ink); font-weight: 600; }
 
 .im-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
 .im-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
