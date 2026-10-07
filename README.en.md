@@ -244,7 +244,7 @@ Private keys are generated on-device and never leave it (ECDH P-256), wrapped by
 **Requirements**: Node.js 22 (same as CI); optional Wrangler CLI for local Worker debugging
 
 ```bash
-git clone https://github.com/nathanpenny520/whizzzest.com.git
+git clone https://github.com/pan-nie/whizzzest.com.git
 cd whizzzest.com
 
 npm install        # only sharp (build-time WebP); the build works without it

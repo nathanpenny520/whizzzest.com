@@ -244,7 +244,7 @@ manifest + Service Worker 双件套，构建期注入资源清单与脏戳；音
 **环境要求**：Node.js 22（与 CI 一致）；可选 Wrangler CLI（本地 Worker 调试）
 
 ```bash
-git clone https://github.com/nathanpenny520/whizzzest.com.git
+git clone https://github.com/pan-nie/whizzzest.com.git
 cd whizzzest.com
 
 npm install        # 仅 sharp（构建期 WebP 优化）；不装也能构建
