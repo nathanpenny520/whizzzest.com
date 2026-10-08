@@ -132,7 +132,7 @@ def main():
             "contact": f.get("contact", "联系我们"),
             "friendLinks": [
                 {"label": f.get("wanzaiGov", "万载县人民政府"), "href": "http://www.wanzai.gov.cn/"},
-                {"label": "作者个人主页", "href": "https://nathanpenny.fun"},
+                {"label": "作者个人主页", "href": "https://pan-nie.github.io"},
             ],
             "copyright": f.get("copyright", ""),
             "icpLines": [f["icp"]] if f.get("icp") else [],
